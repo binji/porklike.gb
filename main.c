@@ -25,8 +25,12 @@ void sigwall(u8* pos);
 void sigempty(u8* pos);
 u8 sigmatch(u8* pos, u8* sig, u8* mask, u8 len);
 void append_region(u8 x, u8 y, u8 w, u8 h);
-u8* getpos(u8* map, u8 x, u8 y);
+u16 getpos(u8 x, u8 y);
+void ds_union(u8 x, u8 y);
+u8 ds_find(u8 id);
 u8 randint(u8 mx);
+
+typedef u8 Map[18*18];
 
 typedef struct Region {
   u8 x, y, w, h;
@@ -37,12 +41,22 @@ typedef struct Room {
 } Room;
 
 u8 key;
-u8 tmap[18*18];
-u8 roommap[18*18];
-u8 sigmap[18*18];
-u8 tempmap[18*18];
+Map tmap;    // Tile map
+Map roommap; // Room map
+Map sigmap;  // Signature map (tracks neighbors)
+Map tempmap; // Temp map (used for carving)
 u8 cands[22];
 u8 num_cands;
+
+// The following data structures is used for rooms as well as union-find
+// algorithm; see https://en.wikipedia.org/wiki/Disjoint-set_data_structure
+// XXX can be much smaller
+Map ds_sets; // TODO seems like it should be possible to put this in roommap
+u8 ds_parents[64];
+u8 ds_sizes[64];
+u8 ds_nextid;
+u8 ds_num_sets;
+
 
  // TODO: I think 22 is max for 4 rooms...
 Region regions[22], *region_end, *new_region_end;
@@ -95,12 +109,16 @@ void roomgen(void) {
   u8 x, y, w, h;
   u8 regl, regr, regt, regb, regw, regh;
   u8 rooml, roomr, roomt, roomb;
-  u8* pos;
+  u16 pos;
 
   blankmap(tmap, 255, 2);
   memset(roommap, 0, sizeof(roommap));
   blankmap(sigmap, 255, 255);
+  blankmap(ds_sets, 0, 0);
 
+  ds_nextid = 0;
+  ds_parents[0] = 0;
+  ds_num_sets = 0;
   num_rooms = 0;
 
   regions[0].x = regions[0].y = 1; regions[0].w = regions[0].h = 16;
@@ -211,10 +229,17 @@ void roomgen(void) {
       region_end = new_region_end;
 
       // Fill room tiles at x, y
-      pos = getpos(tmap, x, y);
-      mapset(pos, w, h, 1);
-      mapset(roommap + (pos - tmap), w, h, ++num_rooms);
-      sigrect_empty(sigmap + (pos - tmap), w, h);
+      pos = getpos(x, y);
+      mapset(tmap + pos, w, h, 1);
+      mapset(roommap + pos, w, h, ++num_rooms);
+      sigrect_empty(sigmap + pos, w, h);
+
+      // Update union find regions; we know that they're disjoint so they each
+      // get their own region id (i.e. the room number)
+      mapset(ds_sets + pos, w, h, ++ds_nextid);
+      ds_parents[ds_nextid] = ds_nextid;
+      ds_sizes[ds_nextid] = w * h; // XXX multiply
+      ++ds_num_sets;
 
       if (num_rooms == 1) {
         maxwidth >>= 1;
@@ -237,6 +262,7 @@ void mazeworms(void) {
   u8 cand;
 
   memset(tempmap, 0, sizeof(tempmap));
+
   // Find all candidates for worm start position
   num_cands = 0;
   pos = 19;
@@ -253,7 +279,19 @@ void mazeworms(void) {
         if (tempmap[pos] == 2 && cand-- == 0) { break; }
       } while(++pos < 305);
 
+      ++ds_nextid;
+      ++ds_num_sets;
+      ds_parents[ds_nextid] = ds_nextid;
+      ds_sizes[ds_nextid] = 0;
+
       digworm(pos);
+
+      // The first spot may be connected to another empty square, no other
+      // square can be "carvable". So we only need to merge regions here.
+      ds_union(ds_nextid, ds_sets[pos - 18]);
+      ds_union(ds_nextid, ds_sets[pos - 1]);
+      ds_union(ds_nextid, ds_sets[pos + 1]);
+      ds_union(ds_nextid, ds_sets[pos + 18]);
     }
   } while(num_cands > 1);
 }
@@ -268,6 +306,9 @@ void digworm(u16 pos) {
     tmap[pos] = 1;          // Set tile to empty.
     sigempty(sigmap + pos); // Update neighbor signatures.
     carve9(pos);            // Update neighbors "cancarve" table.
+
+    ds_sets[pos] = ds_nextid;
+    ++ds_sizes[ds_nextid];
 
     // Continue in the current direction, unless we can't carve. Also randomly
     // change direction after 3 or more steps.
@@ -386,11 +427,40 @@ u8 sigmatch(u8* pos, u8* sig, u8* mask, u8 len) {
   return 0;
 }
 
-u8* getpos(u8* map, u8 x, u8 y) {
-  u8* result = map;
+u16 getpos(u8 x, u8 y) {
+  u16 result = 0;
   do { result += 18; } while (--y);
   do { ++result; } while (--x);
   return result;
+}
+
+void ds_union(u8 x, u8 y) {
+  x = ds_find(x);
+  if (!x) return;  // TODO: remove this since x is always called w/ valid id
+
+  y = ds_find(y);
+  if (!y) return;
+
+  if (x == y) return;
+
+  if (ds_sizes[x] < ds_sizes[y]) {
+    u8 t = x;
+    x = y;
+    y = t;
+  }
+
+  ds_parents[y] = x;
+  ds_sizes[x] = ds_sizes[x] + ds_sizes[y];
+  --ds_num_sets;
+}
+
+u8 ds_find(u8 x) {
+  // Use path-halving as described in
+  // https://en.wikipedia.org/wiki/Disjoint-set_data_structure
+  while (x != ds_parents[x]) {
+    x = ds_parents[x] = ds_parents[ds_parents[x]];
+  }
+  return x;
 }
 
 u8 randint(u8 mx) {
