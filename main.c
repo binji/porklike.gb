@@ -18,6 +18,9 @@ void digworm(u16 pos);
 u8 nexttoroom(u16 pos);
 void update_carve1(u16 pos);
 void carve9(u16 pos);
+void carvedoors(void);
+void update_door1(u16 pos);
+void door9(u16 pos);
 void blankmap(u8* map, u8 border, u8 def);
 void mapset(u8* pos, u8 w, u8 h, u8 val);
 void sigrect_empty(u8* pos, u8 w, u8 h);
@@ -26,7 +29,7 @@ void sigempty(u8* pos);
 u8 sigmatch(u8* pos, u8* sig, u8* mask, u8 len);
 void append_region(u8 x, u8 y, u8 w, u8 h);
 u16 getpos(u8 x, u8 y);
-void ds_union(u8 x, u8 y);
+u8 ds_union(u8 x, u8 y);
 u8 ds_find(u8 id);
 u8 randint(u8 mx);
 
@@ -101,6 +104,7 @@ const u8 other_dim[] = {11, 8, 7, 5, 5, 4, 3, 3};
 void mapgen(void) {
   roomgen();
   mazeworms();
+  carvedoors();
 }
 
 void roomgen(void) {
@@ -234,8 +238,8 @@ void roomgen(void) {
       mapset(roommap + pos, w, h, ++num_rooms);
       sigrect_empty(sigmap + pos, w, h);
 
-      // Update union find regions; we know that they're disjoint so they each
-      // get their own region id (i.e. the room number)
+      // Update disjoint set regions; we know that they're disjoint so they
+      // each get their own region id (i.e. the room number)
       mapset(ds_sets + pos, w, h, ++ds_nextid);
       ds_parents[ds_nextid] = ds_nextid;
       ds_sizes[ds_nextid] = w * h; // XXX multiply
@@ -279,6 +283,7 @@ void mazeworms(void) {
         if (tempmap[pos] == 2 && cand-- == 0) { break; }
       } while(++pos < 305);
 
+      // Update the disjoint set with this new region.
       ++ds_nextid;
       ++ds_num_sets;
       ds_parents[ds_nextid] = ds_nextid;
@@ -286,8 +291,9 @@ void mazeworms(void) {
 
       digworm(pos);
 
-      // The first spot may be connected to another empty square, no other
-      // square can be "carvable". So we only need to merge regions here.
+      // Only the first spot may be connected to another empty tile. No other
+      // tile can be connect to another region (since it would not be
+      // carvable). So we only need to merge regions here.
       ds_union(ds_nextid, ds_sets[pos - 18]);
       ds_union(ds_nextid, ds_sets[pos - 1]);
       ds_union(ds_nextid, ds_sets[pos + 1]);
@@ -363,6 +369,85 @@ void carve9(u16 pos) {
   update_carve1(pos+19);
 }
 
+const u8 doorsig[] = {192, 48};
+const u8 doormask[] = {15, 15};
+
+void carvedoors(void) {
+  u16 pos, diff;
+  u8 cand, match;
+
+  pos = 19;
+  num_cands = 0;
+  do {
+    update_door1(pos);
+  } while(++pos < 305);
+
+  do {
+    // Pick a random door, and calculate its position.
+    cand = randint(num_cands);
+    pos = 19;
+
+    do {
+      if (tempmap[pos] && cand-- == 0) { break; }
+    } while (++pos < 305);
+
+    // Merge the regions, if possible. They may be already part of the same
+    // set, in which case they should not be joined.
+    match = sigmatch(sigmap + pos, doorsig, doormask, sizeof(doorsig));
+    diff = match == 1 ? 18 : 1; // 1: horizontal, 2: vertical
+    if (ds_union(ds_sets[pos - diff], (ds_sets[pos] = ds_sets[pos + diff]))) {
+      // Insert an empty tile to connect the regions
+      tmap[pos] = 1;
+      sigempty(sigmap + pos); // Update neighbor signatures.
+      door9(pos);
+    } else {
+      tempmap[pos] = 0;
+      --num_cands;
+    }
+  } while (num_cands);
+}
+
+void update_door1(u16 pos) {
+  u16 diff;
+  u8 tile = tmap[pos];
+  // A door connects two regions in the following patterns:
+  //   * 0 *   * 1 *
+  //   1   1   0   0
+  //   * 0 *   * 1 *
+  //
+  // Where 1s are walls and 0s are not. The `match` index returns whether it is
+  // a horizontal door or vertical. A door is only allowed between two regions
+  // that are not already connected. We use the disjoint set to determine this
+  // quickly below.
+  u8 match = sigmatch(sigmap + pos, doorsig, doormask, sizeof(doorsig));
+  u8 result = (tile != 255 && (flags_bin[tile] & 1) && match);
+  if (result) {
+    diff = match == 1 ? 18 : 1; // 1: horizontal, 2: vertical
+    if (ds_find(ds_sets[pos + diff]) == ds_find(ds_sets[pos - diff])) {
+      result = 0;
+      if (tempmap[pos]) {
+        --num_cands;
+      }
+    } else if (!tempmap[pos]) {
+      ++num_cands;
+    }
+  }
+  tempmap[pos] = result;
+}
+
+void door9(u16 pos) {
+  --num_cands;
+  tempmap[pos] = 0;
+  update_door1(pos-19);
+  update_door1(pos-18);
+  update_door1(pos-17);
+  update_door1(pos-1);
+  update_door1(pos+1);
+  update_door1(pos+17);
+  update_door1(pos+18);
+  update_door1(pos+19);
+}
+
 void append_region(u8 x, u8 y, u8 w, u8 h) {
   new_region_end->x = x;
   new_region_end->y = y;
@@ -434,14 +519,14 @@ u16 getpos(u8 x, u8 y) {
   return result;
 }
 
-void ds_union(u8 x, u8 y) {
+u8 ds_union(u8 x, u8 y) {
   x = ds_find(x);
-  if (!x) return;  // TODO: remove this since x is always called w/ valid id
+  if (!x) return 0;  // TODO: remove this since x is always called w/ valid id
 
   y = ds_find(y);
-  if (!y) return;
+  if (!y) return 0;
 
-  if (x == y) return;
+  if (x == y) return 0;
 
   if (ds_sizes[x] < ds_sizes[y]) {
     u8 t = x;
@@ -452,6 +537,7 @@ void ds_union(u8 x, u8 y) {
   ds_parents[y] = x;
   ds_sizes[x] = ds_sizes[x] + ds_sizes[y];
   --ds_num_sets;
+  return 1;
 }
 
 u8 ds_find(u8 x) {
@@ -465,7 +551,7 @@ u8 ds_find(u8 x) {
 
 u8 randint(u8 mx) {
   if (mx == 0) { return 0; }
-  u8 mask = 0, mx2 = mx;
+  u8 mask = 1, mx2 = mx;
   do {
     mask <<= 1;
     mask |= 1;
