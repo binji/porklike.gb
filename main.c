@@ -11,7 +11,8 @@ extern const u8 tiles_bg_2bpp[];
 extern const u8 map_bin[];
 extern const u8 flags_bin[];
 
-const u16 dirpos[] = {0xffff, 1, 0xffee, 18};
+const u8 dirpos[]   = {0xff, 1, 0xf0, 16};  // L R U D
+const u8 dirvalid[] = {0b01000000,0b10000000,0b00010000,0b00100000};
 
 const u8 carvesig[] = {255, 214, 124, 179, 233};
 const u8 carvemask[] = {0, 9, 3, 12, 6};
@@ -21,29 +22,59 @@ const u8 doormask[] = {15, 15};
 // floor(35 / x) for x in [3,10]
 const u8 other_dim[] = {11, 8, 7, 5, 5, 4, 3, 3};
 
+// 2 4 1
+// 6   7
+// 3 5 0
+
+// 1010 0001 UL
+// 1110 1001 U
+// 0110 1000 UR
+// 1011 0011 L
+// 1111 1111 M
+// 0111 1100 R
+// 1001 0010 BL
+// 1101 0110 B
+// 0101 0100 BR
+const u8 validmap[] = {
+  0xa1,0xe9,0xe9,0xe9,0xe9,0xe9,0xe9,0xe9,0xe9,0xe9,0xe9,0xe9,0xe9,0xe9,0xe9,0x68,
+  0xb3,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0x7c,
+  0xb3,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0x7c,
+  0xb3,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0x7c,
+  0xb3,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0x7c,
+  0xb3,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0x7c,
+  0xb3,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0x7c,
+  0xb3,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0x7c,
+  0xb3,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0x7c,
+  0xb3,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0x7c,
+  0xb3,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0x7c,
+  0xb3,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0x7c,
+  0xb3,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0x7c,
+  0xb3,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0x7c,
+  0xb3,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0x7c,
+  0x92,0xd6,0xd6,0xd6,0xd6,0xd6,0xd6,0xd6,0xd6,0xd6,0xd6,0xd6,0xd6,0xd6,0xd6,0x54,
+};
+
 void mapgen(void);
 void roomgen(void);
 void mazeworms(void);
-void digworm(u16 pos);
-u8 nexttoroom(u16 pos);
-void update_carve1(u16 pos);
+void update_carve1(u8 pos);
+u8 nexttoroom(u8 pos, u8 valid);
+u8 isvaliddir(u8 pos, u8 dir);
+void digworm(u8 pos);
 void carvedoors(void);
 void update_door1(u16 pos);
 void door9(u16 pos);
 void carvecuts(void);
 void append_region(u8 x, u8 y, u8 w, u8 h);
-void blankmap(u8* map, u8 border, u8 def);
 void mapset(u8* pos, u8 w, u8 h, u8 val);
-void sigrect_empty(u8* pos, u8 w, u8 h);
-void sigwall(u8* pos);
-void sigempty(u8* pos);
+void sigrect_empty(u8 pos, u8 w, u8 h);
+void sigempty(u8 pos);
 u8 sigmatch(u16 pos, u8* sig, u8* mask, u8 len);
-u16 getpos(u8 x, u8 y);
 u8 ds_union(u8 x, u8 y);
 u8 ds_find(u8 id);
 u8 randint(u8 mx);
 
-typedef u8 Map[18*18];
+typedef u8 Map[16*16];
 
 typedef struct Region {
   u8 x, y, w, h;
@@ -53,7 +84,6 @@ typedef struct Room {
   u8 x, y, w, h;
 } Room;
 
-u8 key;
 Map tmap;    // Tile map
 Map roommap; // Room map
 Map sigmap;  // Signature map (tracks neighbors)
@@ -77,6 +107,7 @@ u8 num_rooms;
 
 u8 cands[256];
 u8 num_cands;
+u8 key;
 
 void main(void) {
   disable_interrupts();
@@ -88,7 +119,7 @@ void main(void) {
   init_bkg(0);
   mapgen();
 
-  set_bkg_submap(0, 0, 16, 16, tmap + 19, 18); // TODO: buggy w/ non-zero x, y
+  set_bkg_tiles(0, 0, 16, 16, tmap);
 
   LCDC_REG = 0b10000001;  // display on, bg on
   enable_interrupts();
@@ -101,7 +132,7 @@ void main(void) {
       disable_interrupts();
       DISPLAY_OFF;
       mapgen();
-      set_bkg_submap(0, 0, 16, 16, tmap + 19, 18);
+      set_bkg_tiles(0, 0, 16, 16, tmap);
       LCDC_REG = 0b10000001;  // display on, bg on
       enable_interrupts();
     }
@@ -125,10 +156,10 @@ void roomgen(void) {
   u8 rooml, roomr, roomt, roomb;
   u16 pos;
 
-  blankmap(tmap, 255, 2);
+  memset(tmap, 2, sizeof(tmap));
   memset(roommap, 0, sizeof(roommap));
-  blankmap(sigmap, 255, 255);
-  blankmap(ds_sets, 0, 0);
+  memset(sigmap, 255, sizeof(sigmap));
+  memset(ds_sets, 0, sizeof(ds_sets));
 
   ds_nextid = 0;
   ds_parents[0] = 0;
@@ -243,10 +274,10 @@ void roomgen(void) {
       region_end = new_region_end;
 
       // Fill room tiles at x, y
-      pos = getpos(x, y);
+      pos = ((y - 1) << 4) | (x - 1);
       mapset(tmap + pos, w, h, 1);
       mapset(roommap + pos, w, h, ++num_rooms);
-      sigrect_empty(sigmap + pos, w, h);
+      sigrect_empty(pos, w, h);
 
       // Update disjoint set regions; we know that they're disjoint so they
       // each get their own region id (i.e. the room number)
@@ -267,26 +298,25 @@ void roomgen(void) {
 }
 
 void mazeworms(void) {
-  u16 pos;
-  u8 cand;
+  u8 pos, cand, valid;
 
   memset(tempmap, 0, sizeof(tempmap));
 
   // Find all candidates for worm start position
   num_cands = 0;
-  pos = 19;
+  pos = 0;
   do {
     update_carve1(pos);
-  } while(++pos < 305);
+  } while(++pos);
 
   do {
     if (num_cands) {
       // Choose a random start, and calculate its offset
       cand = randint(num_cands);
-      pos = 19;
+      pos = 0;
       do {
         if (tempmap[pos] == 2 && cand-- == 0) { break; }
-      } while(++pos < 305);
+      } while(++pos);
 
       // Update the disjoint set with this new region.
       ++ds_nextid;
@@ -299,37 +329,67 @@ void mazeworms(void) {
       // Only the first spot may be connected to another empty tile. No other
       // tile can be connect to another region (since it would not be
       // carvable). So we only need to merge regions here.
-      ds_union(ds_nextid, ds_sets[pos - 18]);
-      ds_union(ds_nextid, ds_sets[pos - 1]);
-      ds_union(ds_nextid, ds_sets[pos + 1]);
-      ds_union(ds_nextid, ds_sets[pos + 18]);
+      valid = validmap[pos];
+      if (valid & 0b00010000) { ds_union(ds_nextid, ds_sets[pos-16]); }
+      if (valid & 0b01000000) { ds_union(ds_nextid, ds_sets[pos- 1]); }
+      if (valid & 0b10000000) { ds_union(ds_nextid, ds_sets[pos+ 1]); }
+      if (valid & 0b00100000) { ds_union(ds_nextid, ds_sets[pos+16]); }
     }
   } while(num_cands > 1);
 }
 
-void digworm(u16 pos) {
-  u8 dir, step, num_dirs;
+void update_carve1(u8 pos) {
+  u8 valid = validmap[pos];
+  u8 result;
+  if ((flags_bin[tmap[pos]] & 1) &&
+      sigmatch(pos, carvesig, carvemask, sizeof(carvesig))) {
+    result = 1;
+    if (!nexttoroom(pos, valid)) {
+      ++result;
+      if (tempmap[pos] != 2) { ++num_cands; }
+    }
+  } else {
+    result = 0;
+    if (tempmap[pos] == 2) { --num_cands; }
+  }
+  tempmap[pos] = result;
+}
+
+u8 nexttoroom(u8 pos, u8 valid) {
+  return ((valid & 0b00010000) && roommap[(u8)(pos-16)]) ||
+         ((valid & 0b01000000) && roommap[(u8)(pos- 1)]) ||
+         ((valid & 0b10000000) && roommap[(u8)(pos+ 1)]) ||
+         ((valid & 0b00100000) && roommap[(u8)(pos+16)]);
+}
+
+u8 isvaliddir(u8 pos, u8 dir) {
+  return (validmap[pos] & dirvalid[dir]) && tempmap[(u8)(pos + dirpos[dir])];
+}
+
+void digworm(u8 pos) {
+  u8 dir, step, num_dirs, valid;
 
   // Pick a random direction
   dir = rand() & 3;
   step = 0;
   do {
-    tmap[pos] = 1;          // Set tile to empty.
-    sigempty(sigmap + pos); // Update neighbor signatures.
+    tmap[pos] = 1; // Set tile to empty.
+    sigempty(pos); // Update neighbor signatures.
 
     // Remove this tile from the carvable map
     if (tempmap[pos] == 2) { --num_cands; }
     tempmap[pos] = 0;
 
     // Update neighbors
-    update_carve1(pos-19);
-    update_carve1(pos-18);
-    update_carve1(pos-17);
-    update_carve1(pos-1);
-    update_carve1(pos+1);
-    update_carve1(pos+17);
-    update_carve1(pos+18);
-    update_carve1(pos+19);
+    valid = validmap[pos];
+    if (valid & 0b00000100) { update_carve1((u8)(pos-17)); }
+    if (valid & 0b00010000) { update_carve1((u8)(pos-16)); }
+    if (valid & 0b00000010) { update_carve1((u8)(pos-15)); }
+    if (valid & 0b01000000) { update_carve1((u8)(pos- 1)); }
+    if (valid & 0b10000000) { update_carve1((u8)(pos+ 1)); }
+    if (valid & 0b00001000) { update_carve1((u8)(pos+15)); }
+    if (valid & 0b00100000) { update_carve1((u8)(pos+16)); }
+    if (valid & 0b00000001) { update_carve1((u8)(pos+17)); }
 
     // Update the disjoint set
     ds_sets[pos] = ds_nextid;
@@ -337,11 +397,11 @@ void digworm(u16 pos) {
 
     // Continue in the current direction, unless we can't carve. Also randomly
     // change direction after 3 or more steps.
-    if (!(tempmap[pos + dirpos[dir]]) || ((rand() & 1) && step > 2)) {
+    if (!isvaliddir(pos, dir) || ((rand() & 1) && step > 2)) {
       step = 0;
       num_dirs = 0;
       for (dir = 0; dir < 4; ++dir) {
-        if (tempmap[pos + dirpos[dir]]) {
+        if (isvaliddir(pos, dir)) {
           cands[num_dirs++] = dir;
         }
       }
@@ -353,66 +413,43 @@ void digworm(u16 pos) {
   } while(1);
 }
 
-u8 nexttoroom(u16 pos) {
-  return roommap[pos - 18] || roommap[pos - 1] || roommap[pos + 1] ||
-         roommap[pos + 18];
-}
-
-void update_carve1(u16 pos) {
-  u8 result;
-  u8 tile = tmap[pos];
-  if ((flags_bin[tile] & 1) && tile != 255 &&
-      sigmatch(pos, carvesig, carvemask, sizeof(carvesig))) {
-    result = 1;
-    if (!nexttoroom(pos)) {
-      ++result;
-      if (tempmap[pos] != 2) { ++num_cands; }
-    }
-  } else {
-    result = 0;
-    if (tempmap[pos] == 2) { --num_cands; }
-  }
-  tempmap[pos] = result;
-}
-
 void carvedoors(void) {
-  u16 pos;
-  u8 cand, match, diff;
+  u8 pos, cand, match, diff, valid;
 
-  pos = 19;
+  pos = 0;
   num_cands = 0;
   do {
     update_door1(pos);
-  } while(++pos < 305);
+  } while(++pos);
 
   do {
     // Pick a random door, and calculate its position.
     cand = randint(num_cands);
-    pos = 19;
-
+    pos = 0;
     do {
       if (tempmap[pos] && cand-- == 0) { break; }
-    } while (++pos < 305);
+    } while (++pos);
 
     // Merge the regions, if possible. They may be already part of the same
     // set, in which case they should not be joined.
     match = sigmatch(pos, doorsig, doormask, sizeof(doorsig));
-    diff = match == 1 ? 18 : 1; // 1: horizontal, 2: vertical
+    diff = match == 1 ? 16 : 1; // 1: horizontal, 2: vertical
     if (ds_union(ds_sets[pos - diff], ds_sets[pos + diff])) {
       // Insert an empty tile to connect the regions
       ds_sets[pos] = ds_sets[pos + diff];
       tmap[pos] = 1;
-      sigempty(sigmap + pos); // Update neighbor signatures.
+      sigempty(pos); // Update neighbor signatures.
 
       // Remove this tile from the carvable map
       --num_cands;
       tempmap[pos] = 0;
 
       // Update neighbors
-      update_door1(pos-18);
-      update_door1(pos-1);
-      update_door1(pos+1);
-      update_door1(pos+18);
+      valid = validmap[pos];
+      if (valid & 0b00010000) { update_door1(pos-16); }
+      if (valid & 0b01000000) { update_door1(pos-1); }
+      if (valid & 0b10000000) { update_door1(pos+1); }
+      if (valid & 0b00100000) { update_door1(pos+16); }
     } else {
       tempmap[pos] = 0;
       --num_cands;
@@ -432,9 +469,9 @@ void update_door1(u16 pos) {
   // that are not already connected. We use the disjoint set to determine this
   // quickly below.
   u8 match = sigmatch(pos, doorsig, doormask, sizeof(doorsig));
-  u8 result = (tile != 255 && (flags_bin[tile] & 1) && match);
+  u8 result = (flags_bin[tile] & 1) && match;
   if (result) {
-    diff = match == 1 ? 18 : 1; // 1: horizontal, 2: vertical
+    diff = match == 1 ? 16 : 1; // 1: horizontal, 2: vertical
     if (ds_find(ds_sets[pos + diff]) == ds_find(ds_sets[pos - diff])) {
       result = 0;
       if (tempmap[pos]) {
@@ -448,30 +485,27 @@ void update_door1(u16 pos) {
 }
 
 void carvecuts(void) {
-  u16 pos;
-  u8 tile, match, result, cand;
+  u8 pos, tile, match, result, cand;
 
-  pos = 19;
+  pos = 0;
   do {
     tile = tmap[pos];
     match = sigmatch(pos, doorsig, doormask, sizeof(doorsig));
-    result = (tile != 255 && (flags_bin[tile] & 1) && match);
+    result = (flags_bin[tile] & 1) && match;
     if (result) {
       ++num_cands;
     }
     tempmap[pos] = result;
-  } while(++pos < 305);
+  } while(++pos);
 
   // Pick a random cut, and calculate its position.
   cand = randint(num_cands);
-  pos = 19;
-
+  pos = 0;
   do {
     if (tempmap[pos] && cand-- == 0) { break; }
-  } while (++pos < 305);
+  } while (++pos);
 
   tmap[pos] = 32;
-
   // TODO: how to calculate the distance table?
 }
 
@@ -483,11 +517,6 @@ void append_region(u8 x, u8 y, u8 w, u8 h) {
   ++new_region_end;
 }
 
-void blankmap(u8* map, u8 border, u8 def) {
-  memset(map, border, 18 * 18);  // set border
-  mapset(map + 19, 16, 16, def); // set inner
-}
-
 void mapset(u8* pos, u8 w, u8 h, u8 val) {
   u8 w2 = w;
   do {
@@ -495,12 +524,12 @@ void mapset(u8* pos, u8 w, u8 h, u8 val) {
     if (--w2 == 0) {
       w2 = w;
       --h;
-      pos += 18 - w;
+      pos += 16 - w;
     }
   } while (h);
 }
 
-void sigrect_empty(u8* pos, u8 w, u8 h) {
+void sigrect_empty(u8 pos, u8 w, u8 h) {
   u8 w2 = w;
   do {
     sigempty(pos);
@@ -509,20 +538,21 @@ void sigrect_empty(u8* pos, u8 w, u8 h) {
     if (--w2 == 0) {
       w2 = w;
       --h;
-      pos += 18 - w;
+      pos += 16 - w;
     }
   } while (h);
 }
 
-void sigempty(u8* pos) {
-  pos[-19] &= 0b11111011;
-  pos[-18] &= 0b11101111;
-  pos[-17] &= 0b11111101;
-  pos[-1]  &= 0b10111111;
-  pos[+1]  &= 0b01111111;
-  pos[+17] &= 0b11110111;
-  pos[+18] &= 0b11011111;
-  pos[+19] &= 0b11111110;
+void sigempty(u8 pos) {
+  u8 valid = validmap[pos];
+  if (valid & 0b00000100) { sigmap[(u8)(pos-17)] &= 0b11111011; }
+  if (valid & 0b00010000) { sigmap[(u8)(pos-16)] &= 0b11101111; }
+  if (valid & 0b00000010) { sigmap[(u8)(pos-15)] &= 0b11111101; }
+  if (valid & 0b01000000) { sigmap[(u8)(pos- 1)] &= 0b10111111; }
+  if (valid & 0b10000000) { sigmap[(u8)(pos+ 1)] &= 0b01111111; }
+  if (valid & 0b00001000) { sigmap[(u8)(pos+15)] &= 0b11110111; }
+  if (valid & 0b00100000) { sigmap[(u8)(pos+16)] &= 0b11011111; }
+  if (valid & 0b00000001) { sigmap[(u8)(pos+17)] &= 0b11111110; }
 }
 
 u8 sigmatch(u16 pos, u8* sig, u8* mask, u8 len) {
@@ -537,13 +567,6 @@ u8 sigmatch(u16 pos, u8* sig, u8* mask, u8 len) {
     ++result;
   } while(result < len);
   return 0;
-}
-
-u16 getpos(u8 x, u8 y) {
-  u16 result = 0;
-  do { result += 18; } while (--y);
-  do { ++result; } while (--x);
-  return result;
 }
 
 u8 ds_union(u8 x, u8 y) {
