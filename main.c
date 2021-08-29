@@ -92,13 +92,18 @@ void carvedoors(void);
 void update_door1(u8 pos);
 void carvecuts(void);
 void calcdist(u8 pos);
+void startend(void);
+void fillends(void);
+void update_fill1(u8 pos);
 void append_region(u8 x, u8 y, u8 w, u8 h);
 void mapset(u8* pos, u8 w, u8 h, u8 val);
 void sigrect_empty(u8 pos, u8 w, u8 h);
 void sigempty(u8 pos);
+void sigwall(u8 pos);
 u8 sigmatch(u16 pos, u8* sig, u8* mask, u8 len);
 u8 ds_union(u8 x, u8 y);
 u8 ds_find(u8 id);
+u8 getpos(u8 cand);
 u8 randint(u8 mx);
 
 typedef u8 Map[16*16];
@@ -173,6 +178,8 @@ void mapgen(void) {
   mazeworms();
   carvedoors();
   carvecuts();
+  startend();
+  fillends();
 }
 
 void roomgen(void) {
@@ -366,12 +373,11 @@ void mazeworms(void) {
 }
 
 void update_carve1(u8 pos) {
-  u8 valid = validmap[pos];
   u8 result;
   if ((flags_bin[tmap[pos]] & 1) &&
       sigmatch(pos, carvesig, carvemask, sizeof(carvesig))) {
     result = 1;
-    if (!nexttoroom(pos, valid)) {
+    if (!nexttoroom(pos, validmap[pos])) {
       ++result;
       if (tempmap[pos] != 2) { ++num_cands; }
     }
@@ -441,7 +447,7 @@ void digworm(u8 pos) {
 }
 
 void carvedoors(void) {
-  u8 pos, cand, match, diff;
+  u8 pos, match, diff;
 
   memset(tempmap, 0, sizeof(tempmap));
 
@@ -453,11 +459,7 @@ void carvedoors(void) {
 
   do {
     // Pick a random door, and calculate its position.
-    cand = randint(num_cands);
-    pos = 0;
-    do {
-      if (tempmap[pos] && cand-- == 0) { break; }
-    } while (++pos);
+    pos = getpos(randint(num_cands));;
 
     // Merge the regions, if possible. They may be already part of the same
     // set, in which case they should not be joined.
@@ -506,7 +508,7 @@ void update_door1(u8 pos) {
 }
 
 void carvecuts(void) {
-  u8 pos, cand, diff, match;
+  u8 pos, diff, match;
   u8 maxcuts = 3;
 
   num_cands = 0;
@@ -517,11 +519,7 @@ void carvecuts(void) {
 
   do {
     // Pick a random cut, and calculate its position.
-    cand = randint(num_cands);
-    pos = 0;
-    do {
-      if (tempmap[pos] && cand-- == 0) { break; }
-    } while (++pos);
+    pos = getpos(randint(num_cands));
 
     // Calculate distance from one side of the door to the other.
     match = sigmatch(pos, doorsig, doormask, sizeof(doorsig));
@@ -580,6 +578,78 @@ void calcdist(u8 pos) {
   } while (head != tail);
 }
 
+void startend(void) {
+  u8 pos, endpos;
+
+  // Pick a random walkable location
+  do {
+    endpos = rand();
+  } while (flags_bin[tmap[endpos]] & 1);
+
+  calcdist(endpos);
+
+  u8 startpos = 0, max = 0;
+  // Find the furthest point from endpos.
+  pos = 0;
+  do {
+    if (distmap[pos] > max) {
+      startpos = pos;
+      max = distmap[pos];
+    }
+  } while(++pos);
+
+  tmap[startpos] = 32; // XXX
+}
+
+void fillends(void) {
+  u8 pos, valid;
+  memset(tempmap, 0, sizeof(tempmap));
+
+  // Find all starting positions (dead ends)
+  num_cands = 0;
+  pos = 0;
+  do {
+    update_fill1(pos);
+  } while(++pos);
+
+  do {
+    if (num_cands) {
+      // Choose a random point, and calculate its offset
+      pos = getpos(randint(num_cands));
+
+      tmap[pos] = 2; // Set tile to wall
+      sigwall(pos);  // Update neighbor signatures.
+
+      // Remove this cell from the dead end map
+      --num_cands;
+      tempmap[pos] = 0;
+
+      valid = validmap[pos];
+      if (valid & VALID_UL) { update_fill1(DIR_UL(pos)); }
+      if (valid & VALID_U)  { update_fill1(DIR_U (pos)); }
+      if (valid & VALID_UR) { update_fill1(DIR_UR(pos)); }
+      if (valid & VALID_L)  { update_fill1(DIR_L (pos)); }
+      if (valid & VALID_R)  { update_fill1(DIR_R (pos)); }
+      if (valid & VALID_DL) { update_fill1(DIR_DL(pos)); }
+      if (valid & VALID_D)  { update_fill1(DIR_D (pos)); }
+      if (valid & VALID_DR) { update_fill1(DIR_DR(pos)); }
+    }
+  } while (num_cands);
+}
+
+void update_fill1(u8 pos) {
+  u8 result = !(flags_bin[tmap[pos]] & 1) &&
+              sigmatch(pos, carvesig, carvemask, sizeof(carvesig));
+  if (tempmap[pos] != result) {
+    if (result) {
+      ++num_cands;
+    } else {
+      --num_cands;
+    }
+    tempmap[pos] = result;
+  }
+}
+
 void append_region(u8 x, u8 y, u8 w, u8 h) {
   new_region_end->x = x;
   new_region_end->y = y;
@@ -626,6 +696,18 @@ void sigempty(u8 pos) {
   if (valid & VALID_DR) { sigmap[DIR_DR(pos)] &= MASK_DR; }
 }
 
+void sigwall(u8 pos) {
+  u8 valid = validmap[pos];
+  if (valid & VALID_UL) { sigmap[DIR_UL(pos)] |= VALID_UL; }
+  if (valid & VALID_U)  { sigmap[DIR_U (pos)] |= VALID_U; }
+  if (valid & VALID_UR) { sigmap[DIR_UR(pos)] |= VALID_UR; }
+  if (valid & VALID_L)  { sigmap[DIR_L (pos)] |= VALID_L; }
+  if (valid & VALID_R)  { sigmap[DIR_R (pos)] |= VALID_R; }
+  if (valid & VALID_DL) { sigmap[DIR_DL(pos)] |= VALID_DL; }
+  if (valid & VALID_D)  { sigmap[DIR_D (pos)] |= VALID_D; }
+  if (valid & VALID_DR) { sigmap[DIR_DR(pos)] |= VALID_DR; }
+}
+
 u8 sigmatch(u16 pos, u8* sig, u8* mask, u8 len) {
   u8 result = 0;
   u8 val = sigmap[pos];
@@ -668,6 +750,14 @@ u8 ds_find(u8 x) {
     x = ds_parents[x] = ds_parents[ds_parents[x]];
   }
   return x;
+}
+
+u8 getpos(u8 cand) {
+  u8 pos = 0;
+  do {
+    if (tempmap[pos] && cand-- == 0) { break; }
+  } while (++pos);
+  return pos;
 }
 
 u8 randint(u8 mx) {
