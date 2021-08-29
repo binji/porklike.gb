@@ -11,8 +11,35 @@ extern const u8 tiles_bg_2bpp[];
 extern const u8 map_bin[];
 extern const u8 flags_bin[];
 
+#define VALID_DR 0b00000001
+#define VALID_UR 0b00000010
+#define VALID_UL 0b00000100
+#define VALID_DL 0b00001000
+#define VALID_U  0b00010000
+#define VALID_D  0b00100000
+#define VALID_L  0b01000000
+#define VALID_R  0b10000000
+
+#define MASK_DR  0b11111110
+#define MASK_UR  0b11111101
+#define MASK_UL  0b11111011
+#define MASK_DL  0b11110111
+#define MASK_U   0b11101111
+#define MASK_D   0b11011111
+#define MASK_L   0b10111111
+#define MASK_R   0b01111111
+
+#define DIR_UL(pos)   ((u8)(pos + 239))
+#define DIR_U(pos)    ((u8)(pos + 240))
+#define DIR_UR(pos)   ((u8)(pos + 241))
+#define DIR_L(pos)    ((u8)(pos + 255))
+#define DIR_R(pos)    ((u8)(pos + 1))
+#define DIR_DL(pos)   ((u8)(pos + 15))
+#define DIR_D(pos)    ((u8)(pos + 16))
+#define DIR_DR(pos)   ((u8)(pos + 17))
+
 const u8 dirpos[]   = {0xff, 1, 0xf0, 16};  // L R U D
-const u8 dirvalid[] = {0b01000000,0b10000000,0b00010000,0b00100000};
+const u8 dirvalid[] = {VALID_L,VALID_R,VALID_U,VALID_D};
 
 const u8 carvesig[] = {255, 214, 124, 179, 233};
 const u8 carvemask[] = {0, 9, 3, 12, 6};
@@ -62,9 +89,9 @@ u8 nexttoroom(u8 pos, u8 valid);
 u8 isvaliddir(u8 pos, u8 dir);
 void digworm(u8 pos);
 void carvedoors(void);
-void update_door1(u16 pos);
-void door9(u16 pos);
+void update_door1(u8 pos);
 void carvecuts(void);
+void calcdist(u8 pos);
 void append_region(u8 x, u8 y, u8 w, u8 h);
 void mapset(u8* pos, u8 w, u8 h, u8 val);
 void sigrect_empty(u8 pos, u8 w, u8 h);
@@ -99,13 +126,13 @@ u8 ds_sizes[64];
 u8 ds_nextid;
 u8 ds_num_sets;
 
-
  // TODO: I think 22 is max for 4 rooms...
 Region regions[22], *region_end, *new_region_end;
 Room room[4];
 u8 num_rooms;
 
 u8 cands[256];
+u8 dists[256];
 u8 num_cands;
 u8 key;
 
@@ -330,10 +357,10 @@ void mazeworms(void) {
       // tile can be connect to another region (since it would not be
       // carvable). So we only need to merge regions here.
       valid = validmap[pos];
-      if (valid & 0b00010000) { ds_union(ds_nextid, ds_sets[pos-16]); }
-      if (valid & 0b01000000) { ds_union(ds_nextid, ds_sets[pos- 1]); }
-      if (valid & 0b10000000) { ds_union(ds_nextid, ds_sets[pos+ 1]); }
-      if (valid & 0b00100000) { ds_union(ds_nextid, ds_sets[pos+16]); }
+      if (valid & VALID_U) { ds_union(ds_nextid, ds_sets[DIR_U(pos)]); }
+      if (valid & VALID_L) { ds_union(ds_nextid, ds_sets[DIR_L(pos)]); }
+      if (valid & VALID_R) { ds_union(ds_nextid, ds_sets[DIR_R(pos)]); }
+      if (valid & VALID_D) { ds_union(ds_nextid, ds_sets[DIR_D(pos)]); }
     }
   } while(num_cands > 1);
 }
@@ -356,10 +383,10 @@ void update_carve1(u8 pos) {
 }
 
 u8 nexttoroom(u8 pos, u8 valid) {
-  return ((valid & 0b00010000) && roommap[(u8)(pos-16)]) ||
-         ((valid & 0b01000000) && roommap[(u8)(pos- 1)]) ||
-         ((valid & 0b10000000) && roommap[(u8)(pos+ 1)]) ||
-         ((valid & 0b00100000) && roommap[(u8)(pos+16)]);
+  return ((valid & VALID_U) && roommap[DIR_U(pos)]) ||
+         ((valid & VALID_L) && roommap[DIR_L(pos)]) ||
+         ((valid & VALID_R) && roommap[DIR_R(pos)]) ||
+         ((valid & VALID_D) && roommap[DIR_D(pos)]);
 }
 
 u8 isvaliddir(u8 pos, u8 dir) {
@@ -382,14 +409,14 @@ void digworm(u8 pos) {
 
     // Update neighbors
     valid = validmap[pos];
-    if (valid & 0b00000100) { update_carve1((u8)(pos-17)); }
-    if (valid & 0b00010000) { update_carve1((u8)(pos-16)); }
-    if (valid & 0b00000010) { update_carve1((u8)(pos-15)); }
-    if (valid & 0b01000000) { update_carve1((u8)(pos- 1)); }
-    if (valid & 0b10000000) { update_carve1((u8)(pos+ 1)); }
-    if (valid & 0b00001000) { update_carve1((u8)(pos+15)); }
-    if (valid & 0b00100000) { update_carve1((u8)(pos+16)); }
-    if (valid & 0b00000001) { update_carve1((u8)(pos+17)); }
+    if (valid & VALID_UL) { update_carve1(DIR_UL(pos)); }
+    if (valid & VALID_U)  { update_carve1(DIR_U (pos)); }
+    if (valid & VALID_UR) { update_carve1(DIR_UR(pos)); }
+    if (valid & VALID_L)  { update_carve1(DIR_L (pos)); }
+    if (valid & VALID_R)  { update_carve1(DIR_R (pos)); }
+    if (valid & VALID_DL) { update_carve1(DIR_DL(pos)); }
+    if (valid & VALID_D)  { update_carve1(DIR_D (pos)); }
+    if (valid & VALID_DR) { update_carve1(DIR_DR(pos)); }
 
     // Update the disjoint set
     ds_sets[pos] = ds_nextid;
@@ -414,7 +441,9 @@ void digworm(u8 pos) {
 }
 
 void carvedoors(void) {
-  u8 pos, cand, match, diff, valid;
+  u8 pos, cand, match, diff;
+
+  memset(tempmap, 0, sizeof(tempmap));
 
   pos = 0;
   num_cands = 0;
@@ -440,25 +469,21 @@ void carvedoors(void) {
       tmap[pos] = 1;
       sigempty(pos); // Update neighbor signatures.
 
-      // Remove this tile from the carvable map
-      --num_cands;
-      tempmap[pos] = 0;
-
       // Update neighbors
-      valid = validmap[pos];
-      if (valid & 0b00010000) { update_door1(pos-16); }
-      if (valid & 0b01000000) { update_door1(pos-1); }
-      if (valid & 0b10000000) { update_door1(pos+1); }
-      if (valid & 0b00100000) { update_door1(pos+16); }
-    } else {
-      tempmap[pos] = 0;
-      --num_cands;
+      u8 valid = validmap[pos];
+      if (valid & VALID_U) { update_door1(DIR_U(pos)); }
+      if (valid & VALID_L) { update_door1(DIR_L(pos)); }
+      if (valid & VALID_R) { update_door1(DIR_R(pos)); }
+      if (valid & VALID_D) { update_door1(DIR_D(pos)); }
     }
+
+    // Remove this tile from the carvable map
+    --num_cands;
+    tempmap[pos] = 0;
   } while (num_cands);
 }
 
-void update_door1(u16 pos) {
-  u8 tile = tmap[pos], diff;
+void update_door1(u8 pos) {
   // A door connects two regions in the following patterns:
   //   * 0 *   * 1 *
   //   1   1   0   0
@@ -468,45 +493,91 @@ void update_door1(u16 pos) {
   // a horizontal door or vertical. A door is only allowed between two regions
   // that are not already connected. We use the disjoint set to determine this
   // quickly below.
-  u8 match = sigmatch(pos, doorsig, doormask, sizeof(doorsig));
-  u8 result = (flags_bin[tile] & 1) && match;
-  if (result) {
-    diff = match == 1 ? 16 : 1; // 1: horizontal, 2: vertical
-    if (ds_find(ds_sets[pos + diff]) == ds_find(ds_sets[pos - diff])) {
-      result = 0;
-      if (tempmap[pos]) {
-        --num_cands;
-      }
-    } else if (!tempmap[pos]) {
+  u8 result = (flags_bin[tmap[pos]] & 1) &&
+              sigmatch(pos, doorsig, doormask, sizeof(doorsig));
+  if (tempmap[pos] != result) {
+    if (result) {
       ++num_cands;
+    } else {
+      --num_cands;
     }
+    tempmap[pos] = result;
   }
-  tempmap[pos] = result;
 }
 
 void carvecuts(void) {
-  u8 pos, tile, match, result, cand;
+  u8 pos, cand, diff, match;
+  u8 maxcuts = 3;
 
+  num_cands = 0;
   pos = 0;
   do {
-    tile = tmap[pos];
-    match = sigmatch(pos, doorsig, doormask, sizeof(doorsig));
-    result = (flags_bin[tile] & 1) && match;
-    if (result) {
-      ++num_cands;
-    }
-    tempmap[pos] = result;
+    update_door1(pos);
   } while(++pos);
 
-  // Pick a random cut, and calculate its position.
-  cand = randint(num_cands);
-  pos = 0;
   do {
-    if (tempmap[pos] && cand-- == 0) { break; }
-  } while (++pos);
+    // Pick a random cut, and calculate its position.
+    cand = randint(num_cands);
+    pos = 0;
+    do {
+      if (tempmap[pos] && cand-- == 0) { break; }
+    } while (++pos);
 
-  tmap[pos] = 32;
-  // TODO: how to calculate the distance table?
+    // Calculate distance from one side of the door to the other.
+    match = sigmatch(pos, doorsig, doormask, sizeof(doorsig));
+    diff = match == 1 ? 16 : 1; // 1: horizontal, 2: vertical
+    calcdist(pos + diff);
+
+    // Remove this candidate
+    tempmap[pos] = 0;
+    --num_cands;
+
+    // Connect the regions (creating a cycle) if the distance between the two
+    // sides is > 20 steps (21 is used because the distance starts at 1; that's
+    // so that 0 can be used to represent an unvisited cell).
+    if (distmap[(u8)(pos - diff)] > 21) {
+      tmap[pos] = 1;
+      sigempty(pos); // Update neighbor signatures.
+      --maxcuts;
+    }
+  } while (num_cands && maxcuts);
+}
+
+void calcdist(u8 pos) {
+  u8 head, tail, valid, dist, newpos;
+  dists[0] = 1;
+  cands[head = 0] = pos;
+  tail = 1;
+
+  memset(distmap, 0, sizeof(distmap));
+
+  do {
+    pos = cands[head];
+    if (distmap[pos]) {
+      head++;
+    } else {
+      dist = dists[head++];
+      distmap[pos] = dist;
+
+      valid = validmap[pos];
+      if ((valid & VALID_U) && !(flags_bin[tmap[newpos = DIR_U(pos)]] & 1)) {
+        dists[tail] = dist + 1;
+        cands[tail++] = newpos;
+      }
+      if ((valid & VALID_L) && !(flags_bin[tmap[newpos = DIR_L(pos)]] & 1)) {
+        dists[tail] = dist + 1;
+        cands[tail++] = newpos;
+      }
+      if ((valid & VALID_R) && !(flags_bin[tmap[newpos = DIR_R(pos)]] & 1)) {
+        dists[tail] = dist + 1;
+        cands[tail++] = newpos;
+      }
+      if ((valid & VALID_D) && !(flags_bin[tmap[newpos = DIR_D(pos)]] & 1)) {
+        dists[tail] = dist + 1;
+        cands[tail++] = newpos;
+      }
+    }
+  } while (head != tail);
 }
 
 void append_region(u8 x, u8 y, u8 w, u8 h) {
@@ -545,14 +616,14 @@ void sigrect_empty(u8 pos, u8 w, u8 h) {
 
 void sigempty(u8 pos) {
   u8 valid = validmap[pos];
-  if (valid & 0b00000100) { sigmap[(u8)(pos-17)] &= 0b11111011; }
-  if (valid & 0b00010000) { sigmap[(u8)(pos-16)] &= 0b11101111; }
-  if (valid & 0b00000010) { sigmap[(u8)(pos-15)] &= 0b11111101; }
-  if (valid & 0b01000000) { sigmap[(u8)(pos- 1)] &= 0b10111111; }
-  if (valid & 0b10000000) { sigmap[(u8)(pos+ 1)] &= 0b01111111; }
-  if (valid & 0b00001000) { sigmap[(u8)(pos+15)] &= 0b11110111; }
-  if (valid & 0b00100000) { sigmap[(u8)(pos+16)] &= 0b11011111; }
-  if (valid & 0b00000001) { sigmap[(u8)(pos+17)] &= 0b11111110; }
+  if (valid & VALID_UL) { sigmap[DIR_UL(pos)] &= MASK_UL; }
+  if (valid & VALID_U)  { sigmap[DIR_U (pos)] &= MASK_U; }
+  if (valid & VALID_UR) { sigmap[DIR_UR(pos)] &= MASK_UR; }
+  if (valid & VALID_L)  { sigmap[DIR_L (pos)] &= MASK_L; }
+  if (valid & VALID_R)  { sigmap[DIR_R (pos)] &= MASK_R; }
+  if (valid & VALID_DL) { sigmap[DIR_DL(pos)] &= MASK_DL; }
+  if (valid & VALID_D)  { sigmap[DIR_D (pos)] &= MASK_D; }
+  if (valid & VALID_DR) { sigmap[DIR_DR(pos)] &= MASK_DR; }
 }
 
 u8 sigmatch(u16 pos, u8* sig, u8* mask, u8 len) {
