@@ -173,6 +173,8 @@ Room rooms[4];
 u8 start_room;
 u8 num_rooms;
 u8 num_voids;
+u8 floor;
+u8 dogate;
 
 u8 cands[256];
 u8 num_cands;
@@ -182,6 +184,7 @@ void main(void) {
   disable_interrupts();
   DISPLAY_OFF;
 
+  floor = 3;
   initrand(0x4321);  // TODO: seed with DIV on button press
 
   set_bkg_data(0, 0xb1, tiles_bg_2bpp);
@@ -198,6 +201,8 @@ void main(void) {
 
     // XXX
     if (key & J_A) {
+      ++floor;
+      if (floor == 11) { floor = 0; }
       disable_interrupts();
       DISPLAY_OFF;
       mapgen();
@@ -211,15 +216,21 @@ void main(void) {
 }
 
 void mapgen(void) {
-  roomgen();
-  mazeworms();
-  carvedoors();
-  carvecuts();
-  startend();
-  fillends();
-  prettywalls();
-  voids();
-  decoration();
+  if (floor == 0) {
+    memcpy(tmap, map_bin, 256);
+  } else if (floor == 10) {
+    memcpy(tmap, map_bin + 256, 256);
+  } else {
+    roomgen();
+    mazeworms();
+    carvedoors();
+    carvecuts();
+    startend();
+    fillends();
+    prettywalls();
+    voids();
+    decoration();
+  }
 }
 
 void roomgen(void) {
@@ -231,10 +242,17 @@ void roomgen(void) {
   u8 rooml, roomr, roomt, roomb;
   u16 pos;
 
-  memset(tmap, 2, sizeof(tmap));
+  dogate = floor == 3 || floor == 6 || floor == 9;
+
   memset(roommap, 0, sizeof(roommap));
   memset(sigmap, 255, sizeof(sigmap));
   memset(ds_sets, 0, sizeof(ds_sets));
+
+  if (dogate) {
+    memcpy(tmap, map_bin + (randint(14) << 8), 256);
+  } else {
+    memset(tmap, 2, sizeof(tmap));
+  }
 
   ds_nextid = 0;
   ds_parents[0] = 0;
