@@ -92,6 +92,8 @@ const u8 validmap[] = {
   0x68,0xe9,0xe9,0xe9,0xe9,0xe9,0xe9,0xe9,0xe9,0xe9,0xe9,0xe9,0xe9,0xe9,0xe9,0xa1,
 };
 
+const u8 void_tiles[] = {9, 9, 9, 9, 9, 9, 10};
+
 void mapgen(void);
 void roomgen(void);
 void mazeworms(void);
@@ -108,6 +110,7 @@ u8 startscore(u8 pos);
 void fillends(void);
 void update_fill1(u8 pos);
 void prettywalls(void);
+void voids(void);
 void append_region(u8 x, u8 y, u8 w, u8 h);
 void mapset(u8* pos, u8 w, u8 h, u8 val);
 void sigrect_empty(u8 pos, u8 w, u8 h);
@@ -148,6 +151,7 @@ u8 ds_num_sets;
 Region regions[22], *region_end, *new_region_end;
 Room room[4];
 u8 num_rooms;
+u8 num_voids;
 
 u8 cands[256];
 u8 num_cands;
@@ -193,6 +197,7 @@ void mapgen(void) {
   startend();
   fillends();
   prettywalls();
+  voids();
 }
 
 void roomgen(void) {
@@ -566,13 +571,14 @@ void carvecuts(void) {
 void calcdist(u8 pos) {
   u8 head, oldtail, newtail, sig, valid, dist, newpos;
   cands[head = 0] = pos;
-  oldtail = newtail = 1;
+  newtail = 1;
 
   memset(distmap, 0, sizeof(distmap));
-  distmap[pos] = 1;
-  dist = 2;
+  distmap[pos] = dist = 1;
 
-  while (1) {
+  do {
+    oldtail = newtail;
+    ++dist;
     do {
       pos = cands[head++];
       valid = validmap[pos];
@@ -594,10 +600,7 @@ void calcdist(u8 pos) {
         if (sig & VALID_D) { cands[newtail++] = newpos; }
       }
     } while (head != oldtail);
-    if (oldtail == newtail) { break; }
-    oldtail = newtail;
-    ++dist;
-  }
+  } while (oldtail != newtail);
 }
 
 void startend(void) {
@@ -751,6 +754,44 @@ void prettywalls(void) {
     } else if (tmap[pos] == 1 && (validmap[pos] & VALID_U) &&
                (flags_bin[tmap[DIR_U(pos)]] & 1)) {
       tmap[pos] = (flags_bin[tmap[DIR_U(pos)]] & 0b00001000) ? 0x9f : 3;
+    }
+  } while(++pos);
+}
+
+void voids(void) {
+  u8 pos, head, oldtail, newtail, valid, newpos;
+  pos = 0;
+  num_voids = num_rooms;  // Start void numbering after rooms
+
+  do {
+    if (!tmap[pos]) {
+      // flood fill this region
+      cands[head = 0] = pos;
+      newtail = 1;
+      do {
+        oldtail = newtail;
+        do {
+          pos = cands[head++];
+          roommap[pos] = num_voids;
+          tmap[pos] = void_tiles[randint(sizeof(void_tiles))];
+          valid = validmap[pos];
+
+          // TODO: handle void exits
+          if ((valid & VALID_U) && !tmap[newpos = DIR_U(pos)]) {
+            cands[newtail++] = newpos;
+          }
+          if ((valid & VALID_L) && !tmap[newpos = DIR_L(pos)]) {
+            cands[newtail++] = newpos;
+          }
+          if ((valid & VALID_R) && !tmap[newpos = DIR_R(pos)]) {
+            cands[newtail++] = newpos;
+          }
+          if ((valid & VALID_D) && !tmap[newpos = DIR_D(pos)]) {
+            cands[newtail++] = newpos;
+          }
+        } while(head != oldtail);
+      } while (oldtail != newtail);
+      ++num_voids;
     }
   } while(++pos);
 }
