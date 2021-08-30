@@ -93,6 +93,16 @@ const u8 validmap[] = {
 };
 
 const u8 void_tiles[] = {9, 9, 9, 9, 9, 9, 10};
+const u8 dirt_tiles[] = {1, 73, 74, 75};
+const u8 plant_tiles[] = {11, 12, 70};
+
+const u8 room_permutations[][4] = {
+    {1, 2, 3, 4}, {1, 2, 4, 3}, {1, 3, 2, 4}, {1, 3, 4, 2}, {1, 4, 2, 3},
+    {1, 4, 3, 2}, {2, 1, 3, 4}, {2, 1, 4, 3}, {2, 3, 1, 4}, {2, 3, 4, 1},
+    {2, 4, 1, 3}, {2, 4, 3, 1}, {3, 1, 2, 4}, {3, 1, 4, 2}, {3, 2, 1, 4},
+    {3, 2, 4, 1}, {3, 4, 1, 2}, {3, 4, 2, 1}, {4, 1, 2, 3}, {4, 1, 3, 2},
+    {4, 2, 1, 3}, {4, 2, 3, 1}, {4, 3, 1, 2}, {4, 3, 2, 1},
+};
 
 void mapgen(void);
 void roomgen(void);
@@ -111,6 +121,7 @@ void fillends(void);
 void update_fill1(u8 pos);
 void prettywalls(void);
 void voids(void);
+void decoration(void);
 void append_region(u8 x, u8 y, u8 w, u8 h);
 void mapset(u8* pos, u8 w, u8 h, u8 val);
 void sigrect_empty(u8 pos, u8 w, u8 h);
@@ -127,6 +138,15 @@ typedef u8 Map[16*16];
 typedef struct Region {
   u8 x, y, w, h;
 } Region;
+
+typedef enum RoomKind {
+  ROOM_KIND_VASE,
+  ROOM_KIND_DIRT,
+  ROOM_KIND_CARPET,
+  ROOM_KIND_TORCH,
+  ROOM_KIND_PLANT,
+  NUM_ROOM_KINDS,
+} RoomKind;
 
 typedef struct Room {
   u8 x, y, w, h;
@@ -149,7 +169,8 @@ u8 ds_num_sets;
 
  // TODO: I think 22 is max for 4 rooms...
 Region regions[22], *region_end, *new_region_end;
-Room room[4];
+Room rooms[4];
+u8 start_room;
 u8 num_rooms;
 u8 num_voids;
 
@@ -161,7 +182,7 @@ void main(void) {
   disable_interrupts();
   DISPLAY_OFF;
 
-  initrand(0x1234);  // TODO: seed with DIV on button press
+  initrand(0x4321);  // TODO: seed with DIV on button press
 
   set_bkg_data(0, 0xb1, tiles_bg_2bpp);
   init_bkg(0);
@@ -198,10 +219,12 @@ void mapgen(void) {
   fillends();
   prettywalls();
   voids();
+  decoration();
 }
 
 void roomgen(void) {
   Region *region, *old_region_end;
+  Room* room;
   u8 failmax = 5, maxwidth = 10, maxheight = 10, maxh;
   u8 x, y, w, h;
   u8 regl, regr, regt, regb, regw, regh;
@@ -326,9 +349,11 @@ void roomgen(void) {
       region_end = new_region_end;
 
       // Fill room tiles at x, y
-      pos = ((y - 1) << 4) | (x - 1);
+      --x;
+      --y;
+      pos = (y << 4) | x;
       mapset(tmap + pos, w, h, 1);
-      mapset(roommap + pos, w, h, ++num_rooms);
+      mapset(roommap + pos, w, h, num_rooms);
       sigrect_empty(pos, w, h);
 
       // Update disjoint set regions; we know that they're disjoint so they
@@ -337,6 +362,12 @@ void roomgen(void) {
       ds_parents[ds_nextid] = ds_nextid;
       ds_sizes[ds_nextid] = w * h; // XXX multiply
       ++ds_num_sets;
+
+      room = rooms + num_rooms++;
+      room->x = x;
+      room->y = y;
+      room->w = w;
+      room->h = h;
 
       if (num_rooms == 1) {
         maxwidth >>= 1;
@@ -794,6 +825,72 @@ void voids(void) {
       ++num_voids;
     }
   } while(++pos);
+}
+
+void decoration(void) {
+  RoomKind kind = ROOM_KIND_VASE;
+  Room* room;
+  const u8 (*room_perm)[4] = room_permutations + randint(24);
+  u8 i, room_index, pos, tile, w, h;
+  for (i = 0; i < 4; ++i) {
+    room_index = (*room_perm)[i];
+    if (room_index >= num_rooms) { continue; }
+
+    room = rooms + room_index;
+    pos = (room->y << 4) | room->x;
+    h = room->h;
+    do {
+      w = room->w;
+      do {
+        tile = tmap[pos];
+
+        switch (kind) {
+          case ROOM_KIND_VASE:
+            break; // TODO: need mobs
+
+          case ROOM_KIND_DIRT:
+            if (tile == 1) {
+              tmap[pos] = dirt_tiles[rand() & 3];
+            }
+            break;
+
+          case ROOM_KIND_CARPET:
+            if (tile == 1 && h != room->h && h != 1 && w != room->w &&
+                w != 1) {
+              tmap[pos] = 7;
+            }
+            // fallthrough
+
+          case ROOM_KIND_TORCH:
+            if (tile == 1 && (rand() < 85) && (h & 1) &&
+                sigmatch(pos, freesig, freemask, sizeof(freesig))) {
+              if (w == 1) {
+                tmap[pos] = 65;
+              } else if (w == room->w) {
+                tmap[pos] = 63;
+              }
+            }
+            break;
+
+          case ROOM_KIND_PLANT:
+            if (tile == 1) {
+              tmap[pos] = plant_tiles[randint(3)];
+            } else if (tile == 3) {
+              tmap[pos] = 5;
+            }
+            // TODO: add weed/bomb mobs
+            break;
+        }
+
+        ++pos;
+      } while(--w);
+      pos += 16 - room->w;
+    } while(--h);
+
+
+    // Pick a room kind for the next room
+    kind = randint(NUM_ROOM_KINDS);
+  }
 }
 
 void append_region(u8 x, u8 y, u8 w, u8 h) {
