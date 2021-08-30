@@ -49,6 +49,18 @@ const u8 doormask[] = {15, 15};
 const u8 freesig[] = {0, 0, 0, 0, 16, 64, 32, 128, 161, 104, 84, 146};
 const u8 freemask[] = {8, 4, 2, 1, 6, 12, 9, 3, 10, 5, 10, 5};
 
+const u8 wallsig[] = {
+    251, 233, 253, 84,  146, 80,  16,  144, 112, 208, 241, 248,
+    210, 177, 225, 120, 179, 0,   124, 104, 161, 64,  240, 128,
+    224, 176, 242, 244, 116, 232, 178, 212, 247, 214, 254, 192,
+    48,  96,  32,  160, 245, 250, 243, 249, 246, 252,
+};
+const u8 wallmask[] = {
+    0,  6,  0, 11, 13, 11, 15, 13, 3, 9,  0, 0, 9, 12, 6,  3,
+    12, 15, 3, 7,  14, 15, 0,  15, 6, 12, 0, 0, 3, 6,  12, 9,
+    0,  9,  0, 15, 15, 7,  15, 14, 0, 0,  0, 0, 0, 0,
+};
+
 // floor(35 / x) for x in [3,10]
 const u8 other_dim[] = {11, 8, 7, 5, 5, 4, 3, 3};
 
@@ -100,6 +112,7 @@ void startend(void);
 u8 startscore(u8 pos);
 void fillends(void);
 void update_fill1(u8 pos);
+void prettywalls(void);
 void append_region(u8 x, u8 y, u8 w, u8 h);
 void mapset(u8* pos, u8 w, u8 h, u8 val);
 void sigrect_empty(u8 pos, u8 w, u8 h);
@@ -185,6 +198,7 @@ void mapgen(void) {
   carvecuts();
   startend();
   fillends();
+  prettywalls();
 }
 
 void roomgen(void) {
@@ -746,6 +760,34 @@ void update_fill1(u8 pos) {
     }
     tempmap[pos] = result;
   }
+}
+
+void prettywalls(void) {
+  u8 pos, tile;
+  pos = 0;
+  do {
+    if (tmap[pos] == 2) {
+      tile = sigmatch(pos, wallsig, wallmask, sizeof(wallsig));
+      if (tile) {
+        tile += 14;
+      }
+      if ((flags_bin[tile] & 0b01000000) && !(rand() & 7)) {
+        // TODO: organize tiles so this can be a simple addition
+        switch (tile) {
+          case 0x10: tile = 0x9c; break;
+          case 0x1f: tile = 0xaa; break;
+          case 0x21: tile = 0xab; break;
+          case 0x30: tile = 0xaf; break;
+          case 0x32: tile = 0x9d; break;
+          case 0x33: tile = 0x9e; break;
+        }
+      }
+      tmap[pos] = tile;
+    } else if (tmap[pos] == 1 && (validmap[pos] & VALID_U) &&
+               (flags_bin[tmap[DIR_U(pos)]] & 1)) {
+      tmap[pos] = (flags_bin[tmap[DIR_U(pos)]] & 0b00001000) ? 0x9f : 3;
+    }
+  } while(++pos);
 }
 
 void append_region(u8 x, u8 y, u8 w, u8 h) {
