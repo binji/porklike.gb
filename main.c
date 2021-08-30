@@ -46,6 +46,9 @@ const u8 carvemask[] = {0, 9, 3, 12, 6};
 const u8 doorsig[] = {192, 48};
 const u8 doormask[] = {15, 15};
 
+const u8 freesig[] = {0, 0, 0, 0, 16, 64, 32, 128, 161, 104, 84, 146};
+const u8 freemask[] = {8, 4, 2, 1, 6, 12, 9, 3, 10, 5, 10, 5};
+
 // floor(35 / x) for x in [3,10]
 const u8 other_dim[] = {11, 8, 7, 5, 5, 4, 3, 3};
 
@@ -85,7 +88,8 @@ void mapgen(void);
 void roomgen(void);
 void mazeworms(void);
 void update_carve1(u8 pos);
-u8 nexttoroom(u8 pos, u8 valid);
+u8 nexttoroom4(u8 pos, u8 valid);
+u8 nexttoroom8(u8 pos, u8 valid);
 u8 isvaliddir(u8 pos, u8 dir);
 void digworm(u8 pos);
 void carvedoors(void);
@@ -93,6 +97,7 @@ void update_door1(u8 pos);
 void carvecuts(void);
 void calcdist(u8 pos);
 void startend(void);
+u8 startscore(u8 pos);
 void fillends(void);
 void update_fill1(u8 pos);
 void append_region(u8 x, u8 y, u8 w, u8 h);
@@ -377,7 +382,7 @@ void update_carve1(u8 pos) {
   if ((flags_bin[tmap[pos]] & 1) &&
       sigmatch(pos, carvesig, carvemask, sizeof(carvesig))) {
     result = 1;
-    if (!nexttoroom(pos, validmap[pos])) {
+    if (!nexttoroom4(pos, validmap[pos])) {
       ++result;
       if (tempmap[pos] != 2) { ++num_cands; }
     }
@@ -388,11 +393,19 @@ void update_carve1(u8 pos) {
   tempmap[pos] = result;
 }
 
-u8 nexttoroom(u8 pos, u8 valid) {
+u8 nexttoroom4(u8 pos, u8 valid) {
   return ((valid & VALID_U) && roommap[DIR_U(pos)]) ||
          ((valid & VALID_L) && roommap[DIR_L(pos)]) ||
          ((valid & VALID_R) && roommap[DIR_R(pos)]) ||
          ((valid & VALID_D) && roommap[DIR_D(pos)]);
+}
+
+u8 nexttoroom8(u8 pos, u8 valid) {
+  return nexttoroom4(pos, valid) ||
+         ((valid & VALID_UL) && roommap[DIR_UL(pos)]) ||
+         ((valid & VALID_UR) && roommap[DIR_UR(pos)]) ||
+         ((valid & VALID_DL) && roommap[DIR_DL(pos)]) ||
+         ((valid & VALID_DR) && roommap[DIR_DR(pos)]);
 }
 
 u8 isvaliddir(u8 pos, u8 dir) {
@@ -483,6 +496,9 @@ void carvedoors(void) {
     --num_cands;
     tempmap[pos] = 0;
   } while (num_cands);
+
+  // TODO: its possible to generate a map that is not fully-connected; in that
+  // case we need to start over.
 }
 
 void update_door1(u8 pos) {
@@ -524,6 +540,8 @@ void carvecuts(void) {
     // Calculate distance from one side of the door to the other.
     match = sigmatch(pos, doorsig, doormask, sizeof(doorsig));
     diff = match == 1 ? 16 : 1; // 1: horizontal, 2: vertical
+    // TODO: we only need the distance to the other size of the door; use a
+    // faster routine for this?
     calcdist(pos + diff);
 
     // Remove this candidate
@@ -556,30 +574,55 @@ void calcdist(u8 pos) {
     } else {
       dist = dists[head++];
       distmap[pos] = dist;
+      ++dist;
 
       valid = validmap[pos];
-      if ((valid & VALID_U) && !(flags_bin[tmap[newpos = DIR_U(pos)]] & 1)) {
-        dists[tail] = dist + 1;
-        cands[tail++] = newpos;
+      if (valid & VALID_U) {
+        if (flags_bin[tmap[newpos = DIR_U(pos)]] & 1) {
+          if (!distmap[newpos]) {
+            distmap[newpos] = dist;
+          }
+        } else {
+          dists[tail] = dist;
+          cands[tail++] = newpos;
+        }
       }
-      if ((valid & VALID_L) && !(flags_bin[tmap[newpos = DIR_L(pos)]] & 1)) {
-        dists[tail] = dist + 1;
-        cands[tail++] = newpos;
+      if (valid & VALID_L) {
+        if (flags_bin[tmap[newpos = DIR_L(pos)]] & 1) {
+          if (!distmap[newpos]) {
+            distmap[newpos] = dist;
+          }
+        } else {
+          dists[tail] = dist;
+          cands[tail++] = newpos;
+        }
       }
-      if ((valid & VALID_R) && !(flags_bin[tmap[newpos = DIR_R(pos)]] & 1)) {
-        dists[tail] = dist + 1;
-        cands[tail++] = newpos;
+      if (valid & VALID_R) {
+        if (flags_bin[tmap[newpos = DIR_R(pos)]] & 1) {
+          if (!distmap[newpos]) {
+            distmap[newpos] = dist;
+          }
+        } else {
+          dists[tail] = dist;
+          cands[tail++] = newpos;
+        }
       }
-      if ((valid & VALID_D) && !(flags_bin[tmap[newpos = DIR_D(pos)]] & 1)) {
-        dists[tail] = dist + 1;
-        cands[tail++] = newpos;
+      if (valid & VALID_D) {
+        if (flags_bin[tmap[newpos = DIR_D(pos)]] & 1) {
+          if (!distmap[newpos]) {
+            distmap[newpos] = dist;
+          }
+        } else {
+          dists[tail] = dist;
+          cands[tail++] = newpos;
+        }
       }
     }
   } while (head != tail);
 }
 
 void startend(void) {
-  u8 pos, endpos;
+  u8 pos, startpos, endpos, best, score;
 
   // Pick a random walkable location
   do {
@@ -588,17 +631,70 @@ void startend(void) {
 
   calcdist(endpos);
 
-  u8 startpos = 0, max = 0;
+  startpos = 0;
+  best = 0;
   // Find the furthest point from endpos.
   pos = 0;
   do {
-    if (distmap[pos] > max) {
+    if (distmap[pos] > best) {
       startpos = pos;
-      max = distmap[pos];
+      best = distmap[pos];
     }
   } while(++pos);
 
-  tmap[startpos] = 32; // XXX
+  calcdist(startpos);
+
+  // Now pick the furthest, freestanding location in a room from the startpos.
+  pos = 0;
+  best = 0;
+  do {
+    if (distmap[pos] > best && roommap[pos] &&
+        sigmatch(pos, freesig, freemask, sizeof(freesig))) {
+      endpos = pos;
+      best = distmap[pos];
+    }
+  } while(++pos);
+
+  // Finally pick the closest point that has the best startscore.
+  pos = 0;
+  best = 255;
+  do {
+    score = startscore(pos);
+    if (distmap[pos] && score) {
+      score = distmap[pos] + score;
+      if (score < best) {
+        best = score;
+        startpos = pos;
+      }
+    }
+  } while(++pos);
+
+  tmap[startpos] = 14;
+  tmap[endpos] = 13;
+  sigempty(startpos);
+  sigempty(endpos);
+}
+
+u8 startscore(u8 pos) {
+  u8 score = sigmatch(pos, freesig, freemask, sizeof(freesig));
+  // If the position is not in a room...
+  if (!roommap[pos]) {
+    // ...and not next to a room...
+    if (!nexttoroom8(pos, validmap[pos])) {
+      if (score) {
+        // ...and it's freestanding, then give the best score
+        return 1;
+      } else if (sigmatch(pos, carvesig, carvemask, sizeof(carvesig))) {
+        // If the position is carvable, give a low score
+        return 6;
+      }
+    }
+  } else if (score) {
+    // otherwise the position is in a room, so give a good score if it is
+    // "more" freestanding (not in a corner).
+    return score <= 9 ? 3 : 6;
+  }
+  return 0; // Invalid start position.
 }
 
 void fillends(void) {
@@ -638,8 +734,10 @@ void fillends(void) {
 }
 
 void update_fill1(u8 pos) {
+  u8 tile = tmap[pos];
   u8 result = !(flags_bin[tmap[pos]] & 1) &&
-              sigmatch(pos, carvesig, carvemask, sizeof(carvesig));
+              sigmatch(pos, carvesig, carvemask, sizeof(carvesig)) &&
+              tile != 13 && tile != 14;
   if (tempmap[pos] != result) {
     if (result) {
       ++num_cands;
