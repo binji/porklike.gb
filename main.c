@@ -98,7 +98,6 @@ void mazeworms(void);
 void update_carve1(u8 pos);
 u8 nexttoroom4(u8 pos, u8 valid);
 u8 nexttoroom8(u8 pos, u8 valid);
-u8 isvaliddir(u8 pos, u8 dir);
 void digworm(u8 pos);
 void carvedoors(void);
 void update_door1(u8 pos);
@@ -417,10 +416,6 @@ u8 nexttoroom8(u8 pos, u8 valid) {
          ((valid & VALID_DR) && roommap[DIR_DR(pos)]);
 }
 
-u8 isvaliddir(u8 pos, u8 dir) {
-  return (validmap[pos] & dirvalid[dir]) && tempmap[(u8)(pos + dirpos[dir])];
-}
-
 void digworm(u8 pos) {
   u8 dir, step, num_dirs, valid;
 
@@ -452,14 +447,14 @@ void digworm(u8 pos) {
 
     // Continue in the current direction, unless we can't carve. Also randomly
     // change direction after 3 or more steps.
-    if (!isvaliddir(pos, dir) || ((rand() & 1) && step > 2)) {
+    if (!((valid & dirvalid[dir]) && tempmap[(u8)(pos + dirpos[dir])]) ||
+        ((rand() & 1) && step > 2)) {
       step = 0;
       num_dirs = 0;
-      for (dir = 0; dir < 4; ++dir) {
-        if (isvaliddir(pos, dir)) {
-          cands[num_dirs++] = dir;
-        }
-      }
+      if ((valid & VALID_L) && tempmap[DIR_L(pos)]) { cands[num_dirs++] = 0; }
+      if ((valid & VALID_R) && tempmap[DIR_R(pos)]) { cands[num_dirs++] = 1; }
+      if ((valid & VALID_U) && tempmap[DIR_U(pos)]) { cands[num_dirs++] = 2; }
+      if ((valid & VALID_D) && tempmap[DIR_D(pos)]) { cands[num_dirs++] = 3; }
       if (num_dirs == 0) return;
       dir = cands[randint(num_dirs)];
     }
