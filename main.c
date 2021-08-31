@@ -11,6 +11,14 @@ extern const u8 tiles_bg_2bpp[];
 extern const u8 map_bin[];
 extern const u8 flags_bin[];
 
+#define IS_WALL(tile) (flags_bin[tile] & 1)
+#define HAS_CRACKED_VARIANT(tile) (flags_bin[tile] & 0b01000000)
+#define IS_CRACKED_WALL(tile) (flags_bin[tile] & 0b00001000)
+
+#define IS_DOOR(pos) sigmatch((pos), doorsig, doormask, sizeof(doorsig))
+#define CAN_CARVE(pos) sigmatch((pos), carvesig, carvemask, sizeof(carvesig))
+#define IS_FREESTANDING(pos) sigmatch((pos), freesig, freemask, sizeof(freesig))
+
 #define VALID_UL 0b00000001
 #define VALID_DL 0b00000010
 #define VALID_DR 0b00000100
@@ -19,6 +27,8 @@ extern const u8 flags_bin[];
 #define VALID_U  0b00100000
 #define VALID_R  0b01000000
 #define VALID_L  0b10000000
+#define VALID_L_OR_UL  0b10000001
+#define VALID_U_OR_UL  0b00100001
 
 #define MASK_UL  0b11111110
 #define MASK_DL  0b11111101
@@ -37,6 +47,20 @@ extern const u8 flags_bin[];
 #define DIR_DL(pos)   ((u8)(pos + 15))
 #define DIR_D(pos)    ((u8)(pos + 16))
 #define DIR_DR(pos)   ((u8)(pos + 17))
+
+#define TILE_EMPTY 1
+#define TILE_WALL 2
+#define TILE_WALL_FACE 3
+#define TILE_WALL_FACE_PLANT 5
+#define TILE_CARPET 7
+#define TILE_END 13
+#define TILE_START 14
+#define TILE_GOAL 62
+#define TILE_TORCH_LEFT 63
+#define TILE_TORCH_RIGHT 65
+#define TILE_HEART 67
+#define TILE_FIXED_WALL 84
+#define TILE_STEPS 161
 
 const u8 dirpos[]   = {0xff, 1, 0xf0, 16};  // L R U D
 const u8 dirvalid[] = {VALID_L,VALID_R,VALID_U,VALID_D};
@@ -122,7 +146,6 @@ void update_fill1(u8 pos);
 void prettywalls(void);
 void voids(void);
 void decoration(void);
-void append_region(u8 x, u8 y, u8 w, u8 h);
 void mapset(u8* pos, u8 w, u8 h, u8 val);
 void sigrect_empty(u8 pos, u8 w, u8 h);
 void sigempty(u8 pos);
@@ -135,10 +158,6 @@ u8 randint(u8 mx);
 
 typedef u8 Map[16*16];
 
-typedef struct Region {
-  u8 x, y, w, h;
-} Region;
-
 typedef enum RoomKind {
   ROOM_KIND_VASE,
   ROOM_KIND_DIRT,
@@ -149,7 +168,7 @@ typedef enum RoomKind {
 } RoomKind;
 
 typedef struct Room {
-  u8 x, y, w, h;
+  u8 pos, w, h, pad;
 } Room;
 
 Map tmap;    // Tile map
@@ -167,24 +186,24 @@ u8 ds_sizes[64];
 u8 ds_nextid;
 u8 ds_num_sets;
 
- // TODO: I think 22 is max for 4 rooms...
-Region regions[22], *region_end, *new_region_end;
 Room rooms[4];
 u8 start_room;
 u8 num_rooms;
 u8 num_voids;
 u8 floor;
 u8 dogate;
+u8 startpos, endpos, goalpos;
 
 u8 cands[256];
 u8 num_cands;
+
 u8 key;
 
 void main(void) {
   disable_interrupts();
   DISPLAY_OFF;
 
-  floor = 3;
+  floor = 0;
   initrand(0x4321);  // TODO: seed with DIV on button press
 
   set_bkg_data(0, 0xb1, tiles_bg_2bpp);
@@ -234,13 +253,9 @@ void mapgen(void) {
 }
 
 void roomgen(void) {
-  Region *region, *old_region_end;
-  Room* room;
+  Room* room = rooms;
   u8 failmax = 5, maxwidth = 10, maxheight = 10, maxh;
-  u8 x, y, w, h;
-  u8 regl, regr, regt, regb, regw, regh;
-  u8 rooml, roomr, roomt, roomb;
-  u16 pos;
+  u8 sig, valid, walkable, val, w, h, pos;
 
   dogate = floor == 3 || floor == 6 || floor == 9;
 
@@ -248,19 +263,67 @@ void roomgen(void) {
   memset(sigmap, 255, sizeof(sigmap));
   memset(ds_sets, 0, sizeof(ds_sets));
 
-  if (dogate) {
-    memcpy(tmap, map_bin + (randint(14) << 8), 256);
-  } else {
-    memset(tmap, 2, sizeof(tmap));
-  }
-
+  // Initialize disjoint set
   ds_nextid = 0;
   ds_parents[0] = 0;
   ds_num_sets = 0;
-  num_rooms = 0;
 
-  regions[0].x = regions[0].y = 1; regions[0].w = regions[0].h = 16;
-  region_end = regions + 1;
+  if (dogate) {
+    // Pick a random gate map
+    memcpy(tmap, map_bin + 512 + (randint(14) << 8), 256);
+
+    // Update signature map for empty tiles
+    pos = 0;
+    do {
+      switch (tmap[pos]) {
+        case TILE_END:
+          endpos = pos;
+          goto empty;
+
+        case TILE_START:
+          startpos = pos;
+          goto empty;
+
+        case TILE_GOAL:
+          // Temporarily change to stairs so the empty spaces behind the gate
+          // can be part of the spanning graph created during the carvedoors()
+          // step.
+          tmap[pos] = TILE_END;
+          goalpos = pos;
+          goto empty;
+
+        case TILE_HEART:
+          // TODO: add heart mob
+          goto empty;
+
+        empty:
+        case TILE_CARPET:
+        case TILE_EMPTY:
+        case TILE_STEPS:
+          // Update sigmap
+          sigempty(pos);
+
+          // Update disjoint set for the gate area
+          ++ds_nextid;
+          ds_sets[pos] = ds_nextid;
+          ds_parents[ds_nextid] = ds_nextid;
+          ds_sizes[ds_nextid] = 1;
+
+          valid = validmap[pos];
+          if (valid & VALID_U) { ds_union(ds_nextid, ds_sets[DIR_U(pos)]); }
+          if (valid & VALID_L) { ds_union(ds_nextid, ds_sets[DIR_L(pos)]); }
+          if (valid & VALID_R) { ds_union(ds_nextid, ds_sets[DIR_R(pos)]); }
+          if (valid & VALID_D) { ds_union(ds_nextid, ds_sets[DIR_D(pos)]); }
+          break;
+      }
+
+    } while (++pos);
+  } else {
+    // Start with a completely empty map (all walls)
+    memset(tmap, TILE_WALL, sizeof(tmap));
+  }
+
+  num_rooms = 0;
 
   do {
     // Pick width and height for room.
@@ -269,109 +332,85 @@ void roomgen(void) {
     if (maxh > maxheight) maxh = maxheight;
     h = 3 + randint(maxh - 2);
 
-    // Try to place a room
-    // Find valid regions
+    // Update width/height maps
+    //
+    // The basic idea is to start in the lower-right corner and work backward.
+    // There are two maps; one that tracks whether a room of this width will
+    // fit, and the other tracks whether a room of this height will fit. When
+    // both values are 0, the room fits.
+    //
+    // The room must have a one tile border around it, except for when it is
+    // adjacent to the map edge.
     num_cands = 0;
-    region = regions;
-    while (region < region_end) {
-      if (w <= region->w && h <= region->h) {
-        cands[num_cands++] = region - regions;
+    pos = 255;
+    do {
+      valid = validmap[pos];
+      sig = ~sigmap[pos];
+      walkable = !IS_WALL(tmap[pos]);
+      if (walkable || (sig & VALID_L_OR_UL)) {
+        // This tile is either in a room, or on the right or lower border of
+        // the room.
+        val = h + 1;
+      } else if (valid & VALID_D) {
+        // This tile is above a room or the bottom edge; we subtract one from
+        // the value below to track whether it is far enough away to fit a room
+        // of height `h`.
+        val = tempmap[DIR_D(pos)];
+        if (val) { --val; }
+      } else {
+        // This tile is on the bottom edge of the map.
+        val = h - 1;
       }
-      ++region;
-    }
+      tempmap[pos] = val;
+
+      if (walkable || (sig & VALID_U_OR_UL)) {
+        // This tile is either in a room, or on the right or lower border of
+        // the room.
+        val = w + 1;
+      } else if (valid & VALID_R) {
+        val = distmap[DIR_R(pos)];
+        if (val) {
+          // This tile is to the left of a room or the right edge of the map.
+          // We also update the "height" map in this case to extend out the
+          // invalid region vertically. For example, if placing a 3x3 room,
+          // where there is an existing room (marked with x):
+          //
+          // width map   height map   overlap
+          // 000000012   000000000    0000000..
+          // 000000012   011112220    0........
+          // 000000012   022222220    0........
+          // 000000012   033333330    0........
+          // 0123xxxx2   0444xxxx0    0........
+          // 0123xxxx2   0444xxxx0    0........
+          // 0123xxxx2   1111xxxx1    .........
+          // 000000012   222222222    .........
+          //
+          --val;
+          tempmap[pos] = tempmap[DIR_R(pos)];
+        } else {
+          val = 0;
+          if (!tempmap[pos]) {
+            // This is valid position, add it to the candidate list.
+            cands[num_cands++] = pos;
+          }
+        }
+      } else {
+        val = w - 1;
+      }
+      distmap[pos] = val;
+    } while(pos--);
 
     if (num_cands) {
-      // TODO: this method is biased toward regions with overlap; probably want
-      // to pick a random location first, then determine if it is valid (i.e.
-      // in a region).
+      pos = cands[randint(num_cands)];
 
-      // Pick a random region
-      region = regions + cands[randint(num_cands)];
-
-      // Pick a random position in the region
-      x = region->x + randint(region->w - w);
-      y = region->y + randint(region->h - h);
-
-      old_region_end = new_region_end = region_end;
-      region = regions;
-      do {
-        regl = region->x;
-        regt = region->y;
-        regw = region->w;
-        regh = region->h;
-        regr = regl + regw;
-        regb = regt + regh;
-
-        rooml = x - 1;
-        roomr = x + w + 1;
-        roomt = y - 1;
-        roomb = y + h + 1;
-
-        // Only split this region if it contains the room (include 1 tile
-        // border)
-        if (roomr > regl && roomb > regt && rooml < regr && roomt < regb) {
-          // We want to split this region, which means it is replaced by up to
-          // 4 other regions. If this is not the last region to process, then
-          // we copy that region on top of this one to pack the regions. This
-          // means that we have to process this region again (since it
-          // changed).
-          if (--old_region_end != region) {
-            *region = *old_region_end;
-          } else {
-            // However, if this is the last region, then we are done (so
-            // increment region).
-            ++region;
-          }
-
-          // Divide chosen region into new regions
-          // Add top region
-          if (roomt > regt) {
-            append_region(regl, regt, regw, roomt - regt);
-          }
-
-          // Add bottom region
-          if (roomb < regb) {
-            append_region(regl, roomb, regw, regb - roomb);
-          }
-
-          // Add left region
-          if (rooml > regl) {
-            append_region(regl, regt, rooml - regl, regh);
-          }
-
-          // Add right region
-          if (roomr < regr) {
-            append_region(roomr, regt, regr - roomr, regh);
-          }
-        } else {
-          ++region;
-        }
-      } while (region < old_region_end);
-
-      // Fill over any regions that were removed between old_region_end and
-      // region_end. e.g.
-      // If the regions are:
-      //   0 1 2 3
-      //
-      // and region 1 is split into 4 5 6, then the list is:
-      //   0 3 2 x 4 5 6
-      //
-      // If region 2 is now split into 7 and 8:
-      //   0 3 x x 4 5 6 7 8
-      //
-      // Now the new regions must be packed into the x's
-      //   0 3 8 7 4 5 6
-      while (old_region_end < region_end) {
-        *old_region_end++ = *--new_region_end;
-      }
-      region_end = new_region_end;
+      room->pos = pos;
+      room->w = w;
+      room->h = h;
+      ++room;
 
       // Fill room tiles at x, y
-      --x;
-      --y;
-      pos = (y << 4) | x;
       mapset(tmap + pos, w, h, 1);
-      mapset(roommap + pos, w, h, num_rooms);
+      mapset(roommap + pos, w, h, ++num_rooms);
       sigrect_empty(pos, w, h);
 
       // Update disjoint set regions; we know that they're disjoint so they
@@ -380,12 +419,6 @@ void roomgen(void) {
       ds_parents[ds_nextid] = ds_nextid;
       ds_sizes[ds_nextid] = w * h; // XXX multiply
       ++ds_num_sets;
-
-      room = rooms + num_rooms++;
-      room->x = x;
-      room->y = y;
-      room->w = w;
-      room->h = h;
 
       if (num_rooms == 1) {
         maxwidth >>= 1;
@@ -440,9 +473,9 @@ void mazeworms(void) {
 }
 
 void update_carve1(u8 pos) {
+  u8 tile = tmap[pos];
   u8 result;
-  if ((flags_bin[tmap[pos]] & 1) &&
-      sigmatch(pos, carvesig, carvemask, sizeof(carvesig))) {
+  if (tile != TILE_FIXED_WALL && IS_WALL(tile) && CAN_CARVE(pos)) {
     result = 1;
     if (!nexttoroom4(pos, validmap[pos])) {
       ++result;
@@ -534,7 +567,7 @@ void carvedoors(void) {
 
     // Merge the regions, if possible. They may be already part of the same
     // set, in which case they should not be joined.
-    match = sigmatch(pos, doorsig, doormask, sizeof(doorsig));
+    match = IS_DOOR(pos);
     diff = match == 1 ? 16 : 1; // 1: horizontal, 2: vertical
     if (ds_union(ds_sets[pos - diff], ds_sets[pos + diff])) {
       // Insert an empty tile to connect the regions
@@ -569,8 +602,8 @@ void update_door1(u8 pos) {
   // a horizontal door or vertical. A door is only allowed between two regions
   // that are not already connected. We use the disjoint set to determine this
   // quickly below.
-  u8 result = (flags_bin[tmap[pos]] & 1) &&
-              sigmatch(pos, doorsig, doormask, sizeof(doorsig));
+  u8 tile = tmap[pos];
+  u8 result = tile != TILE_FIXED_WALL && IS_WALL(tile) && IS_DOOR(pos);
   if (tempmap[pos] != result) {
     if (result) {
       ++num_cands;
@@ -596,7 +629,7 @@ void carvecuts(void) {
     pos = getpos(randint(num_cands));
 
     // Calculate distance from one side of the door to the other.
-    match = sigmatch(pos, doorsig, doormask, sizeof(doorsig));
+    match = IS_DOOR(pos);
     diff = match == 1 ? 16 : 1; // 1: horizontal, 2: vertical
     // TODO: we only need the distance to the other size of the door; use a
     // faster routine for this?
@@ -653,12 +686,14 @@ void calcdist(u8 pos) {
 }
 
 void startend(void) {
-  u8 pos, startpos, endpos, best, score;
+  u8 pos, best, score;
 
-  // Pick a random walkable location
-  do {
-    endpos = rand();
-  } while (flags_bin[tmap[endpos]] & 1);
+  if (!dogate) {
+    // Pick a random walkable location
+    do {
+      endpos = rand();
+    } while (IS_WALL(tmap[endpos]));
+  }
 
   calcdist(endpos);
 
@@ -675,16 +710,17 @@ void startend(void) {
 
   calcdist(startpos);
 
-  // Now pick the furthest, freestanding location in a room from the startpos.
-  pos = 0;
-  best = 0;
-  do {
-    if (distmap[pos] > best && roommap[pos] &&
-        sigmatch(pos, freesig, freemask, sizeof(freesig))) {
-      endpos = pos;
-      best = distmap[pos];
-    }
-  } while(++pos);
+  if (!dogate) {
+    // Now pick the furthest, freestanding location in a room from the startpos.
+    pos = 0;
+    best = 0;
+    do {
+      if (distmap[pos] > best && roommap[pos] && IS_FREESTANDING(pos)) {
+        endpos = pos;
+        best = distmap[pos];
+      }
+    } while(++pos);
+  }
 
   // Finally pick the closest point that has the best startscore.
   pos = 0;
@@ -700,14 +736,18 @@ void startend(void) {
     }
   } while(++pos);
 
-  tmap[startpos] = 14;
-  tmap[endpos] = 13;
+  tmap[startpos] = TILE_START;
+  tmap[endpos] = TILE_END;
   sigempty(startpos);
   sigempty(endpos);
+
+  if (dogate) {
+    tmap[goalpos] = TILE_GOAL;
+  }
 }
 
 u8 startscore(u8 pos) {
-  u8 score = sigmatch(pos, freesig, freemask, sizeof(freesig));
+  u8 score = IS_FREESTANDING(pos);
   // If the position is not in a room...
   if (!roommap[pos]) {
     // ...and not next to a room...
@@ -715,7 +755,7 @@ u8 startscore(u8 pos) {
       if (score) {
         // ...and it's freestanding, then give the best score
         return 1;
-      } else if (sigmatch(pos, carvesig, carvemask, sizeof(carvesig))) {
+      } else if (CAN_CARVE(pos)) {
         // If the position is carvable, give a low score
         return 6;
       }
@@ -766,9 +806,8 @@ void fillends(void) {
 
 void update_fill1(u8 pos) {
   u8 tile = tmap[pos];
-  u8 result = !(flags_bin[tmap[pos]] & 1) &&
-              sigmatch(pos, carvesig, carvemask, sizeof(carvesig)) &&
-              tile != 13 && tile != 14;
+  u8 result = !IS_WALL(tmap[pos]) && CAN_CARVE(pos) && tile != TILE_START &&
+              tile != TILE_END;
   if (tempmap[pos] != result) {
     if (result) {
       ++num_cands;
@@ -783,26 +822,29 @@ void prettywalls(void) {
   u8 pos, tile;
   pos = 0;
   do {
-    if (tmap[pos] == 2) {
+    if (tmap[pos] == TILE_FIXED_WALL) {
+      tmap[pos] = TILE_WALL;
+    }
+    if (tmap[pos] == TILE_WALL) {
       tile = sigmatch(pos, wallsig, wallmask, sizeof(wallsig));
       if (tile) {
         tile += 14;
       }
-      if ((flags_bin[tile] & 0b01000000) && !(rand() & 7)) {
+      if (HAS_CRACKED_VARIANT(tile) && !(rand() & 7)) {
         // TODO: organize tiles so this can be a simple addition
         switch (tile) {
-          case 0x10: tile = 0x9c; break;
-          case 0x1f: tile = 0xaa; break;
-          case 0x21: tile = 0xab; break;
-          case 0x30: tile = 0xaf; break;
-          case 0x32: tile = 0x9d; break;
-          case 0x33: tile = 0x9e; break;
+          case 0x10: tile = 0x9d; break;
+          case 0x1f: tile = 0xab; break;
+          case 0x21: tile = 0xac; break;
+          case 0x30: tile = 0xb0; break;
+          case 0x32: tile = 0x9e; break;
+          case 0x33: tile = 0x9f; break;
         }
       }
       tmap[pos] = tile;
-    } else if (tmap[pos] == 1 && (validmap[pos] & VALID_U) &&
-               (flags_bin[tmap[DIR_U(pos)]] & 1)) {
-      tmap[pos] = (flags_bin[tmap[DIR_U(pos)]] & 0b00001000) ? 0x9f : 3;
+    } else if (tmap[pos] == TILE_EMPTY && (validmap[pos] & VALID_U) &&
+               IS_WALL(tmap[DIR_U(pos)])) {
+      tmap[pos] = IS_CRACKED_WALL(tmap[DIR_U(pos)]) ? 0xa0 : 3;
     }
   } while(++pos);
 }
@@ -855,7 +897,7 @@ void decoration(void) {
     if (room_index >= num_rooms) { continue; }
 
     room = rooms + room_index;
-    pos = (room->y << 4) | room->x;
+    pos = room->pos;
     h = room->h;
     do {
       w = room->w;
@@ -867,34 +909,34 @@ void decoration(void) {
             break; // TODO: need mobs
 
           case ROOM_KIND_DIRT:
-            if (tile == 1) {
+            if (tile == TILE_EMPTY) {
               tmap[pos] = dirt_tiles[rand() & 3];
             }
             break;
 
           case ROOM_KIND_CARPET:
-            if (tile == 1 && h != room->h && h != 1 && w != room->w &&
+            if (tile == TILE_EMPTY && h != room->h && h != 1 && w != room->w &&
                 w != 1) {
-              tmap[pos] = 7;
+              tmap[pos] = TILE_CARPET;
             }
             // fallthrough
 
           case ROOM_KIND_TORCH:
-            if (tile == 1 && (rand() < 85) && (h & 1) &&
-                sigmatch(pos, freesig, freemask, sizeof(freesig))) {
+            if (tile == TILE_EMPTY && (rand() < 85) && (h & 1) &&
+                IS_FREESTANDING(pos)) {
               if (w == 1) {
-                tmap[pos] = 65;
+                tmap[pos] = TILE_TORCH_RIGHT;
               } else if (w == room->w) {
-                tmap[pos] = 63;
+                tmap[pos] = TILE_TORCH_LEFT;
               }
             }
             break;
 
           case ROOM_KIND_PLANT:
-            if (tile == 1) {
+            if (tile == TILE_EMPTY) {
               tmap[pos] = plant_tiles[randint(3)];
-            } else if (tile == 3) {
-              tmap[pos] = 5;
+            } else if (tile == TILE_WALL_FACE) {
+              tmap[pos] = TILE_WALL_FACE_PLANT;
             }
             // TODO: add weed/bomb mobs
             break;
@@ -909,14 +951,6 @@ void decoration(void) {
     // Pick a room kind for the next room
     kind = randint(NUM_ROOM_KINDS);
   }
-}
-
-void append_region(u8 x, u8 y, u8 w, u8 h) {
-  new_region_end->x = x;
-  new_region_end->y = y;
-  new_region_end->w = w;
-  new_region_end->h = h;
-  ++new_region_end;
 }
 
 void mapset(u8* pos, u8 w, u8 h, u8 val) {
