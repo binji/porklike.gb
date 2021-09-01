@@ -199,9 +199,17 @@ u8 num_cands;
 
 u8 key;
 
+u16 myclock;
+void tim_interrupt(void) { ++myclock; }
+
 void main(void) {
-  disable_interrupts();
   DISPLAY_OFF;
+  add_TIM(tim_interrupt);
+  TMA_REG = 0;      // Divide clock by 256 => 16Hz
+  TAC_REG = 0b100;  // 4096Hz, timer on.
+  IE_REG |= TIM_IFLAG;
+
+  enable_interrupts();
 
   floor = 0;
   initrand(0x4321);  // TODO: seed with DIV on button press
@@ -213,7 +221,6 @@ void main(void) {
   set_bkg_tiles(0, 0, 16, 16, tmap);
 
   LCDC_REG = 0b10000001;  // display on, bg on
-  enable_interrupts();
 
   while(1) {
     key = joypad();
@@ -222,17 +229,21 @@ void main(void) {
     if (key & J_A) {
       ++floor;
       if (floor == 11) { floor = 0; }
-      disable_interrupts();
       DISPLAY_OFF;
       mapgen();
       set_bkg_tiles(0, 0, 16, 16, tmap);
       LCDC_REG = 0b10000001;  // display on, bg on
-      enable_interrupts();
     }
 
     wait_vbl_done();
   }
 }
+
+u8 dummy[11];
+#define TIMESTART dummy[0] = (u8)(myclock)
+#define TIMEDIFF(x)                                                            \
+  dummy[x] = (u8)(myclock)-dummy[0];                                           \
+  TIMESTART
 
 void mapgen(void) {
   if (floor == 0) {
@@ -240,15 +251,28 @@ void mapgen(void) {
   } else if (floor == 10) {
     memcpy(tmap, map_bin + 256, 256);
   } else {
+    TIMESTART;
     roomgen();
+    TIMEDIFF(1);
     mazeworms();
+    TIMEDIFF(2);
     carvedoors();
+    TIMEDIFF(3);
     carvecuts();
+    TIMEDIFF(4);
     startend();
+    TIMEDIFF(5);
     fillends();
+    TIMEDIFF(6);
     prettywalls();
+    TIMEDIFF(7);
     voids();
+    TIMEDIFF(8);
     decoration();
+    TIMEDIFF(9);
+
+    dummy[10] = dummy[1] + dummy[2] + dummy[3] + dummy[4] + dummy[5] +
+                dummy[6] + dummy[7] + dummy[8] + dummy[9];
   }
 }
 
@@ -1055,18 +1079,34 @@ u8 getpos(u8 cand) {
   return pos;
 }
 
+const u8 randmask[] = {
+  0,0,
+  1,
+  3,3,
+  7,7,7,7,
+  15,15,15,15,15,15,15,15,
+  31,31,31,31,31,31,31,31,31,31,31,31,31,31,31,31,
+  63,63,63,63,63,63,63,63,63,63,63,63,63,63,63,63,
+  63,63,63,63,63,63,63,63,63,63,63,63,63,63,63,63,
+  127,127,127,127,127,127,127,127,127,127,127,127,127,127,127,127,
+  127,127,127,127,127,127,127,127,127,127,127,127,127,127,127,127,
+  127,127,127,127,127,127,127,127,127,127,127,127,127,127,127,127,
+  127,127,127,127,127,127,127,127,127,127,127,127,127,127,127,127,
+  255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,
+  255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,
+  255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,
+  255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,
+  255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,
+  255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,
+  255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,
+  255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,
+};
+
 u8 randint(u8 mx) {
   if (mx == 0) { return 0; }
-  u8 mask = 1, mx2 = mx;
-  do {
-    mask <<= 1;
-    mask |= 1;
-    mx2 >>= 1;
-  } while (mx2);
-
   u8 result;
   do {
-    result = rand() & mask;
+    result = rand() & randmask[mx];
   } while (result >= mx);
   return result;
 }
