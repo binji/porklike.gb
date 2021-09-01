@@ -167,10 +167,6 @@ typedef enum RoomKind {
   NUM_ROOM_KINDS,
 } RoomKind;
 
-typedef struct Room {
-  u8 pos, w, h, pad;
-} Room;
-
 Map tmap;    // Tile map
 Map roommap; // Room map
 Map sigmap;  // Signature map (tracks neighbors)
@@ -186,7 +182,10 @@ u8 ds_sizes[64];
 u8 ds_nextid;
 u8 ds_num_sets;
 
-Room rooms[4];
+u8 room_pos[4];
+u8 room_w[4];
+u8 room_h[4];
+
 u8 start_room;
 u8 num_rooms;
 u8 num_voids;
@@ -277,7 +276,6 @@ void mapgen(void) {
 }
 
 void roomgen(void) {
-  Room* room = rooms;
   u8 failmax = 5, maxwidth = 10, maxheight = 10, maxh;
   u8 sig, valid, walkable, val, w, h, pos;
 
@@ -427,14 +425,13 @@ void roomgen(void) {
     if (num_cands) {
       pos = cands[randint(num_cands)];
 
-      room->pos = pos;
-      room->w = w;
-      room->h = h;
-      ++room;
+      room_pos[num_rooms] = pos;
+      room_w[num_rooms] = w;
+      room_h[num_rooms] = h;
 
       // Fill room tiles at x, y
       mapset(tmap + pos, w, h, 1);
-      mapset(roommap + pos, w, h, ++num_rooms);
+      mapset(roommap + pos, w, h, num_rooms);
       sigrect_empty(pos, w, h);
 
       // Update disjoint set regions; we know that they're disjoint so they
@@ -444,7 +441,7 @@ void roomgen(void) {
       ds_sizes[ds_nextid] = w * h; // XXX multiply
       ++ds_num_sets;
 
-      if (num_rooms == 1) {
+      if (++num_rooms == 1) {
         maxwidth >>= 1;
         maxheight >>= 1;
       }
@@ -913,18 +910,16 @@ void voids(void) {
 
 void decoration(void) {
   RoomKind kind = ROOM_KIND_VASE;
-  Room* room;
   const u8 (*room_perm)[4] = room_permutations + randint(24);
-  u8 i, room_index, pos, tile, w, h;
+  u8 i, room, pos, tile, w, h;
   for (i = 0; i < 4; ++i) {
-    room_index = (*room_perm)[i];
-    if (room_index >= num_rooms) { continue; }
+    room = (*room_perm)[i];
+    if (room >= num_rooms) { continue; }
 
-    room = rooms + room_index;
-    pos = room->pos;
-    h = room->h;
+    pos = room_pos[room];
+    h = room_h[room];
     do {
-      w = room->w;
+      w = room_w[room];
       do {
         tile = tmap[pos];
 
@@ -939,8 +934,8 @@ void decoration(void) {
             break;
 
           case ROOM_KIND_CARPET:
-            if (tile == TILE_EMPTY && h != room->h && h != 1 && w != room->w &&
-                w != 1) {
+            if (tile == TILE_EMPTY && h != room_h[room] && h != 1 &&
+                w != room_w[room] && w != 1) {
               tmap[pos] = TILE_CARPET;
             }
             // fallthrough
@@ -950,7 +945,7 @@ void decoration(void) {
                 IS_FREESTANDING(pos)) {
               if (w == 1) {
                 tmap[pos] = TILE_TORCH_RIGHT;
-              } else if (w == room->w) {
+              } else if (w == room_w[room]) {
                 tmap[pos] = TILE_TORCH_LEFT;
               }
             }
@@ -968,7 +963,7 @@ void decoration(void) {
 
         ++pos;
       } while(--w);
-      pos += 16 - room->w;
+      pos += 16 - room_w[room];
     } while(--h);
 
 
