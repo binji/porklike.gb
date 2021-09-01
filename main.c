@@ -11,6 +11,13 @@ extern const u8 tiles_bg_2bpp[];
 extern const u8 map_bin[];
 extern const u8 flags_bin[];
 
+#define MAX_DS_SET 64  /* XXX can be smaller */
+#define MAX_ROOMS 4
+#define MAX_CANDS 256
+
+#define MAP_WIDTH 16
+#define MAP_HEIGHT 16
+
 #define IS_WALL(tile) (flags_bin[tile] & 1)
 #define HAS_CRACKED_VARIANT(tile) (flags_bin[tile] & 0b01000000)
 #define IS_CRACKED_WALL(tile) (flags_bin[tile] & 0b00001000)
@@ -120,7 +127,7 @@ const u8 void_tiles[] = {9, 9, 9, 9, 9, 9, 10};
 const u8 dirt_tiles[] = {1, 73, 74, 75};
 const u8 plant_tiles[] = {11, 12, 70};
 
-const u8 room_permutations[][4] = {
+const u8 room_permutations[][MAX_ROOMS] = {
     {1, 2, 3, 4}, {1, 2, 4, 3}, {1, 3, 2, 4}, {1, 3, 4, 2}, {1, 4, 2, 3},
     {1, 4, 3, 2}, {2, 1, 3, 4}, {2, 1, 4, 3}, {2, 3, 1, 4}, {2, 3, 4, 1},
     {2, 4, 1, 3}, {2, 4, 3, 1}, {3, 1, 2, 4}, {3, 1, 4, 2}, {3, 2, 1, 4},
@@ -156,7 +163,7 @@ u8 ds_find(u8 id);
 u8 getpos(u8 cand);
 u8 randint(u8 mx);
 
-typedef u8 Map[16*16];
+typedef u8 Map[MAP_WIDTH * MAP_HEIGHT];
 
 typedef enum RoomKind {
   ROOM_KIND_VASE,
@@ -168,32 +175,32 @@ typedef enum RoomKind {
 } RoomKind;
 
 Map tmap;    // Tile map
-Map roommap; // Room map
-Map sigmap;  // Signature map (tracks neighbors)
-Map tempmap; // Temp map (used for carving)
+Map roommap; // Room/void map
 Map distmap; // Distance map
+Map sigmap;  // Signature map (tracks neighbors) **only used during mapgen
+Map tempmap; // Temp map (used for carving)      **only used during mapgen
 
 // The following data structures is used for rooms as well as union-find
 // algorithm; see https://en.wikipedia.org/wiki/Disjoint-set_data_structure
-// XXX can be much smaller
-Map ds_sets; // TODO seems like it should be possible to put this in roommap
-u8 ds_parents[64];
-u8 ds_sizes[64];
-u8 ds_nextid;
-u8 ds_num_sets;
+Map ds_sets;               // **only used during mapgen
+u8 ds_parents[MAX_DS_SET]; // **only used during mapgen
+u8 ds_sizes[MAX_DS_SET];   // **only used during mapgen
+u8 ds_nextid;              // **only used during mapgen
+u8 ds_num_sets;            // **only used during mapgen
+u8 dogate;                 // **only used during mapgen
+u8 endpos, goalpos;        // **only used during mapgen
 
-u8 room_pos[4];
-u8 room_w[4];
-u8 room_h[4];
+u8 room_pos[MAX_ROOMS];
+u8 room_w[MAX_ROOMS];
+u8 room_h[MAX_ROOMS];
+u8 num_rooms;
 
 u8 start_room;
-u8 num_rooms;
 u8 num_voids;
 u8 floor;
-u8 dogate;
-u8 startpos, endpos, goalpos;
+u8 startpos;
 
-u8 cands[256];
+u8 cands[MAX_CANDS];
 u8 num_cands;
 
 u8 key;
@@ -217,7 +224,7 @@ void main(void) {
   init_bkg(0);
   mapgen();
 
-  set_bkg_tiles(0, 0, 16, 16, tmap);
+  set_bkg_tiles(0, 0, MAP_WIDTH, MAP_HEIGHT, tmap);
 
   LCDC_REG = 0b10000001;  // display on, bg on
 
@@ -230,7 +237,7 @@ void main(void) {
       if (floor == 11) { floor = 0; }
       DISPLAY_OFF;
       mapgen();
-      set_bkg_tiles(0, 0, 16, 16, tmap);
+      set_bkg_tiles(0, 0, MAP_WIDTH, MAP_HEIGHT, tmap);
       LCDC_REG = 0b10000001;  // display on, bg on
     }
 
@@ -449,7 +456,7 @@ void roomgen(void) {
       // cannot place room
       --failmax;
     }
-  } while (failmax && num_rooms < 4);
+  } while (failmax && num_rooms < MAX_ROOMS);
 }
 
 void mazeworms(void) {
@@ -584,7 +591,7 @@ void carvedoors(void) {
 
   do {
     // Pick a random door, and calculate its position.
-    pos = getpos(randint(num_cands));;
+    pos = getpos(randint(num_cands));
 
     // Merge the regions, if possible. They may be already part of the same
     // set, in which case they should not be joined.
@@ -805,8 +812,8 @@ void fillends(void) {
       // Choose a random point, and calculate its offset
       pos = getpos(randint(num_cands));
 
-      tmap[pos] = 2; // Set tile to wall
-      sigwall(pos);  // Update neighbor signatures.
+      tmap[pos] = TILE_WALL; // Set tile to wall
+      sigwall(pos);          // Update neighbor signatures.
 
       // Remove this cell from the dead end map
       --num_cands;
@@ -910,9 +917,9 @@ void voids(void) {
 
 void decoration(void) {
   RoomKind kind = ROOM_KIND_VASE;
-  const u8 (*room_perm)[4] = room_permutations + randint(24);
+  const u8 (*room_perm)[MAX_ROOMS] = room_permutations + randint(24);
   u8 i, room, pos, tile, w, h;
-  for (i = 0; i < 4; ++i) {
+  for (i = 0; i < MAX_ROOMS; ++i) {
     room = (*room_perm)[i];
     if (room >= num_rooms) { continue; }
 
@@ -963,7 +970,7 @@ void decoration(void) {
 
         ++pos;
       } while(--w);
-      pos += 16 - room_w[room];
+      pos += MAP_WIDTH - room_w[room];
     } while(--h);
 
 
@@ -979,7 +986,7 @@ void mapset(u8* pos, u8 w, u8 h, u8 val) {
     if (--w2 == 0) {
       w2 = w;
       --h;
-      pos += 16 - w;
+      pos += MAP_WIDTH - w;
     }
   } while (h);
 }
@@ -993,7 +1000,7 @@ void sigrect_empty(u8 pos, u8 w, u8 h) {
     if (--w2 == 0) {
       w2 = w;
       --h;
-      pos += 16 - w;
+      pos += MAP_WIDTH - w;
     }
   } while (h);
 }
