@@ -39,3 +39,7 @@ for row in rows:
         s += '0 '
     s += '  '
   print(s)
+
+for i in range(len(sigs)):
+  sigs[i] |= msks[i]
+print(sigs)

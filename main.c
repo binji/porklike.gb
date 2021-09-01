@@ -15,9 +15,9 @@ extern const u8 flags_bin[];
 #define HAS_CRACKED_VARIANT(tile) (flags_bin[tile] & 0b01000000)
 #define IS_CRACKED_WALL(tile) (flags_bin[tile] & 0b00001000)
 
-#define IS_DOOR(pos) sigmatch((pos), doorsig, doormask, sizeof(doorsig))
-#define CAN_CARVE(pos) sigmatch((pos), carvesig, carvemask, sizeof(carvesig))
-#define IS_FREESTANDING(pos) sigmatch((pos), freesig, freemask, sizeof(freesig))
+#define IS_DOOR(pos) sigmatch((pos), doorsig, doormask)
+#define CAN_CARVE(pos) sigmatch((pos), carvesig, carvemask)
+#define IS_FREESTANDING(pos) sigmatch((pos), freesig, freemask)
 
 #define VALID_UL 0b00000001
 #define VALID_DL 0b00000010
@@ -65,19 +65,19 @@ extern const u8 flags_bin[];
 const u8 dirpos[]   = {0xff, 1, 0xf0, 16};  // L R U D
 const u8 dirvalid[] = {VALID_L,VALID_R,VALID_U,VALID_D};
 
-const u8 carvesig[] = {255, 214, 124, 179, 233};
+const u8 carvesig[] = {255, 223, 127, 191, 239, 0};
 const u8 carvemask[] = {0, 9, 3, 12, 6};
-const u8 doorsig[] = {192, 48};
+const u8 doorsig[] = {207, 63, 0};
 const u8 doormask[] = {15, 15};
 
-const u8 freesig[] = {0, 0, 0, 0, 16, 64, 32, 128, 161, 104, 84, 146};
+const u8 freesig[] = {8, 4, 2, 1, 22, 76, 41, 131, 171, 109, 94, 151, 0};
 const u8 freemask[] = {8, 4, 2, 1, 6, 12, 9, 3, 10, 5, 10, 5};
 
 const u8 wallsig[] = {
-    251, 233, 253, 84,  146, 80,  16,  144, 112, 208, 241, 248,
-    210, 177, 225, 120, 179, 0,   124, 104, 161, 64,  240, 128,
-    224, 176, 242, 244, 116, 232, 178, 212, 247, 214, 254, 192,
-    48,  96,  32,  160, 245, 250, 243, 249, 246, 252,
+    251, 239, 253, 95,  159, 91,  31,  157, 115, 217, 241, 248,
+    219, 189, 231, 123, 191, 15,  127, 111, 175, 79,  240, 143,
+    230, 188, 242, 244, 119, 238, 190, 221, 247, 223, 254, 207,
+    63,  103, 47,  174, 245, 250, 243, 249, 246, 252, 0,
 };
 const u8 wallmask[] = {
     0,  6,  0, 11, 13, 11, 15, 13, 3, 9,  0, 0, 9, 12, 6,  3,
@@ -150,7 +150,7 @@ void mapset(u8* pos, u8 w, u8 h, u8 val);
 void sigrect_empty(u8 pos, u8 w, u8 h);
 void sigempty(u8 pos);
 void sigwall(u8 pos);
-u8 sigmatch(u16 pos, u8* sig, u8* mask, u8 len);
+u8 sigmatch(u16 pos, u8* sig, u8* mask);
 u8 ds_union(u8 x, u8 y);
 u8 ds_find(u8 id);
 u8 getpos(u8 cand);
@@ -850,7 +850,7 @@ void prettywalls(void) {
       tmap[pos] = TILE_WALL;
     }
     if (tmap[pos] == TILE_WALL) {
-      tile = sigmatch(pos, wallsig, wallmask, sizeof(wallsig));
+      tile = sigmatch(pos, wallsig, wallmask);
       if (tile) {
         tile += 14;
       }
@@ -1027,26 +1027,25 @@ void sigwall(u8 pos) {
   if (valid & VALID_DR) { sigmap[DIR_DR(pos)] |= VALID_UL; }
 }
 
-u8 sigmatch(u16 pos, u8* sig, u8* mask, u8 len) {
+u8 sigmatch(u16 pos, u8* sig, u8* mask) {
   u8 result = 0;
   u8 val = sigmap[pos];
-  do {
-    if ((val | *mask) == (*sig | *mask)) {
+  while (1) {
+    if (*sig == 0) { return 0; }
+    if ((val | *mask) == *sig) {
       return result + 1;
     }
     ++mask;
     ++sig;
     ++result;
-  } while(result < len);
-  return 0;
+  }
 }
 
 u8 ds_union(u8 x, u8 y) {
-  x = ds_find(x);
-  if (!x) return 0;  // TODO: remove this since x is always called w/ valid id
-
-  y = ds_find(y);
   if (!y) return 0;
+  if (!x) return 0;  // TODO: remove this since x is always called w/ valid id
+  x = ds_find(x);
+  y = ds_find(y);
 
   if (x == y) return 0;
 
