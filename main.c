@@ -2,29 +2,39 @@
 #include <rand.h>
 #include <string.h>
 
+#include "tilebg.c"
+#include "tileshared.c"
+#include "tilesprites.c"
+#include "map.c"
+#include "flags.c"
+
 typedef int8_t s8;
 typedef uint8_t u8;
 typedef int16_t s16;
 typedef uint16_t u16;
 
-extern const u8 tiles_bg_2bpp[];
-extern const u8 map_bin[];
-extern const u8 flags_bin[];
-
 #define MAX_DS_SET 64  /* XXX can be smaller */
 #define MAX_ROOMS 4
+#define MAX_VOIDS 10 /* XXX Figure out what this should be */
 #define MAX_CANDS 256
+#define MAX_MOBS 32  /* XXX Figure out what this should be */
+
+#define PLAYER_MOB 0
 
 #define MAP_WIDTH 16
 #define MAP_HEIGHT 16
 
-#define IS_WALL(tile) (flags_bin[tile] & 1)
-#define HAS_CRACKED_VARIANT(tile) (flags_bin[tile] & 0b01000000)
-#define IS_CRACKED_WALL(tile) (flags_bin[tile] & 0b00001000)
+#define IS_WALL_TILE(tile) (flags_bin[tile] & 1)
+#define TILE_HAS_CRACKED_VARIANT(tile) (flags_bin[tile] & 0b01000000)
+#define IS_CRACKED_WALL_TILE(tile) (flags_bin[tile] & 0b00001000)
 
 #define IS_DOOR(pos) sigmatch((pos), doorsig, doormask)
 #define CAN_CARVE(pos) sigmatch((pos), carvesig, carvemask)
 #define IS_FREESTANDING(pos) sigmatch((pos), freesig, freemask)
+
+#define IS_SMARTMOB(tile, pos) ((flags_bin[tile] & 3) || mobmap[pos])
+
+#define URAND() ((u8)rand())
 
 #define VALID_UL 0b00000001
 #define VALID_DL 0b00000010
@@ -59,15 +69,27 @@ extern const u8 flags_bin[];
 #define TILE_WALL 2
 #define TILE_WALL_FACE 3
 #define TILE_WALL_FACE_PLANT 5
+#define TILE_TELEPORTER 6
 #define TILE_CARPET 7
-#define TILE_END 13
-#define TILE_START 14
-#define TILE_GOAL 62
-#define TILE_TORCH_LEFT 63
-#define TILE_TORCH_RIGHT 65
-#define TILE_HEART 67
-#define TILE_FIXED_WALL 84
-#define TILE_STEPS 161
+#define TILE_VOID1 9
+#define TILE_VOID2 10
+#define TILE_END 0xd
+#define TILE_START 0xe
+#define TILE_GOAL 0x3e
+#define TILE_TORCH_LEFT 0x3f
+#define TILE_TORCH_RIGHT 0x41
+#define TILE_HEART 0x42
+#define TILE_DIRT1 0x43
+#define TILE_DIRT2 0x44
+#define TILE_DIRT3 0x48
+#define TILE_PLANT1 0xb
+#define TILE_PLANT2 0xc
+#define TILE_PLANT3 0x47
+#define TILE_FIXED_WALL 0x4a
+#define TILE_SAW1 0x59
+#define TILE_WALL_FACE_CRACKED 0x60
+#define TILE_STEPS 0x6a
+#define TILE_ENTRANCE 0x6b
 
 const u8 dirpos[]   = {0xff, 1, 0xf0, 16};  // L R U D
 const u8 dirvalid[] = {VALID_L,VALID_R,VALID_U,VALID_D};
@@ -123,19 +145,139 @@ const u8 validmap[] = {
   0x68,0xe9,0xe9,0xe9,0xe9,0xe9,0xe9,0xe9,0xe9,0xe9,0xe9,0xe9,0xe9,0xe9,0xe9,0xa1,
 };
 
-const u8 void_tiles[] = {9, 9, 9, 9, 9, 9, 10};
-const u8 dirt_tiles[] = {1, 73, 74, 75};
-const u8 plant_tiles[] = {11, 12, 70};
+const u8 void_tiles[] = {TILE_VOID1, TILE_VOID1, TILE_VOID1, TILE_VOID1,
+                         TILE_VOID1, TILE_VOID1, TILE_VOID2};
+const u8 dirt_tiles[] = {TILE_EMPTY, TILE_DIRT1, TILE_DIRT2, TILE_DIRT3};
+const u8 plant_tiles[] = {TILE_PLANT1, TILE_PLANT2, TILE_PLANT3};
 
 const u8 room_permutations[][MAX_ROOMS] = {
-    {1, 2, 3, 4}, {1, 2, 4, 3}, {1, 3, 2, 4}, {1, 3, 4, 2}, {1, 4, 2, 3},
-    {1, 4, 3, 2}, {2, 1, 3, 4}, {2, 1, 4, 3}, {2, 3, 1, 4}, {2, 3, 4, 1},
-    {2, 4, 1, 3}, {2, 4, 3, 1}, {3, 1, 2, 4}, {3, 1, 4, 2}, {3, 2, 1, 4},
-    {3, 2, 4, 1}, {3, 4, 1, 2}, {3, 4, 2, 1}, {4, 1, 2, 3}, {4, 1, 3, 2},
-    {4, 2, 1, 3}, {4, 2, 3, 1}, {4, 3, 1, 2}, {4, 3, 2, 1},
+    {0, 1, 2, 3}, {0, 1, 3, 2}, {0, 2, 1, 3}, {0, 2, 3, 1}, {0, 3, 1, 2},
+    {0, 3, 2, 1}, {1, 0, 2, 3}, {1, 0, 3, 2}, {1, 2, 0, 3}, {1, 2, 3, 0},
+    {1, 3, 0, 2}, {1, 3, 2, 0}, {2, 0, 1, 3}, {2, 0, 3, 1}, {2, 1, 0, 3},
+    {2, 1, 3, 0}, {2, 3, 0, 1}, {2, 3, 1, 0}, {3, 0, 1, 2}, {3, 0, 2, 1},
+    {3, 1, 0, 2}, {3, 1, 2, 0}, {3, 2, 0, 1}, {3, 2, 1, 0},
 };
 
+const u8 vase_mobs[] = {0, 0, 0, 0, 0, 0, MOB_TYPE_VASE1, MOB_TYPE_VASE2};
+const u8 plant_mobs[] = {MOB_TYPE_WEED, MOB_TYPE_WEED, MOB_TYPE_BOMB};
+
+const u8 mob_plan[] = {
+    // floor 1
+    MOB_TYPE_SLIME, MOB_TYPE_SLIME, MOB_TYPE_SLIME, MOB_TYPE_SLIME,
+    MOB_TYPE_SLIME,
+    // floor 2
+    MOB_TYPE_SLIME, MOB_TYPE_SLIME, MOB_TYPE_QUEEN, MOB_TYPE_SLIME,
+    MOB_TYPE_SLIME, MOB_TYPE_QUEEN,
+    // floor 3
+    MOB_TYPE_SLIME, MOB_TYPE_SLIME, MOB_TYPE_QUEEN, MOB_TYPE_SLIME,
+    MOB_TYPE_SLIME, MOB_TYPE_QUEEN, MOB_TYPE_SLIME,
+    // floor 4
+    MOB_TYPE_SCORPION, MOB_TYPE_SCORPION, MOB_TYPE_SCORPION, MOB_TYPE_HULK,
+    MOB_TYPE_SCORPION, MOB_TYPE_SCORPION, MOB_TYPE_SCORPION, MOB_TYPE_HULK,
+    // floor 5
+    MOB_TYPE_SCORPION, MOB_TYPE_SCORPION, MOB_TYPE_HULK, MOB_TYPE_SCORPION,
+    MOB_TYPE_SCORPION, MOB_TYPE_HULK, MOB_TYPE_SCORPION, MOB_TYPE_SCORPION,
+    MOB_TYPE_HULK,
+    // floor 6
+    MOB_TYPE_HULK, MOB_TYPE_SCORPION, MOB_TYPE_HULK, MOB_TYPE_SCORPION,
+    MOB_TYPE_SCORPION, MOB_TYPE_HULK, MOB_TYPE_SCORPION, MOB_TYPE_SCORPION,
+    MOB_TYPE_HULK,
+    // floor 7
+    MOB_TYPE_GHOST, MOB_TYPE_GHOST, MOB_TYPE_GHOST, MOB_TYPE_KONG,
+    MOB_TYPE_GHOST, MOB_TYPE_GHOST, MOB_TYPE_GHOST, MOB_TYPE_KONG,
+    MOB_TYPE_GHOST,
+    // floor 8
+    MOB_TYPE_GHOST, MOB_TYPE_GHOST, MOB_TYPE_KONG, MOB_TYPE_GHOST,
+    MOB_TYPE_GHOST, MOB_TYPE_KONG, MOB_TYPE_GHOST, MOB_TYPE_GHOST,
+    MOB_TYPE_KONG,
+    // floor 9
+    MOB_TYPE_GHOST, MOB_TYPE_KONG, MOB_TYPE_GHOST, MOB_TYPE_KONG,
+    MOB_TYPE_GHOST, MOB_TYPE_KONG, MOB_TYPE_GHOST, MOB_TYPE_KONG,
+    MOB_TYPE_GHOST};
+
+const u8 mob_plan_floor[] = {
+    0,  // floor 0
+    0,  // floor 1
+    5,  // floor 2
+    11, // floor 3
+    18, // floor 4
+    26, // floor 5
+    35, // floor 6
+    44, // floor 7
+    53, // floor 8
+    62, // floor 9
+    70, // total
+};
+
+// XXX
+const u8 mob_tile[] = {
+    0x99, // player
+    0x80, // slime
+    0x86, // queen
+    0x8a, // scorpion
+    0x83, // hulk
+    0x8d, // ghost
+    0x90, // kong
+    0x9d, // reaper
+    0xb6, // weed
+    0xb9, // bomb
+    0x5d, // vase1
+    0x5e, // vase2
+    0x5f, // chest
+};
+
+typedef u8 Map[MAP_WIDTH * MAP_HEIGHT];
+
+typedef enum RoomKind {
+  ROOM_KIND_VASE,
+  ROOM_KIND_DIRT,
+  ROOM_KIND_CARPET,
+  ROOM_KIND_TORCH,
+  ROOM_KIND_PLANT,
+  NUM_ROOM_KINDS,
+} RoomKind;
+
+typedef enum MobType {
+  MOB_TYPE_PLAYER,
+  MOB_TYPE_SLIME,
+  MOB_TYPE_QUEEN,
+  MOB_TYPE_SCORPION,
+  MOB_TYPE_HULK,
+  MOB_TYPE_GHOST,
+  MOB_TYPE_KONG,
+  MOB_TYPE_REAPER,
+  MOB_TYPE_WEED,
+  MOB_TYPE_BOMB,
+  MOB_TYPE_VASE1,
+  MOB_TYPE_VASE2,
+  MOB_TYPE_CHEST,
+  NUM_MOB_TYPES,
+} MobType;
+
+typedef enum PickupType {
+  PICKUP_TYPE_HEART,
+  PICKUP_TYPE_KEY,
+  PICKUP_TYPE_JUMP,
+  PICKUP_TYPE_BOLT,
+  PICKUP_TYPE_PUSH,
+  PICKUP_TYPE_GRAPPLE,
+  PICKUP_TYPE_SPEAR,
+  PICKUP_TYPE_SMASH,
+  PICKUP_TYPE_HOOK,
+  PICKUP_TYPE_SPIN,
+  PICKUP_TYPE_SUPLEX,
+  PICKUP_TYPE_SLAP,
+} PickupType;
+
+void init(void);
+
+void addmob(MobType type, u8 pos);
+void addpickup(PickupType type, u8 pos);
+
+// Map generation
 void mapgen(void);
+void mapgeninit(void);
+void copymap(u8 index);
 void roomgen(void);
 void mazeworms(void);
 void update_carve1(u8 pos);
@@ -152,7 +294,10 @@ void fillends(void);
 void update_fill1(u8 pos);
 void prettywalls(void);
 void voids(void);
+void chests(void);
 void decoration(void);
+void spawnmobs(void);
+u8 no_mob_neighbors(u8 pos);
 void mapset(u8* pos, u8 w, u8 h, u8 val);
 void sigrect_empty(u8 pos, u8 w, u8 h);
 void sigempty(u8 pos);
@@ -163,45 +308,46 @@ u8 ds_find(u8 id);
 u8 getpos(u8 cand);
 u8 randint(u8 mx);
 
-typedef u8 Map[MAP_WIDTH * MAP_HEIGHT];
-
-typedef enum RoomKind {
-  ROOM_KIND_VASE,
-  ROOM_KIND_DIRT,
-  ROOM_KIND_CARPET,
-  ROOM_KIND_TORCH,
-  ROOM_KIND_PLANT,
-  NUM_ROOM_KINDS,
-} RoomKind;
 
 Map tmap;    // Tile map
 Map roommap; // Room/void map
 Map distmap; // Distance map
+Map mobmap;  // Mob map
 Map sigmap;  // Signature map (tracks neighbors) **only used during mapgen
 Map tempmap; // Temp map (used for carving)      **only used during mapgen
 
 // The following data structures is used for rooms as well as union-find
 // algorithm; see https://en.wikipedia.org/wiki/Disjoint-set_data_structure
-Map ds_sets;               // **only used during mapgen
-u8 ds_parents[MAX_DS_SET]; // **only used during mapgen
-u8 ds_sizes[MAX_DS_SET];   // **only used during mapgen
-u8 ds_nextid;              // **only used during mapgen
-u8 ds_num_sets;            // **only used during mapgen
-u8 dogate;                 // **only used during mapgen
-u8 endpos, goalpos;        // **only used during mapgen
+Map ds_sets;                   // **only used during mapgen
+u8 ds_parents[MAX_DS_SET];     // **only used during mapgen
+u8 ds_sizes[MAX_DS_SET];       // **only used during mapgen
+u8 ds_nextid;                  // **only used during mapgen
+u8 ds_num_sets;                // **only used during mapgen
+u8 dogate;                     // **only used during mapgen
+u8 endpos, gatepos, heartpos;  // **only used during mapgen
 
 u8 room_pos[MAX_ROOMS];
 u8 room_w[MAX_ROOMS];
 u8 room_h[MAX_ROOMS];
+u8 room_avoid[MAX_ROOMS]; // ** only used during mapgen
 u8 num_rooms;
 
-u8 start_room;
+u8 void_num_tiles[MAX_VOIDS]; // Number of tiles in a void region
+u8 void_num_walls[MAX_VOIDS]; // Number of walls in a void region
 u8 num_voids;
+
+u8 start_room;
 u8 floor;
 u8 startpos;
 
 u8 cands[MAX_CANDS];
 u8 num_cands;
+
+u8 mob_anim_frame[NUM_MOB_TYPES];
+u8 mob_anim_speed[NUM_MOB_TYPES];
+MobType mob_type[MAX_MOBS];
+u8 mob_pos[MAX_MOBS];
+u8 num_mobs;
 
 u8 key;
 
@@ -209,23 +355,10 @@ u16 myclock;
 void tim_interrupt(void) { ++myclock; }
 
 void main(void) {
-  DISPLAY_OFF;
-  add_TIM(tim_interrupt);
-  TMA_REG = 0;      // Divide clock by 256 => 16Hz
-  TAC_REG = 0b100;  // 4096Hz, timer on.
-  IE_REG |= TIM_IFLAG;
-
-  enable_interrupts();
-
-  floor = 0;
-  initrand(0x4321);  // TODO: seed with DIV on button press
-
-  set_bkg_data(0, 0xb1, tiles_bg_2bpp);
-  init_bkg(0);
+  init();
   mapgen();
 
-  set_bkg_tiles(0, 0, MAP_WIDTH, MAP_HEIGHT, tmap);
-
+  set_bkg_tiles(2, 1, MAP_WIDTH, MAP_HEIGHT, tmap);
   LCDC_REG = 0b10000001;  // display on, bg on
 
   while(1) {
@@ -237,7 +370,7 @@ void main(void) {
       if (floor == 11) { floor = 0; }
       DISPLAY_OFF;
       mapgen();
-      set_bkg_tiles(0, 0, MAP_WIDTH, MAP_HEIGHT, tmap);
+      set_bkg_tiles(2, 1, MAP_WIDTH, MAP_HEIGHT, tmap);
       LCDC_REG = 0b10000001;  // display on, bg on
     }
 
@@ -245,17 +378,56 @@ void main(void) {
   }
 }
 
-u8 dummy[11];
+void init(void) {
+  DISPLAY_OFF;
+
+   // 0:LightGray 1:DarkGray 2:Black 3:White
+  BGP_REG = OBP0_REG = OBP1_REG = 0b00111001;
+
+  add_TIM(tim_interrupt);
+  TMA_REG = 0;      // Divide clock by 256 => 16Hz
+  TAC_REG = 0b100;  // 4096Hz, timer on.
+  IE_REG |= TIM_IFLAG;
+
+  enable_interrupts();
+
+  floor = 0;
+  initrand(0x4321);  // TODO: seed with DIV on button press
+
+  set_sprite_data(0, SPRITES_TILES, sprites_bin);
+  set_bkg_data(0, BG_TILES, bg_bin);
+  set_bkg_data(0x80, SHARED_TILES, shared_bin);
+  init_bkg(0);
+
+  num_mobs = 0;
+  addmob(MOB_TYPE_PLAYER, 0);
+}
+
+u8 dummy[13];
 #define TIMESTART dummy[0] = (u8)(myclock)
 #define TIMEDIFF(x)                                                            \
   dummy[x] = (u8)(myclock)-dummy[0];                                           \
   TIMESTART
 
+void addmob(MobType type, u8 pos) {
+  mob_type[num_mobs] = type;
+  mob_pos[num_mobs] = pos;
+  ++num_mobs;
+  mobmap[pos] = num_mobs; // index+1
+}
+
+void addpickup(PickupType pick, u8 pos) {
+  // TODO
+}
+
 void mapgen(void) {
+  num_mobs = 1;
+  mapgeninit();
   if (floor == 0) {
-    memcpy(tmap, map_bin, 256);
+    copymap(0);
+    addmob(MOB_TYPE_CHEST, 119);  // x=7,y=7
   } else if (floor == 10) {
-    memcpy(tmap, map_bin + 256, 256);
+    copymap(1);
   } else {
     TIMESTART;
     roomgen();
@@ -274,12 +446,39 @@ void mapgen(void) {
     TIMEDIFF(7);
     voids();
     TIMEDIFF(8);
-    decoration();
+    chests();
     TIMEDIFF(9);
+    decoration();
+    TIMEDIFF(10);
+    spawnmobs();
+    TIMEDIFF(11);
 
-    dummy[10] = dummy[1] + dummy[2] + dummy[3] + dummy[4] + dummy[5] +
-                dummy[6] + dummy[7] + dummy[8] + dummy[9];
+    dummy[12] = dummy[1] + dummy[2] + dummy[3] + dummy[4] + dummy[5] +
+                dummy[6] + dummy[7] + dummy[8] + dummy[9] + dummy[10] + dummy[11];
   }
+
+  // XXX
+  for (u8 i = 0; i < num_mobs; ++i) {
+    tmap[mob_pos[i]] = mob_tile[mob_type[i]];
+  }
+}
+
+void mapgeninit(void) {
+  memset(roommap, 0, sizeof(roommap));
+  memset(mobmap, 0, sizeof(mobmap));
+  memset(sigmap, 255, sizeof(sigmap));
+  memset(ds_sets, 0, sizeof(ds_sets));
+
+  dogate = 0;
+
+  // Initialize disjoint set
+  ds_nextid = 0;
+  ds_parents[0] = 0;
+  ds_num_sets = 0;
+
+  num_rooms = 0;
+  num_voids = 0;
+  start_room = 0;
 }
 
 void roomgen(void) {
@@ -288,71 +487,13 @@ void roomgen(void) {
 
   dogate = floor == 3 || floor == 6 || floor == 9;
 
-  memset(roommap, 0, sizeof(roommap));
-  memset(sigmap, 255, sizeof(sigmap));
-  memset(ds_sets, 0, sizeof(ds_sets));
-
-  // Initialize disjoint set
-  ds_nextid = 0;
-  ds_parents[0] = 0;
-  ds_num_sets = 0;
-
   if (dogate) {
     // Pick a random gate map
-    memcpy(tmap, map_bin + 512 + (randint(14) << 8), 256);
-
-    // Update signature map for empty tiles
-    pos = 0;
-    do {
-      switch (tmap[pos]) {
-        case TILE_END:
-          endpos = pos;
-          goto empty;
-
-        case TILE_START:
-          startpos = pos;
-          goto empty;
-
-        case TILE_GOAL:
-          // Temporarily change to stairs so the empty spaces behind the gate
-          // can be part of the spanning graph created during the carvedoors()
-          // step.
-          tmap[pos] = TILE_END;
-          goalpos = pos;
-          goto empty;
-
-        case TILE_HEART:
-          // TODO: add heart mob
-          goto empty;
-
-        empty:
-        case TILE_CARPET:
-        case TILE_EMPTY:
-        case TILE_STEPS:
-          // Update sigmap
-          sigempty(pos);
-
-          // Update disjoint set for the gate area
-          ++ds_nextid;
-          ds_sets[pos] = ds_nextid;
-          ds_parents[ds_nextid] = ds_nextid;
-          ds_sizes[ds_nextid] = 1;
-
-          valid = validmap[pos];
-          if (valid & VALID_U) { ds_union(ds_nextid, ds_sets[DIR_U(pos)]); }
-          if (valid & VALID_L) { ds_union(ds_nextid, ds_sets[DIR_L(pos)]); }
-          if (valid & VALID_R) { ds_union(ds_nextid, ds_sets[DIR_R(pos)]); }
-          if (valid & VALID_D) { ds_union(ds_nextid, ds_sets[DIR_D(pos)]); }
-          break;
-      }
-
-    } while (++pos);
+    copymap(2 + randint(14));
   } else {
     // Start with a completely empty map (all walls)
     memset(tmap, TILE_WALL, sizeof(tmap));
   }
-
-  num_rooms = 0;
 
   do {
     // Pick width and height for room.
@@ -375,7 +516,7 @@ void roomgen(void) {
     do {
       valid = validmap[pos];
       sig = ~sigmap[pos];
-      walkable = !IS_WALL(tmap[pos]);
+      walkable = !IS_WALL_TILE(tmap[pos]);
       if (walkable || (sig & VALID_L_OR_UL)) {
         // This tile is either in a room, or on the right or lower border of
         // the room.
@@ -435,10 +576,11 @@ void roomgen(void) {
       room_pos[num_rooms] = pos;
       room_w[num_rooms] = w;
       room_h[num_rooms] = h;
+      room_avoid[num_rooms] = 0;
 
       // Fill room tiles at x, y
       mapset(tmap + pos, w, h, 1);
-      mapset(roommap + pos, w, h, num_rooms);
+      mapset(roommap + pos, w, h, num_rooms + 1);
       sigrect_empty(pos, w, h);
 
       // Update disjoint set regions; we know that they're disjoint so they
@@ -457,6 +599,62 @@ void roomgen(void) {
       --failmax;
     }
   } while (failmax && num_rooms < MAX_ROOMS);
+}
+
+void copymap(u8 index) {
+  u8 pos, valid;
+
+  memcpy(tmap, map_bin + (index << 8), 256);
+
+  // Update signature map for empty tiles
+  pos = 0;
+  do {
+    switch (tmap[pos]) {
+      case TILE_END:
+        endpos = pos;
+        goto empty;
+
+      case TILE_START:
+      case TILE_ENTRANCE:
+        startpos = pos;
+        mobmap[mob_pos[PLAYER_MOB]] = 0; // Clear old player location
+        mob_pos[PLAYER_MOB] = pos;
+        mobmap[pos] = PLAYER_MOB + 1;
+        goto empty;
+
+      case TILE_GOAL:
+        // Temporarily change to stairs so the empty spaces behind the gate
+        // can be part of the spanning graph created during the carvedoors()
+        // step.
+        tmap[pos] = TILE_END;
+        gatepos = pos;
+        goto empty;
+
+      case TILE_HEART:
+        heartpos = pos;
+        goto empty;
+
+      empty:
+      case TILE_CARPET:
+      case TILE_EMPTY:
+      case TILE_STEPS:
+        // Update sigmap
+        sigempty(pos);
+
+        // Update disjoint set for the gate area
+        ++ds_nextid;
+        ds_sets[pos] = ds_nextid;
+        ds_parents[ds_nextid] = ds_nextid;
+        ds_sizes[ds_nextid] = 1;
+
+        valid = validmap[pos];
+        if (valid & VALID_U) { ds_union(ds_nextid, ds_sets[DIR_U(pos)]); }
+        if (valid & VALID_L) { ds_union(ds_nextid, ds_sets[DIR_L(pos)]); }
+        if (valid & VALID_R) { ds_union(ds_nextid, ds_sets[DIR_R(pos)]); }
+        if (valid & VALID_D) { ds_union(ds_nextid, ds_sets[DIR_D(pos)]); }
+        break;
+    }
+  } while (++pos);
 }
 
 void mazeworms(void) {
@@ -503,7 +701,7 @@ void mazeworms(void) {
 void update_carve1(u8 pos) {
   u8 tile = tmap[pos];
   u8 result;
-  if (tile != TILE_FIXED_WALL && IS_WALL(tile) && CAN_CARVE(pos)) {
+  if (tile != TILE_FIXED_WALL && IS_WALL_TILE(tile) && CAN_CARVE(pos)) {
     result = 1;
     if (!nexttoroom4(pos, validmap[pos])) {
       ++result;
@@ -535,7 +733,7 @@ void digworm(u8 pos) {
   u8 dir, step, num_dirs, valid;
 
   // Pick a random direction
-  dir = rand() & 3;
+  dir = URAND() & 3;
   step = 0;
   do {
     tmap[pos] = 1; // Set tile to empty.
@@ -563,7 +761,7 @@ void digworm(u8 pos) {
     // Continue in the current direction, unless we can't carve. Also randomly
     // change direction after 3 or more steps.
     if (!((valid & dirvalid[dir]) && tempmap[(u8)(pos + dirpos[dir])]) ||
-        ((rand() & 1) && step > 2)) {
+        ((URAND() & 1) && step > 2)) {
       step = 0;
       num_dirs = 0;
       if ((valid & VALID_L) && tempmap[DIR_L(pos)]) { cands[num_dirs++] = 0; }
@@ -631,7 +829,7 @@ void update_door1(u8 pos) {
   // that are not already connected. We use the disjoint set to determine this
   // quickly below.
   u8 tile = tmap[pos];
-  u8 result = tile != TILE_FIXED_WALL && IS_WALL(tile) && IS_DOOR(pos);
+  u8 result = tile != TILE_FIXED_WALL && IS_WALL_TILE(tile) && IS_DOOR(pos);
   if (tempmap[pos] != result) {
     if (result) {
       ++num_cands;
@@ -719,8 +917,8 @@ void startend(void) {
   if (!dogate) {
     // Pick a random walkable location
     do {
-      endpos = rand();
-    } while (IS_WALL(tmap[endpos]));
+      endpos = URAND();
+    } while (IS_WALL_TILE(tmap[endpos]));
   }
 
   calcdist(endpos);
@@ -764,13 +962,22 @@ void startend(void) {
     }
   } while(++pos);
 
+  if (roommap[startpos]) {
+    start_room = roommap[startpos] - 1;
+  }
+
   tmap[startpos] = TILE_START;
   tmap[endpos] = TILE_END;
   sigempty(startpos);
   sigempty(endpos);
+  mob_pos[PLAYER_MOB] = startpos;
+  mobmap[startpos] = PLAYER_MOB + 1;
 
   if (dogate) {
-    tmap[goalpos] = TILE_GOAL;
+    tmap[gatepos] = TILE_GOAL;
+    if (floor < 9) {
+      addpickup(PICKUP_TYPE_HEART, heartpos);
+    }
   }
 }
 
@@ -834,8 +1041,8 @@ void fillends(void) {
 
 void update_fill1(u8 pos) {
   u8 tile = tmap[pos];
-  u8 result = !IS_WALL(tmap[pos]) && CAN_CARVE(pos) && tile != TILE_START &&
-              tile != TILE_END;
+  u8 result = !IS_WALL_TILE(tmap[pos]) && CAN_CARVE(pos) &&
+              tile != TILE_START && tile != TILE_END;
   if (tempmap[pos] != result) {
     if (result) {
       ++num_cands;
@@ -858,21 +1065,15 @@ void prettywalls(void) {
       if (tile) {
         tile += 14;
       }
-      if (HAS_CRACKED_VARIANT(tile) && !(rand() & 7)) {
-        // TODO: organize tiles so this can be a simple addition
-        switch (tile) {
-          case 0x10: tile = 0x9d; break;
-          case 0x1f: tile = 0xab; break;
-          case 0x21: tile = 0xac; break;
-          case 0x30: tile = 0xb0; break;
-          case 0x32: tile = 0x9e; break;
-          case 0x33: tile = 0x9f; break;
-        }
+      if (TILE_HAS_CRACKED_VARIANT(tile) && !(URAND() & 7)) {
+        tile += 0x35;
       }
       tmap[pos] = tile;
     } else if (tmap[pos] == TILE_EMPTY && (validmap[pos] & VALID_U) &&
-               IS_WALL(tmap[DIR_U(pos)])) {
-      tmap[pos] = IS_CRACKED_WALL(tmap[DIR_U(pos)]) ? 0xa0 : 3;
+               IS_WALL_TILE(tmap[DIR_U(pos)])) {
+      tmap[pos] = IS_CRACKED_WALL_TILE(tmap[DIR_U(pos)])
+                      ? TILE_WALL_FACE_CRACKED
+                      : TILE_WALL_FACE;
     }
   } while(++pos);
 }
@@ -880,7 +1081,9 @@ void prettywalls(void) {
 void voids(void) {
   u8 pos, head, oldtail, newtail, valid, newpos;
   pos = 0;
-  num_voids = num_rooms;  // Start void numbering after rooms
+  num_voids = 0;
+
+  memset(void_num_tiles, 0, sizeof(void_num_tiles));
 
   do {
     if (!tmap[pos]) {
@@ -891,22 +1094,25 @@ void voids(void) {
         oldtail = newtail;
         do {
           pos = cands[head++];
-          roommap[pos] = num_voids;
-          tmap[pos] = void_tiles[randint(sizeof(void_tiles))];
-          valid = validmap[pos];
+          if (!tmap[pos]) {
+            roommap[pos] = num_rooms + num_voids + 1;
+            ++void_num_tiles[num_voids];
+            tmap[pos] = void_tiles[randint(sizeof(void_tiles))];
+            valid = validmap[pos];
 
-          // TODO: handle void exits
-          if ((valid & VALID_U) && !tmap[newpos = DIR_U(pos)]) {
-            cands[newtail++] = newpos;
-          }
-          if ((valid & VALID_L) && !tmap[newpos = DIR_L(pos)]) {
-            cands[newtail++] = newpos;
-          }
-          if ((valid & VALID_R) && !tmap[newpos = DIR_R(pos)]) {
-            cands[newtail++] = newpos;
-          }
-          if ((valid & VALID_D) && !tmap[newpos = DIR_D(pos)]) {
-            cands[newtail++] = newpos;
+            // TODO: handle void exits
+            if ((valid & VALID_U) && !tmap[newpos = DIR_U(pos)]) {
+              cands[newtail++] = newpos;
+            }
+            if ((valid & VALID_L) && !tmap[newpos = DIR_L(pos)]) {
+              cands[newtail++] = newpos;
+            }
+            if ((valid & VALID_R) && !tmap[newpos = DIR_R(pos)]) {
+              cands[newtail++] = newpos;
+            }
+            if ((valid & VALID_D) && !tmap[newpos = DIR_D(pos)]) {
+              cands[newtail++] = newpos;
+            }
           }
         } while(head != oldtail);
       } while (oldtail != newtail);
@@ -915,10 +1121,72 @@ void voids(void) {
   } while(++pos);
 }
 
+void chests(void) {
+  u8 has_teleporter, room, chest_pos, i, pos, cand0, cand1;
+
+  // Teleporter in level if level >= 5 and rnd(5)<1 (20%)
+  has_teleporter = floor >= 5 && URAND() < 51;
+
+  // Pick a random room
+  room = randint(num_rooms);
+
+  // Pick a random x,y in room (non-edge) for chest
+  chest_pos;
+  do {
+    chest_pos = room_pos[room] + (((randint(room_h[room] - 2) + 1) << 4) |
+                                  (randint(room_w[room] - 2) + 1));
+  } while (tmap[chest_pos] != 1);
+
+  // Pick a random position in each void and add it to the candidates. If
+  // has_teleporter is true, then add chest_pos too.
+  // The candidate indexes are stored starting at `num_voids`, so that the
+  // actual positions can be stored starting at 0.
+  for (i = 0; i < num_voids; ++i) {
+    cands[1 + num_rooms + num_voids + i] = randint(void_num_tiles[i]);
+  }
+
+  // Convert these candidate to positions
+  pos = 0;
+  do {
+    if (cands[num_voids + roommap[pos]]-- == 0) {
+      // Subtract num_rooms so that the void regions starts at candidate 0 and
+      // the rooms are not included.
+      cands[(u8)(roommap[pos] - num_rooms - 1)] = pos;
+    }
+  } while (++pos);
+
+  num_cands = num_voids;
+  if (has_teleporter) {
+    cands[num_cands++] = chest_pos;
+  }
+
+  if (num_cands > 2) {
+    // Pick two random candidates and turn them into teleporters
+    cand0 = randint(num_cands);
+    cand1 = randint(num_cands - 1);
+    if (cand1 == cand0) { ++cand1; }
+    tmap[cands[cand0]] = tmap[cands[cand1]] = TILE_TELEPORTER;
+
+    // Swap out the already used candidates
+    cands[cand0] = cands[--num_cands];
+    cands[cand1] = cands[--num_cands];
+  }
+
+  // Add chest position as a candidate if it wasn't already included above
+  if (!has_teleporter) {
+    cands[num_cands++] = chest_pos;
+  }
+
+  for (i = 0; i < num_cands; ++i) {
+    addmob(MOB_TYPE_CHEST, cands[i]);
+    // TODO: randomly make some chests heart containers
+  }
+}
+
 void decoration(void) {
   RoomKind kind = ROOM_KIND_VASE;
   const u8 (*room_perm)[MAX_ROOMS] = room_permutations + randint(24);
-  u8 i, room, pos, tile, w, h;
+  u8 i, room, pos, tile, w, h, mob;
   for (i = 0; i < MAX_ROOMS; ++i) {
     room = (*room_perm)[i];
     if (room >= num_rooms) { continue; }
@@ -932,11 +1200,16 @@ void decoration(void) {
 
         switch (kind) {
           case ROOM_KIND_VASE:
-            break; // TODO: need mobs
+            mob = vase_mobs[randint(sizeof(vase_mobs))];
+            if (mob && !IS_SMARTMOB(tile, pos) && IS_FREESTANDING(pos) &&
+                (h == room_h[room] || h == 1 || w == room_w[room] || w == 1)) {
+              addmob(mob, pos);
+            }
+            break;
 
           case ROOM_KIND_DIRT:
             if (tile == TILE_EMPTY) {
-              tmap[pos] = dirt_tiles[rand() & 3];
+              tmap[pos] = dirt_tiles[URAND() & 3];
             }
             break;
 
@@ -948,7 +1221,7 @@ void decoration(void) {
             // fallthrough
 
           case ROOM_KIND_TORCH:
-            if (tile == TILE_EMPTY && (rand() < 85) && (h & 1) &&
+            if (tile == TILE_EMPTY && (URAND() < 85) && (h & 1) &&
                 IS_FREESTANDING(pos)) {
               if (w == 1) {
                 tmap[pos] = TILE_TORCH_RIGHT;
@@ -964,8 +1237,24 @@ void decoration(void) {
             } else if (tile == TILE_WALL_FACE) {
               tmap[pos] = TILE_WALL_FACE_PLANT;
             }
-            // TODO: add weed/bomb mobs
+
+            if (!IS_SMARTMOB(tile, pos) && room != start_room &&
+                !(URAND() & 3) && no_mob_neighbors(pos) &&
+                IS_FREESTANDING(pos)) {
+              mob = plant_mobs[randint(sizeof(plant_mobs))];
+              addmob(mob, pos);
+              if (mob == MOB_TYPE_WEED) {
+                room_avoid[room] = 1;
+              }
+            }
             break;
+        }
+
+        if (kind != ROOM_KIND_PLANT && room != start_room &&
+            tmap[pos] == TILE_EMPTY && !mobmap[pos] && IS_FREESTANDING(pos) &&
+            URAND() < 26) {
+          tmap[pos] = TILE_SAW1;
+          sigwall(pos);
         }
 
         ++pos;
@@ -977,6 +1266,45 @@ void decoration(void) {
     // Pick a room kind for the next room
     kind = randint(NUM_ROOM_KINDS);
   }
+}
+
+void spawnmobs(void) {
+  u8 pos, room, mobs;
+
+  pos = 0;
+  num_cands = 0;
+  do {
+    room = roommap[pos];
+    if (room && room - 1 != start_room && room <= num_rooms &&
+        !IS_SMARTMOB(tmap[pos], pos) && !room_avoid[room - 1]) {
+      tempmap[pos] = 1;
+      ++num_cands;
+    } else {
+      tempmap[pos] = 0;
+    }
+  } while (++pos);
+
+  mobs = mob_plan_floor[floor + 1] - mob_plan_floor[floor];
+
+  do {
+    pos = getpos(randint(num_cands));
+    tempmap[pos] = 0;
+    --num_cands;
+    --mobs;
+    addmob(mob_plan[mob_plan_floor[floor] + mobs], pos);
+  } while (mobs && num_cands);
+
+  // TODO: pack mobs into avoid rooms
+
+  // TODO: give a mob a key, if this is a gate floor
+}
+
+u8 no_mob_neighbors(u8 pos) {
+  u8 valid = validmap[pos];
+  return !(((valid & VALID_U) && mobmap[DIR_U(pos)]) ||
+           ((valid & VALID_L) && mobmap[DIR_L(pos)]) ||
+           ((valid & VALID_R) && mobmap[DIR_R(pos)]) ||
+           ((valid & VALID_D) && mobmap[DIR_D(pos)]));
 }
 
 void mapset(u8* pos, u8 w, u8 h, u8 val) {
@@ -1107,7 +1435,7 @@ u8 randint(u8 mx) {
   if (mx == 0) { return 0; }
   u8 result;
   do {
-    result = rand() & randmask[mx];
+    result = URAND() & randmask[mx];
   } while (result >= mx);
   return result;
 }

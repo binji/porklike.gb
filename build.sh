@@ -1,9 +1,14 @@
 #!/bin/bash
-../rgbds/rgbgfx -t tiles-bg.tilemap -u tiles-bg.png -o tiles-bg.2bpp
-xxd -i tiles-bg.2bpp > tiles.c
-sed -i "s/char/const char/" tiles.c
-xxd -i map.bin > map.c
-sed -i "s/char/const char/" map.c
-xxd -i flags.bin > flags.c
-sed -i "s/char/const char/" flags.c
-../gbdk/bin/lcc -Wa-l -Wl-m tiles.c map.c flags.c main.c -o main.gb
+../rgbds/rgbgfx -t bg.tilemap -u bg.png -o bg.bin
+../rgbds/rgbgfx -u shared.png -o shared.bin
+../rgbds/rgbgfx -u sprites.png -o sprites.bin
+cd ref
+python flags.py
+python map.py
+cd ..
+python ref/bin2c.py bg.bin -t -o tilebg.c
+python ref/bin2c.py shared.bin -t -o tileshared.c
+python ref/bin2c.py sprites.bin -t -o tilesprites.c
+python ref/bin2c.py map.bin -o map.c
+python ref/bin2c.py flags.bin -o flags.c
+../gbdk/bin/lcc -Wa-l -Wl-m main.c -o main.gb

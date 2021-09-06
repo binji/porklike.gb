@@ -4,6 +4,10 @@
 /main.map
 /map.bin
 /map.c
-/tiles-bg.2bpp
-/tiles-bg.tilemap
-/tiles.c
+/bg.bin
+/bg.tilemap
+/shared.bin
+/sprites.bin
+/tilebg.c
+/tileshared.c
+/tilesprites.c

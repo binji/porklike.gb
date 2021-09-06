@@ -6,7 +6,7 @@ with open('flags.txt', 'r') as f:
       tile, line = line[:2], line[2:]
       flags.append(int(tile, 16))
 
-with open('../tiles-bg.tilemap', 'rb') as f:
+with open('../bg.tilemap', 'rb') as f:
   tilemap = f.read()
 
 new_flags = []

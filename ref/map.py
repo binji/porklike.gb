@@ -8,7 +8,7 @@ with open('map.txt', 'r') as f:
       row.append(int(tile, 16))
     rows.append(row)
 
-with open('../tiles-bg.tilemap', 'rb') as f:
+with open('../bg.tilemap', 'rb') as f:
   tilemap = f.read()
 
 maps = []
