@@ -12,6 +12,7 @@ typedef int8_t s8;
 typedef uint8_t u8;
 typedef int16_t s16;
 typedef uint16_t u16;
+typedef void (*vfp)(void);
 
 #define MAX_DS_SET 64  /* XXX can be smaller */
 #define MAX_ROOMS 4
@@ -24,6 +25,9 @@ typedef uint16_t u16;
 #define MAP_WIDTH 16
 #define MAP_HEIGHT 16
 
+#define TILE_ANIM_SPEED 8
+#define TILE_ANIM_FRAME_DIFF 16
+
 #define IS_WALL_TILE(tile) (flags_bin[tile] & 1)
 #define TILE_HAS_CRACKED_VARIANT(tile) (flags_bin[tile] & 0b01000000)
 #define IS_CRACKED_WALL_TILE(tile) (flags_bin[tile] & 0b00001000)
@@ -35,6 +39,8 @@ typedef uint16_t u16;
 #define IS_SMARTMOB(tile, pos) ((flags_bin[tile] & 3) || mobmap[pos])
 
 #define URAND() ((u8)rand())
+
+#define POS_TO_ADDR(pos) (0x9822 + (((pos)&0xf0) << 1) + ((pos)&0xf))
 
 #define VALID_UL 0b00000001
 #define VALID_DL 0b00000010
@@ -86,7 +92,7 @@ typedef uint16_t u16;
 #define TILE_PLANT2 0xc
 #define TILE_PLANT3 0x47
 #define TILE_FIXED_WALL 0x4a
-#define TILE_SAW1 0x59
+#define TILE_SAW1 0x4e
 #define TILE_WALL_FACE_CRACKED 0x60
 #define TILE_STEPS 0x6a
 #define TILE_ENTRANCE 0x6b
@@ -209,21 +215,54 @@ const u8 mob_plan_floor[] = {
     70, // total
 };
 
-// XXX
-const u8 mob_tile[] = {
-    0x99, // player
-    0x80, // slime
-    0x86, // queen
-    0x8a, // scorpion
-    0x83, // hulk
-    0x8d, // ghost
-    0x90, // kong
-    0x9d, // reaper
-    0xb6, // weed
-    0xb9, // bomb
-    0x5d, // vase1
-    0x5e, // vase2
-    0x5f, // chest
+const u8 mob_anim_frames[] = {
+    0x99, 0x9a, 0x9b, 0x9c,                   // player
+    0x80, 0x81, 0x80, 0x82,                   // slime
+    0x86, 0x87, 0x88, 0x89,                   // queen
+    0x8a, 0x8b, 0x8a, 0x8c,                   // scorpion
+    0x83, 0x84, 0x83, 0x85,                   // hulk
+    0x8d, 0x8e, 0x8f, 0x8e,                   // ghost
+    0x90, 0x91, 0x92, 0x93,                   // kong
+    0x9d, 0x9e, 0x9f, 0xa0,                   // reaper
+    0x94, 0x95, 0x96, 0x95,                   // weed
+    0x97, 0x97, 0x97, 0x97, 0x97, 0x97, 0x97, //
+    0x97, 0x97, 0x97, 0x97, 0x97, 0x98,       // bomb
+    0x59,                                     // vase1
+    0x5f,                                     // vase2
+    0x53,                                     // chest
+};
+
+const u8 mob_anim_start[] = {
+    0,  // player
+    4,  // slime
+    8,  // queen
+    12, // scorpion
+    16, // hulk
+    20, // ghost
+    24, // kong
+    28, // reaper
+    32, // weed
+    36, // bomb
+    49, // vase1
+    50, // vase2
+    51, // chest
+    52, // total
+};
+
+const u8 mob_anim_speed[] = {
+    24, // player
+    12, // slime
+    12, // queen
+    12, // scorpion
+    13, // hulk
+    16, // ghost
+    12, // kong
+    16, // reaper
+    16, // weed
+    8,  // bomb
+    255, // vase1
+    255, // vase2
+    255, // chest
 };
 
 typedef u8 Map[MAP_WIDTH * MAP_HEIGHT];
@@ -270,6 +309,8 @@ typedef enum PickupType {
 } PickupType;
 
 void init(void);
+void animate_tiles(void);
+void vbl_interrupt(void);
 
 void addmob(MobType type, u8 pos);
 void addpickup(PickupType type, u8 pos);
@@ -296,6 +337,9 @@ void prettywalls(void);
 void voids(void);
 void chests(void);
 void decoration(void);
+void begintileanim(void);
+void endtileanim(void);
+void addtileanim(u8 pos, u8 tile);
 void spawnmobs(void);
 u8 no_mob_neighbors(u8 pos);
 void mapset(u8* pos, u8 w, u8 h, u8 val);
@@ -343,11 +387,20 @@ u8 startpos;
 u8 cands[MAX_CANDS];
 u8 num_cands;
 
-u8 mob_anim_frame[NUM_MOB_TYPES];
-u8 mob_anim_speed[NUM_MOB_TYPES];
+u8 mob_anim_frame[MAX_MOBS];
+u8 mob_anim_timer[MAX_MOBS];
 MobType mob_type[MAX_MOBS];
 u8 mob_pos[MAX_MOBS];
 u8 num_mobs;
+
+// TODO: how big to make these arrays?
+u8 tile_code[128];     // code for animating tiles
+u8 mob_tile_code[256]; // code for animating mobs
+u8 tile_code_end;      // next available index in tile_code
+u16 last_tile_addr;    // last tile address in HL for {mob_,}tile_code
+u8 last_tile_val;      // last tile value in A for {mob_,}tile_code
+u8 tile_timer; // timer for animating tiles (every TILE_ANIM_SPEED frames)
+u8 tile_inc;   // either 0 or TILE_ANIM_FRAME_DIFF, for two frames of animation
 
 u8 key;
 
@@ -374,6 +427,7 @@ void main(void) {
       LCDC_REG = 0b10000001;  // display on, bg on
     }
 
+    animate_tiles();
     wait_vbl_done();
   }
 }
@@ -401,6 +455,73 @@ void init(void) {
 
   num_mobs = 0;
   addmob(MOB_TYPE_PLAYER, 0);
+
+  tile_inc = 0;
+  tile_timer = TILE_ANIM_SPEED;
+  tile_code[0] = mob_tile_code[0] = 0xc9; // ret
+  add_VBL(vbl_interrupt);
+}
+
+void animate_tiles(void) {
+  u8 first, i, frame;
+  u8* ptr;
+  u16 addr;
+
+  first = 1;
+  mob_tile_code[0] = 0xf5; // push af
+  ptr = mob_tile_code + 1;
+
+  // Loop through all mobs, update animations
+  for (i = 0; i < num_mobs; ++i) {
+    // TODO: mob must be drawn if it is on top of an animating tile, and it
+    // updated this frame.
+    if (--mob_anim_timer[i] == 0) {
+      mob_anim_timer[i] = mob_anim_speed[mob_type[i]];
+      if (++mob_anim_frame[i] == mob_anim_start[mob_type[i] + 1]) {
+        mob_anim_frame[i] = mob_anim_start[mob_type[i]];
+      }
+
+      addr = POS_TO_ADDR(mob_pos[i]);
+      frame = mob_anim_frames[mob_anim_frame[i]];
+
+      if (first) {
+        first = 0;
+        *ptr++ = 0x21; // ld hl, addr
+        *ptr++ = (u8)addr;
+        *ptr++ = addr >> 8;
+        *ptr++ = 0x3e; // ld a, frame
+        *ptr++ = frame;
+      } else {
+        if ((addr >> 8) == (last_tile_addr >> 8)) {
+          *ptr++ = 0x2e; // ld l, lo(addr)
+          *ptr++ = (u8)addr;
+        } else {
+          *ptr++ = 0x21; // ld hl, addr
+          *ptr++ = (u8)addr;
+          *ptr++ = addr >> 8;
+        }
+        if (frame != last_tile_val) {
+          *ptr++ = 0x3e; // ld a, frame
+          *ptr++ = frame;
+        }
+      }
+      last_tile_addr = addr;
+      last_tile_val = frame;
+      *ptr++ = 0x77; // ld (hl), a
+    }
+  }
+  *ptr++ = 0xf1; // pop af
+  *ptr++ = 0xc9; // ret
+}
+
+void vbl_interrupt(void) {
+  if (--tile_timer == 0) {
+    tile_timer = TILE_ANIM_SPEED;
+    tile_inc ^= TILE_ANIM_FRAME_DIFF;
+    ((vfp)tile_code)();
+  }
+
+  ((vfp)mob_tile_code)();
 }
 
 u8 dummy[13];
@@ -412,17 +533,22 @@ u8 dummy[13];
 void addmob(MobType type, u8 pos) {
   mob_type[num_mobs] = type;
   mob_pos[num_mobs] = pos;
+  mob_anim_timer[num_mobs] = 1;
+  mob_anim_frame[num_mobs] = mob_anim_start[type];
   ++num_mobs;
   mobmap[pos] = num_mobs; // index+1
 }
 
 void addpickup(PickupType pick, u8 pos) {
   // TODO
+  (void)pick;
+  (void)pos;
 }
 
 void mapgen(void) {
   num_mobs = 1;
   mapgeninit();
+  begintileanim();
   if (floor == 0) {
     copymap(0);
     addmob(MOB_TYPE_CHEST, 119);  // x=7,y=7
@@ -456,11 +582,7 @@ void mapgen(void) {
     dummy[12] = dummy[1] + dummy[2] + dummy[3] + dummy[4] + dummy[5] +
                 dummy[6] + dummy[7] + dummy[8] + dummy[9] + dummy[10] + dummy[11];
   }
-
-  // XXX
-  for (u8 i = 0; i < num_mobs; ++i) {
-    tmap[mob_pos[i]] = mob_tile[mob_type[i]];
-  }
+  endtileanim();
 }
 
 void mapgeninit(void) {
@@ -628,6 +750,11 @@ void copymap(u8 index) {
         // step.
         tmap[pos] = TILE_END;
         gatepos = pos;
+        goto empty;
+
+      case TILE_TORCH_LEFT:
+      case TILE_TORCH_RIGHT:
+        addtileanim(pos, tmap[pos]);
         goto empty;
 
       case TILE_HEART:
@@ -963,7 +1090,7 @@ void startend(void) {
   } while(++pos);
 
   if (roommap[startpos]) {
-    start_room = roommap[startpos] - 1;
+    start_room = roommap[startpos];
   }
 
   tmap[startpos] = TILE_START;
@@ -1225,8 +1352,10 @@ void decoration(void) {
                 IS_FREESTANDING(pos)) {
               if (w == 1) {
                 tmap[pos] = TILE_TORCH_RIGHT;
+                addtileanim(pos, TILE_TORCH_RIGHT);
               } else if (w == room_w[room]) {
                 tmap[pos] = TILE_TORCH_LEFT;
+                addtileanim(pos, TILE_TORCH_LEFT);
               }
             }
             break;
@@ -1238,7 +1367,7 @@ void decoration(void) {
               tmap[pos] = TILE_WALL_FACE_PLANT;
             }
 
-            if (!IS_SMARTMOB(tile, pos) && room != start_room &&
+            if (!IS_SMARTMOB(tile, pos) && room + 1 != start_room &&
                 !(URAND() & 3) && no_mob_neighbors(pos) &&
                 IS_FREESTANDING(pos)) {
               mob = plant_mobs[randint(sizeof(plant_mobs))];
@@ -1250,11 +1379,12 @@ void decoration(void) {
             break;
         }
 
-        if (kind != ROOM_KIND_PLANT && room != start_room &&
+        if (kind != ROOM_KIND_PLANT && room + 1 != start_room &&
             tmap[pos] == TILE_EMPTY && !mobmap[pos] && IS_FREESTANDING(pos) &&
             URAND() < 26) {
           tmap[pos] = TILE_SAW1;
           sigwall(pos);
+          addtileanim(pos, TILE_SAW1);
         }
 
         ++pos;
@@ -1268,6 +1398,43 @@ void decoration(void) {
   }
 }
 
+void begintileanim(void) {
+  u16 addr = (u16)&tile_inc;
+  tile_code[0] = 0xf5; // push af
+  tile_code[1] = 0xc5; // push bc
+  tile_code[2] = 0xfa; // ld a, (NNNN)
+  tile_code[3] = (u8)addr;
+  tile_code[4] = addr >> 8;
+  tile_code[5] = 0x47; // ld b, a
+  tile_code_end = 6;
+}
+
+void endtileanim(void) {
+  tile_code[tile_code_end++] = 0xc1; // pop bc
+  tile_code[tile_code_end++] = 0xf1; // pop af
+  tile_code[tile_code_end] = 0xc9; // ret
+}
+
+void addtileanim(u8 pos, u8 tile) {
+  u16 addr = POS_TO_ADDR(pos);
+  if (tile_code_end == 6 || (addr >> 8) != (last_tile_addr >> 8)) {
+    tile_code[tile_code_end++] = 0x21; // ld hl, NNNN
+    tile_code[tile_code_end++] = (u8)addr;
+    tile_code[tile_code_end++] = addr >> 8;
+  } else {
+    tile_code[tile_code_end++] = 0x2e; // ld l, NN
+    tile_code[tile_code_end++] = (u8)addr;
+  }
+  if (tile != last_tile_val) {
+    tile_code[tile_code_end++] = 0x3e; // ld a, NN
+    tile_code[tile_code_end++] = tile;
+    tile_code[tile_code_end++] = 0x80; // add b
+  }
+  tile_code[tile_code_end++] = 0x77; // ld (hl), a
+  last_tile_addr = addr;
+  last_tile_val = tile;
+}
+
 void spawnmobs(void) {
   u8 pos, room, mobs;
 
@@ -1275,7 +1442,7 @@ void spawnmobs(void) {
   num_cands = 0;
   do {
     room = roommap[pos];
-    if (room && room - 1 != start_room && room <= num_rooms &&
+    if (room && room != start_room && room <= num_rooms &&
         !IS_SMARTMOB(tmap[pos], pos) && !room_avoid[room - 1]) {
       tempmap[pos] = 1;
       ++num_cands;
