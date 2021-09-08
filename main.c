@@ -27,10 +27,16 @@ typedef void (*vfp)(void);
 
 #define TILE_ANIM_SPEED 8
 #define TILE_ANIM_FRAME_DIFF 16
+#define TILE_FLIP_DIFF 0x22
+
+#define WALK_TIME 8
+#define BUMP_TIME 4
+#define WAIT_TIME 6
 
 #define IS_WALL_TILE(tile) (flags_bin[tile] & 1)
 #define TILE_HAS_CRACKED_VARIANT(tile) (flags_bin[tile] & 0b01000000)
 #define IS_CRACKED_WALL_TILE(tile) (flags_bin[tile] & 0b00001000)
+#define IS_ANIMATED_TILE(tile) (flags_bin[tile] & 0b00010000)
 
 #define IS_DOOR(pos) sigmatch((pos), doorsig, doormask)
 #define CAN_CARVE(pos) sigmatch((pos), carvesig, carvemask)
@@ -312,12 +318,13 @@ typedef enum PickupType {
   PICKUP_TYPE_SLAP,
 } PickupType;
 
-typedef enum MobState {
-  MOB_STATE_NONE,
-  MOB_STATE_WALK,
-  MOB_STATE_BUMP1,
-  MOB_STATE_BUMP2,
-} MobState;
+typedef enum MobAnimState {
+  MOB_ANIM_STATE_NONE,
+  MOB_ANIM_STATE_WAIT,
+  MOB_ANIM_STATE_WALK,
+  MOB_ANIM_STATE_BUMP1,
+  MOB_ANIM_STATE_BUMP2,
+} MobAnimState;
 
 void init(void);
 void beginmobanim(void);
@@ -411,7 +418,7 @@ u8 mob_pos[MAX_MOBS];
 u8 mob_x[MAX_MOBS], mob_y[MAX_MOBS];
 u8 mob_dx[MAX_MOBS], mob_dy[MAX_MOBS];
 u8 mob_move_timer[MAX_MOBS];
-MobState mob_state[MAX_MOBS];
+MobAnimState mob_anim_state[MAX_MOBS];
 u8 mob_flip[MAX_MOBS];
 u8 num_mobs;
 
@@ -532,12 +539,12 @@ void move_player(void) {
       set_mob_tile_during_vbl(pos, tmap[pos]);
       if (!valid || IS_WALL_TILE(tmap[newpos])) {
         // bump
-        mob_move_timer[PLAYER_MOB] = 4;
-        mob_state[PLAYER_MOB] = MOB_STATE_BUMP1;
+        mob_move_timer[PLAYER_MOB] = BUMP_TIME;
+        mob_anim_state[PLAYER_MOB] = MOB_ANIM_STATE_BUMP1;
       } else {
         // walk
-        mob_move_timer[PLAYER_MOB] = 8;
-        mob_state[PLAYER_MOB] = MOB_STATE_WALK;
+        mob_move_timer[PLAYER_MOB] = WALK_TIME;
+        mob_anim_state[PLAYER_MOB] = MOB_ANIM_STATE_WALK;
         mob_pos[PLAYER_MOB] = newpos;
         mob_anim_speed[PLAYER_MOB] = mob_anim_timer[PLAYER_MOB] = 3;
       }
@@ -553,6 +560,10 @@ void animate_mobs(void) {
     // TODO: mob must be drawn if it is on top of an animating tile, and it
     // updated this frame.
     dotile = 0;
+    if (tile_timer == 1 && IS_ANIMATED_TILE(tmap[mob_pos[i]])) {
+      dotile = 1;
+    }
+
     if (--mob_anim_timer[i] == 0) {
       mob_anim_timer[i] = mob_anim_speed[i];
       if (++mob_anim_frame[i] == mob_anim_start[mob_type[i] + 1]) {
@@ -563,7 +574,7 @@ void animate_mobs(void) {
 
     frame = mob_anim_frames[mob_anim_frame[i]];
     if (mob_flip[i]) {
-      frame += 0x22;
+      frame += TILE_FLIP_DIFF;
     }
 
     if (mob_move_timer[i]) {
@@ -572,13 +583,27 @@ void animate_mobs(void) {
       move_sprite(i, mob_x[i], mob_y[i]);
       set_sprite_tile(i, frame);
       if (--mob_move_timer[i] == 0) {
-        if (mob_state[i] == MOB_STATE_BUMP1) {
-          mob_move_timer[i] = 4;
-          mob_dx[i] = -mob_dx[i];
-          mob_dy[i] = -mob_dy[i];
-          mob_state[i] = MOB_STATE_BUMP2;
-        } else if (mob_state[i] == MOB_STATE_WALK) {
-          mob_anim_speed[i] = mob_anim_orig_speed[mob_type[i]];
+        switch (mob_anim_state[i]) {
+          case MOB_ANIM_STATE_BUMP1:
+            mob_anim_state[i] = MOB_ANIM_STATE_BUMP2;
+            mob_move_timer[i] = BUMP_TIME;
+            mob_dx[i] = -mob_dx[i];
+            mob_dy[i] = -mob_dy[i];
+            break;
+
+          case MOB_ANIM_STATE_WALK:
+            mob_anim_speed[i] = mob_anim_orig_speed[mob_type[i]];
+            // fallthrough
+
+          case MOB_ANIM_STATE_BUMP2:
+            mob_anim_state[i] = MOB_ANIM_STATE_WAIT;
+            mob_move_timer[i] = WAIT_TIME;
+            mob_dx[i] = mob_dy[i] = 0;
+            break;
+
+          case MOB_ANIM_STATE_WAIT:
+            mob_anim_state[i] = MOB_ANIM_STATE_NONE;
+            break;
         }
       }
     } else if (dotile) {
@@ -632,7 +657,7 @@ void addmob(MobType type, u8 pos) {
   mob_anim_speed[num_mobs] = mob_anim_orig_speed[type];
   mob_anim_frame[num_mobs] = mob_anim_start[type];
   mob_move_timer[num_mobs] = 0;
-  mob_state[num_mobs] = MOB_STATE_NONE;
+  mob_anim_state[num_mobs] = MOB_ANIM_STATE_NONE;
   mob_flip[num_mobs] = 0;
   ++num_mobs;
   mobmap[pos] = num_mobs; // index+1
