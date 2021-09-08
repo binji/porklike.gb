@@ -29,6 +29,8 @@ typedef void (*vfp)(void);
 #define TILE_ANIM_FRAME_DIFF 16
 #define TILE_FLIP_DIFF 0x22
 
+#define FADE_TIME 8
+
 #define WALK_TIME 8
 #define BUMP_TIME 4
 #define WAIT_TIME 6
@@ -104,6 +106,13 @@ typedef void (*vfp)(void);
 #define TILE_WALL_FACE_CRACKED 0x60
 #define TILE_STEPS 0x6a
 #define TILE_ENTRANCE 0x6b
+
+const u8 fadepal[] = {
+    0b11111111, // 0:Black     1:Black    2:Black 3:Black
+    0b10111111, // 0:Black     1:Black    2:Black 3:DarkGray
+    0b01111110, // 0:DarkGray  1:Black    2:Black 3:LightGray
+    0b00111001, // 0:LightGray 1:DarkGray 2:Black 3:White
+};
 
 const u8 dirx[] = {0xff, 1, 0, 0};       // L R U D
 const u8 diry[] = {0, 0, 0xff, 1};       // L R U D
@@ -334,6 +343,9 @@ void endmobanim(void);
 void set_mob_tile_during_vbl(u8 pos, u8 tile);
 void vbl_interrupt(void);
 
+void fadeout(void);
+void fadein(void);
+
 void addmob(MobType type, u8 pos);
 void addpickup(PickupType type, u8 pos);
 void mobwalk(u8 index, u8 pos);
@@ -448,12 +460,15 @@ void main(void) {
 
     // XXX
     if (key & J_START) {
-      ++floor;
-      if (floor == 11) { floor = 0; }
-      DISPLAY_OFF;
+      if (++floor == 11) { floor = 0; }
+      fadeout();
+      IE_REG &= ~VBL_IFLAG;
       mapgen();
+      beginmobanim(); // Reset the mob anims so they don't draw on this new map
+      IE_REG |= VBL_IFLAG;
+      wait_vbl_done(); // wait to copy tiles
       set_bkg_tiles(2, 1, MAP_WIDTH, MAP_HEIGHT, tmap);
-      LCDC_REG = 0b10000011;  // display on, bg on, obj on
+      fadein();
     }
 
     beginmobanim();
@@ -468,7 +483,7 @@ void init(void) {
   DISPLAY_OFF;
 
    // 0:LightGray 1:DarkGray 2:Black 3:White
-  BGP_REG = OBP0_REG = OBP1_REG = 0b00111001;
+  BGP_REG = OBP0_REG = OBP1_REG = fadepal[3];
 
   add_TIM(tim_interrupt);
   TMA_REG = 0;      // Divide clock by 256 => 16Hz
@@ -498,12 +513,15 @@ void beginmobanim(void) {
   last_tile_addr = 0;
   last_tile_val = 0xff;
   tile_code_end = 1;
-  mob_tile_code[0] = 0xf5; // push af
+  // Initialize to ret so if a VBL occurs while we're setting the animation it
+  // won't run off the end
+  mob_tile_code[0] = 0xc9;  // ret
 }
 
 void endmobanim(void) {
   mob_tile_code[tile_code_end++] = 0xf1; // pop af
   mob_tile_code[tile_code_end++] = 0xc9; // ret
+  mob_tile_code[0] = 0xf5; // push af
 }
 
 void move_player(void) {
@@ -547,6 +565,8 @@ void move_player(void) {
         mob_anim_state[PLAYER_MOB] = MOB_ANIM_STATE_WALK;
         mob_pos[PLAYER_MOB] = newpos;
         mob_anim_speed[PLAYER_MOB] = mob_anim_timer[PLAYER_MOB] = 3;
+        mobmap[pos] = 0;
+        mobmap[newpos] = PLAYER_MOB + 1;
       }
     }
   }
@@ -572,43 +592,45 @@ void animate_mobs(void) {
       dotile = 1;
     }
 
-    frame = mob_anim_frames[mob_anim_frame[i]];
-    if (mob_flip[i]) {
-      frame += TILE_FLIP_DIFF;
-    }
-
-    if (mob_move_timer[i]) {
-      mob_x[i] += mob_dx[i];
-      mob_y[i] += mob_dy[i];
-      move_sprite(i, mob_x[i], mob_y[i]);
-      set_sprite_tile(i, frame);
-      if (--mob_move_timer[i] == 0) {
-        switch (mob_anim_state[i]) {
-          case MOB_ANIM_STATE_BUMP1:
-            mob_anim_state[i] = MOB_ANIM_STATE_BUMP2;
-            mob_move_timer[i] = BUMP_TIME;
-            mob_dx[i] = -mob_dx[i];
-            mob_dy[i] = -mob_dy[i];
-            break;
-
-          case MOB_ANIM_STATE_WALK:
-            mob_anim_speed[i] = mob_anim_orig_speed[mob_type[i]];
-            // fallthrough
-
-          case MOB_ANIM_STATE_BUMP2:
-            mob_anim_state[i] = MOB_ANIM_STATE_WAIT;
-            mob_move_timer[i] = WAIT_TIME;
-            mob_dx[i] = mob_dy[i] = 0;
-            break;
-
-          case MOB_ANIM_STATE_WAIT:
-            mob_anim_state[i] = MOB_ANIM_STATE_NONE;
-            break;
-        }
+    if (dotile || mob_move_timer[i]) {
+      frame = mob_anim_frames[mob_anim_frame[i]];
+      if (mob_flip[i]) {
+        frame += TILE_FLIP_DIFF;
       }
-    } else if (dotile) {
-      hide_sprite(i);
-      set_mob_tile_during_vbl(mob_pos[i], frame);
+
+      if (mob_move_timer[i]) {
+        mob_x[i] += mob_dx[i];
+        mob_y[i] += mob_dy[i];
+        move_sprite(i, mob_x[i], mob_y[i]);
+        set_sprite_tile(i, frame);
+        if (--mob_move_timer[i] == 0) {
+          switch (mob_anim_state[i]) {
+            case MOB_ANIM_STATE_BUMP1:
+              mob_anim_state[i] = MOB_ANIM_STATE_BUMP2;
+              mob_move_timer[i] = BUMP_TIME;
+              mob_dx[i] = -mob_dx[i];
+              mob_dy[i] = -mob_dy[i];
+              break;
+
+            case MOB_ANIM_STATE_WALK:
+              mob_anim_speed[i] = mob_anim_orig_speed[mob_type[i]];
+              // fallthrough
+
+            case MOB_ANIM_STATE_BUMP2:
+              mob_anim_state[i] = MOB_ANIM_STATE_WAIT;
+              mob_move_timer[i] = WAIT_TIME;
+              mob_dx[i] = mob_dy[i] = 0;
+              break;
+
+            case MOB_ANIM_STATE_WAIT:
+              mob_anim_state[i] = MOB_ANIM_STATE_NONE;
+              break;
+          }
+        }
+      } else {
+        hide_sprite(i);
+        set_mob_tile_during_vbl(mob_pos[i], frame);
+      }
     }
   }
 }
@@ -642,6 +664,24 @@ void vbl_interrupt(void) {
   }
 
   ((vfp)mob_tile_code)();
+}
+
+void fadeout(void) {
+  u8 i, j;
+  i = 3;
+  do {
+    for (j = 0; j < FADE_TIME; ++j) { wait_vbl_done(); }
+    BGP_REG = OBP0_REG = OBP1_REG = fadepal[i];
+  } while(i--);
+}
+
+void fadein(void) {
+  u8 i, j;
+  i = 0;
+  do {
+    for (j = 0; j < FADE_TIME; ++j) { wait_vbl_done(); }
+    BGP_REG = OBP0_REG = OBP1_REG = fadepal[i];
+  } while(++i != 4);
 }
 
 u8 dummy[13];
@@ -725,6 +765,11 @@ void mapgeninit(void) {
   num_rooms = 0;
   num_voids = 0;
   start_room = 0;
+
+  mob_anim_timer[PLAYER_MOB] = 1;
+  mob_anim_speed[num_mobs] = mob_anim_orig_speed[MOB_TYPE_PLAYER];
+  mob_move_timer[PLAYER_MOB] = 0;
+  mob_flip[PLAYER_MOB] = 0;
 }
 
 void roomgen(void) {
