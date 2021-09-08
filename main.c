@@ -41,6 +41,8 @@ typedef void (*vfp)(void);
 #define URAND() ((u8)rand())
 
 #define POS_TO_ADDR(pos) (0x9822 + (((pos)&0xf0) << 1) + ((pos)&0xf))
+#define POS_TO_X(pos) (((pos & 0xf) << 3) + 24)
+#define POS_TO_Y(pos) (((pos & 0xf0) >> 1) + 24)
 
 #define VALID_UL 0b00000001
 #define VALID_DL 0b00000010
@@ -97,7 +99,9 @@ typedef void (*vfp)(void);
 #define TILE_STEPS 0x6a
 #define TILE_ENTRANCE 0x6b
 
-const u8 dirpos[]   = {0xff, 1, 0xf0, 16};  // L R U D
+const u8 dirx[] = {0xff, 1, 0, 0};       // L R U D
+const u8 diry[] = {0, 0, 0xff, 1};       // L R U D
+const u8 dirpos[] = {0xff, 1, 0xf0, 16}; // L R U D
 const u8 dirvalid[] = {VALID_L,VALID_R,VALID_U,VALID_D};
 
 const u8 carvesig[] = {255, 223, 127, 191, 239, 0};
@@ -249,7 +253,7 @@ const u8 mob_anim_start[] = {
     52, // total
 };
 
-const u8 mob_anim_speed[] = {
+const u8 mob_anim_orig_speed[] = {
     24, // player
     12, // slime
     12, // queen
@@ -308,12 +312,24 @@ typedef enum PickupType {
   PICKUP_TYPE_SLAP,
 } PickupType;
 
+typedef enum MobState {
+  MOB_STATE_NONE,
+  MOB_STATE_WALK,
+  MOB_STATE_BUMP1,
+  MOB_STATE_BUMP2,
+} MobState;
+
 void init(void);
-void animate_tiles(void);
+void beginmobanim(void);
+void move_player(void);
+void animate_mobs(void);
+void endmobanim(void);
+void set_mob_tile_during_vbl(u8 pos, u8 tile);
 void vbl_interrupt(void);
 
 void addmob(MobType type, u8 pos);
 void addpickup(PickupType type, u8 pos);
+void mobwalk(u8 index, u8 pos);
 
 // Map generation
 void mapgen(void);
@@ -389,8 +405,14 @@ u8 num_cands;
 
 u8 mob_anim_frame[MAX_MOBS];
 u8 mob_anim_timer[MAX_MOBS];
+u8 mob_anim_speed[MAX_MOBS];
 MobType mob_type[MAX_MOBS];
 u8 mob_pos[MAX_MOBS];
+u8 mob_x[MAX_MOBS], mob_y[MAX_MOBS];
+u8 mob_dx[MAX_MOBS], mob_dy[MAX_MOBS];
+u8 mob_move_timer[MAX_MOBS];
+MobState mob_state[MAX_MOBS];
+u8 mob_flip[MAX_MOBS];
 u8 num_mobs;
 
 // TODO: how big to make these arrays?
@@ -412,22 +434,25 @@ void main(void) {
   mapgen();
 
   set_bkg_tiles(2, 1, MAP_WIDTH, MAP_HEIGHT, tmap);
-  LCDC_REG = 0b10000001;  // display on, bg on
+  LCDC_REG = 0b10000011;  // display on, bg on, obj on
 
   while(1) {
     key = joypad();
 
     // XXX
-    if (key & J_A) {
+    if (key & J_START) {
       ++floor;
       if (floor == 11) { floor = 0; }
       DISPLAY_OFF;
       mapgen();
       set_bkg_tiles(2, 1, MAP_WIDTH, MAP_HEIGHT, tmap);
-      LCDC_REG = 0b10000001;  // display on, bg on
+      LCDC_REG = 0b10000011;  // display on, bg on, obj on
     }
 
-    animate_tiles();
+    beginmobanim();
+    move_player();
+    animate_mobs();
+    endmobanim();
     wait_vbl_done();
   }
 }
@@ -462,56 +487,126 @@ void init(void) {
   add_VBL(vbl_interrupt);
 }
 
-void animate_tiles(void) {
-  u8 first, i, frame;
-  u8* ptr;
-  u16 addr;
-
-  first = 1;
+void beginmobanim(void) {
+  last_tile_addr = 0;
+  last_tile_val = 0xff;
+  tile_code_end = 1;
   mob_tile_code[0] = 0xf5; // push af
-  ptr = mob_tile_code + 1;
+}
+
+void endmobanim(void) {
+  mob_tile_code[tile_code_end++] = 0xf1; // pop af
+  mob_tile_code[tile_code_end++] = 0xc9; // ret
+}
+
+void move_player(void) {
+  u8 pos, newpos, dir, valid;
+  // XXX
+  if (mob_move_timer[PLAYER_MOB] == 0) {
+    if (key & (J_LEFT | J_RIGHT | J_UP | J_DOWN)) {
+      pos = mob_pos[PLAYER_MOB];
+      valid = validmap[pos];
+      if (key & J_LEFT) {
+        dir = 0;
+        valid = (valid & VALID_L);
+        mob_flip[PLAYER_MOB] = 1;
+      } else if (key & J_RIGHT) {
+        dir = 1;
+        valid = (valid & VALID_R);
+        mob_flip[PLAYER_MOB] = 0;
+      } else if (key & J_UP) {
+        dir = 2;
+        valid = (valid & VALID_U);
+      } else if (key & J_DOWN) {
+        dir = 3;
+        valid = (valid & VALID_D);
+      }
+
+      newpos = pos + dirpos[dir];
+
+      mob_x[PLAYER_MOB] = POS_TO_X(pos);
+      mob_y[PLAYER_MOB] = POS_TO_Y(pos);
+      mob_dx[PLAYER_MOB] = dirx[dir];
+      mob_dy[PLAYER_MOB] = diry[dir];
+
+      set_mob_tile_during_vbl(pos, tmap[pos]);
+      if (!valid || IS_WALL_TILE(tmap[newpos])) {
+        // bump
+        mob_move_timer[PLAYER_MOB] = 4;
+        mob_state[PLAYER_MOB] = MOB_STATE_BUMP1;
+      } else {
+        // walk
+        mob_move_timer[PLAYER_MOB] = 8;
+        mob_state[PLAYER_MOB] = MOB_STATE_WALK;
+        mob_pos[PLAYER_MOB] = newpos;
+        mob_anim_speed[PLAYER_MOB] = mob_anim_timer[PLAYER_MOB] = 3;
+      }
+    }
+  }
+}
+
+void animate_mobs(void) {
+  u8 i, dotile, frame;
 
   // Loop through all mobs, update animations
   for (i = 0; i < num_mobs; ++i) {
     // TODO: mob must be drawn if it is on top of an animating tile, and it
     // updated this frame.
+    dotile = 0;
     if (--mob_anim_timer[i] == 0) {
-      mob_anim_timer[i] = mob_anim_speed[mob_type[i]];
+      mob_anim_timer[i] = mob_anim_speed[i];
       if (++mob_anim_frame[i] == mob_anim_start[mob_type[i] + 1]) {
         mob_anim_frame[i] = mob_anim_start[mob_type[i]];
       }
+      dotile = 1;
+    }
 
-      addr = POS_TO_ADDR(mob_pos[i]);
-      frame = mob_anim_frames[mob_anim_frame[i]];
+    frame = mob_anim_frames[mob_anim_frame[i]];
+    if (mob_flip[i]) {
+      frame += 0x22;
+    }
 
-      if (first) {
-        first = 0;
-        *ptr++ = 0x21; // ld hl, addr
-        *ptr++ = (u8)addr;
-        *ptr++ = addr >> 8;
-        *ptr++ = 0x3e; // ld a, frame
-        *ptr++ = frame;
-      } else {
-        if ((addr >> 8) == (last_tile_addr >> 8)) {
-          *ptr++ = 0x2e; // ld l, lo(addr)
-          *ptr++ = (u8)addr;
-        } else {
-          *ptr++ = 0x21; // ld hl, addr
-          *ptr++ = (u8)addr;
-          *ptr++ = addr >> 8;
-        }
-        if (frame != last_tile_val) {
-          *ptr++ = 0x3e; // ld a, frame
-          *ptr++ = frame;
+    if (mob_move_timer[i]) {
+      mob_x[i] += mob_dx[i];
+      mob_y[i] += mob_dy[i];
+      move_sprite(i, mob_x[i], mob_y[i]);
+      set_sprite_tile(i, frame);
+      if (--mob_move_timer[i] == 0) {
+        if (mob_state[i] == MOB_STATE_BUMP1) {
+          mob_move_timer[i] = 4;
+          mob_dx[i] = -mob_dx[i];
+          mob_dy[i] = -mob_dy[i];
+          mob_state[i] = MOB_STATE_BUMP2;
+        } else if (mob_state[i] == MOB_STATE_WALK) {
+          mob_anim_speed[i] = mob_anim_orig_speed[mob_type[i]];
         }
       }
-      last_tile_addr = addr;
-      last_tile_val = frame;
-      *ptr++ = 0x77; // ld (hl), a
+    } else if (dotile) {
+      hide_sprite(i);
+      set_mob_tile_during_vbl(mob_pos[i], frame);
     }
   }
-  *ptr++ = 0xf1; // pop af
-  *ptr++ = 0xc9; // ret
+}
+
+void set_mob_tile_during_vbl(u8 pos, u8 tile) {
+  u16 addr = POS_TO_ADDR(pos);
+  u8 *ptr = mob_tile_code + tile_code_end;
+  if (tile_code_end == 1 || (addr >> 8) != (last_tile_addr >> 8)) {
+    *ptr++ = 0x21; // ld hl, addr
+    *ptr++ = (u8)addr;
+    *ptr++ = addr >> 8;
+  } else {
+    *ptr++ = 0x2e; // ld l, lo(addr)
+    *ptr++ = (u8)addr;
+  }
+  last_tile_addr = addr;
+  if (tile != last_tile_val) {
+    *ptr++ = 0x3e; // ld a, tile
+    *ptr++ = tile;
+    last_tile_val = tile;
+  }
+  *ptr++ = 0x77; // ld (hl), a
+  tile_code_end = ptr - mob_tile_code;
 }
 
 void vbl_interrupt(void) {
@@ -534,7 +629,11 @@ void addmob(MobType type, u8 pos) {
   mob_type[num_mobs] = type;
   mob_pos[num_mobs] = pos;
   mob_anim_timer[num_mobs] = 1;
+  mob_anim_speed[num_mobs] = mob_anim_orig_speed[type];
   mob_anim_frame[num_mobs] = mob_anim_start[type];
+  mob_move_timer[num_mobs] = 0;
+  mob_state[num_mobs] = MOB_STATE_NONE;
+  mob_flip[num_mobs] = 0;
   ++num_mobs;
   mobmap[pos] = num_mobs; // index+1
 }
@@ -1407,32 +1506,37 @@ void begintileanim(void) {
   tile_code[4] = addr >> 8;
   tile_code[5] = 0x47; // ld b, a
   tile_code_end = 6;
+  last_tile_addr = 0;
+  last_tile_val = 0;
 }
 
 void endtileanim(void) {
-  tile_code[tile_code_end++] = 0xc1; // pop bc
-  tile_code[tile_code_end++] = 0xf1; // pop af
-  tile_code[tile_code_end] = 0xc9; // ret
+  u8 *ptr = tile_code + tile_code_end;
+  *ptr++ = 0xc1; // pop bc
+  *ptr++ = 0xf1; // pop af
+  *ptr = 0xc9;   // ret
 }
 
 void addtileanim(u8 pos, u8 tile) {
+  u8* ptr = tile_code + tile_code_end;
   u16 addr = POS_TO_ADDR(pos);
   if (tile_code_end == 6 || (addr >> 8) != (last_tile_addr >> 8)) {
-    tile_code[tile_code_end++] = 0x21; // ld hl, NNNN
-    tile_code[tile_code_end++] = (u8)addr;
-    tile_code[tile_code_end++] = addr >> 8;
+    *ptr++ = 0x21; // ld hl, NNNN
+    *ptr++ = (u8)addr;
+    *ptr++ = addr >> 8;
   } else {
-    tile_code[tile_code_end++] = 0x2e; // ld l, NN
-    tile_code[tile_code_end++] = (u8)addr;
+    *ptr++ = 0x2e; // ld l, NN
+    *ptr++ = (u8)addr;
   }
-  if (tile != last_tile_val) {
-    tile_code[tile_code_end++] = 0x3e; // ld a, NN
-    tile_code[tile_code_end++] = tile;
-    tile_code[tile_code_end++] = 0x80; // add b
-  }
-  tile_code[tile_code_end++] = 0x77; // ld (hl), a
   last_tile_addr = addr;
-  last_tile_val = tile;
+  if (tile != last_tile_val) {
+    *ptr++ = 0x3e; // ld a, NN
+    *ptr++ = tile;
+    *ptr++ = 0x80; // add b
+    last_tile_val = tile;
+  }
+  *ptr++ = 0x77; // ld (hl), a
+  tile_code_end = ptr - tile_code;
 }
 
 void spawnmobs(void) {
