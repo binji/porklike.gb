@@ -33,9 +33,12 @@ typedef void (*vfp)(void);
 
 #define WALK_TIME 8
 #define BUMP_TIME 4
-#define WAIT_TIME 6
+
+#define AI_COOL_TIME 8
 
 #define IS_WALL_TILE(tile) (flags_bin[tile] & 1)
+#define IS_WALL_OR_SPECIAL_TILE(tile) (flags_bin[tile] & 3)
+#define IS_OPAQUE_TILE(tile) (flags_bin[tile] & 4)
 #define TILE_HAS_CRACKED_VARIANT(tile) (flags_bin[tile] & 0b01000000)
 #define IS_CRACKED_WALL_TILE(tile) (flags_bin[tile] & 0b00001000)
 #define IS_ANIMATED_TILE(tile) (flags_bin[tile] & 0b00010000)
@@ -45,6 +48,8 @@ typedef void (*vfp)(void);
 #define IS_FREESTANDING(pos) sigmatch((pos), freesig, freemask)
 
 #define IS_SMARTMOB(tile, pos) ((flags_bin[tile] & 3) || mobmap[pos])
+#define IS_MOB_AI(tile, pos)                                                   \
+  ((flags_bin[tile] & 3) || (mobmap[pos] && !mob_active[mobmap[pos] - 1]))
 
 #define URAND() ((u8)rand())
 
@@ -107,6 +112,82 @@ typedef void (*vfp)(void);
 #define TILE_STEPS 0x6a
 #define TILE_ENTRANCE 0x6b
 
+typedef u8 Map[MAP_WIDTH * MAP_HEIGHT];
+
+typedef enum Dir {
+  DIR_LEFT,
+  DIR_RIGHT,
+  DIR_UP,
+  DIR_DOWN,
+} Dir;
+
+typedef enum Turn {
+  TURN_PLAYER,
+  TURN_PLAYER_WAIT,
+  TURN_AI,
+  TURN_AI_WAIT,
+  TURN_WEEDS,
+  TURN_WEEDS_WAIT,
+} Turn;
+
+typedef enum RoomKind {
+  ROOM_KIND_VASE,
+  ROOM_KIND_DIRT,
+  ROOM_KIND_CARPET,
+  ROOM_KIND_TORCH,
+  ROOM_KIND_PLANT,
+  NUM_ROOM_KINDS,
+} RoomKind;
+
+typedef enum MobType {
+  MOB_TYPE_PLAYER,
+  MOB_TYPE_SLIME,
+  MOB_TYPE_QUEEN,
+  MOB_TYPE_SCORPION,
+  MOB_TYPE_HULK,
+  MOB_TYPE_GHOST,
+  MOB_TYPE_KONG,
+  MOB_TYPE_REAPER,
+  MOB_TYPE_WEED,
+  MOB_TYPE_BOMB,
+  MOB_TYPE_VASE1,
+  MOB_TYPE_VASE2,
+  MOB_TYPE_CHEST,
+  NUM_MOB_TYPES,
+} MobType;
+
+typedef enum PickupType {
+  PICKUP_TYPE_HEART,
+  PICKUP_TYPE_KEY,
+  PICKUP_TYPE_JUMP,
+  PICKUP_TYPE_BOLT,
+  PICKUP_TYPE_PUSH,
+  PICKUP_TYPE_GRAPPLE,
+  PICKUP_TYPE_SPEAR,
+  PICKUP_TYPE_SMASH,
+  PICKUP_TYPE_HOOK,
+  PICKUP_TYPE_SPIN,
+  PICKUP_TYPE_SUPLEX,
+  PICKUP_TYPE_SLAP,
+} PickupType;
+
+typedef enum MobAnimState {
+  MOB_ANIM_STATE_NONE,
+  MOB_ANIM_STATE_WALK,
+  MOB_ANIM_STATE_BUMP1,
+  MOB_ANIM_STATE_BUMP2,
+} MobAnimState;
+
+typedef enum MobAI {
+  MOB_AI_NONE,
+  MOB_AI_WAIT,
+  MOB_AI_WEED,
+  MOB_AI_REAPER,
+  MOB_AI_ATTACK,
+  MOB_AI_QUEEN,
+  MOB_AI_KONG,
+} MobAI;
+
 const u8 fadepal[] = {
     0b11111111, // 0:Black     1:Black    2:Black 3:Black
     0b10111111, // 0:Black     1:Black    2:Black 3:DarkGray
@@ -168,6 +249,39 @@ const u8 validmap[] = {
   0x7c,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xb3,
   0x7c,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xb3,
   0x68,0xe9,0xe9,0xe9,0xe9,0xe9,0xe9,0xe9,0xe9,0xe9,0xe9,0xe9,0xe9,0xe9,0xe9,0xa1,
+};
+
+// U           0b0010 0000   20
+// L           0b1000 0000   80
+// D           0b0001 0000   10
+// R           0b0100 0000   40
+// U UR:       0b0010 1000   28
+// U UL:       0b0010 0001   21
+// L UL:       0b1000 0001   81
+// L DL:       0b1000 0010   82
+// D DL:       0b0001 0010   12
+// D DR:       0b0001 0100   14
+// R DR:       0b0100 0100   44
+// R UR:       0b0100 1000   48
+// UL U  UR:   0b0010 1001   29
+// L  UL U:    0b1010 0001   a1
+// UL L  DL:   0b1000 0011   83
+// L  DL D:    0b1001 0010   92
+// DL D  DR:   0b0001 0110   16
+// D  DR R:    0b0101 0100   54
+// DR R  UR:   0b0100 1100   4c
+// R  UR U:    0b0110 1000   68
+
+const u8 sightsig[] = {                          // extended out to 16 wide
+  0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,  0, 0, 0, 0, 0, 0, 0,
+  0x00,0x00,0x00,0x00,0x20,0x00,0x00,0x00,0x00,  0, 0, 0, 0, 0, 0, 0,
+  0x00,0x00,0x00,0x21,0x20,0x28,0x00,0x00,0x00,  0, 0, 0, 0, 0, 0, 0,
+  0x00,0x00,0x81,0xa1,0x29,0x68,0x48,0x00,0x00,  0, 0, 0, 0, 0, 0, 0,
+  0x00,0x80,0x80,0x83,0xff,0x4c,0x40,0x40,0x00,  0, 0, 0, 0, 0, 0, 0,
+  0x00,0x00,0x82,0x92,0x16,0x54,0x44,0x00,0x00,  0, 0, 0, 0, 0, 0, 0,
+  0x00,0x00,0x00,0x12,0x10,0x14,0x00,0x00,0x00,  0, 0, 0, 0, 0, 0, 0,
+  0x00,0x00,0x00,0x00,0x10,0x00,0x00,0x00,0x00,  0, 0, 0, 0, 0, 0, 0,
+  0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,  0, 0, 0, 0, 0, 0, 0,
 };
 
 const u8 void_tiles[] = {TILE_VOID1, TILE_VOID1, TILE_VOID1, TILE_VOID1,
@@ -284,62 +398,55 @@ const u8 mob_anim_orig_speed[] = {
     255, // chest
 };
 
-typedef u8 Map[MAP_WIDTH * MAP_HEIGHT];
+const MobAI mob_ai_wait[] = {
+    MOB_AI_NONE,   // player
+    MOB_AI_WAIT,   // slime
+    MOB_AI_WAIT,   // queen
+    MOB_AI_WAIT,   // scorpion
+    MOB_AI_WAIT,   // hulk
+    MOB_AI_WAIT,   // ghost
+    MOB_AI_WAIT,   // kong
+    MOB_AI_REAPER, // reaper
+    MOB_AI_WEED,   // weed
+    MOB_AI_NONE,   // bomb
+    MOB_AI_NONE,   // vase1
+    MOB_AI_NONE,   // vase2
+    MOB_AI_NONE,   // chest
+};
 
-typedef enum RoomKind {
-  ROOM_KIND_VASE,
-  ROOM_KIND_DIRT,
-  ROOM_KIND_CARPET,
-  ROOM_KIND_TORCH,
-  ROOM_KIND_PLANT,
-  NUM_ROOM_KINDS,
-} RoomKind;
-
-typedef enum MobType {
-  MOB_TYPE_PLAYER,
-  MOB_TYPE_SLIME,
-  MOB_TYPE_QUEEN,
-  MOB_TYPE_SCORPION,
-  MOB_TYPE_HULK,
-  MOB_TYPE_GHOST,
-  MOB_TYPE_KONG,
-  MOB_TYPE_REAPER,
-  MOB_TYPE_WEED,
-  MOB_TYPE_BOMB,
-  MOB_TYPE_VASE1,
-  MOB_TYPE_VASE2,
-  MOB_TYPE_CHEST,
-  NUM_MOB_TYPES,
-} MobType;
-
-typedef enum PickupType {
-  PICKUP_TYPE_HEART,
-  PICKUP_TYPE_KEY,
-  PICKUP_TYPE_JUMP,
-  PICKUP_TYPE_BOLT,
-  PICKUP_TYPE_PUSH,
-  PICKUP_TYPE_GRAPPLE,
-  PICKUP_TYPE_SPEAR,
-  PICKUP_TYPE_SMASH,
-  PICKUP_TYPE_HOOK,
-  PICKUP_TYPE_SPIN,
-  PICKUP_TYPE_SUPLEX,
-  PICKUP_TYPE_SLAP,
-} PickupType;
-
-typedef enum MobAnimState {
-  MOB_ANIM_STATE_NONE,
-  MOB_ANIM_STATE_WAIT,
-  MOB_ANIM_STATE_WALK,
-  MOB_ANIM_STATE_BUMP1,
-  MOB_ANIM_STATE_BUMP2,
-} MobAnimState;
+const MobAI mob_ai_active[] = {
+    MOB_AI_NONE,   // player
+    MOB_AI_ATTACK, // slime
+    MOB_AI_QUEEN,  // queen
+    MOB_AI_ATTACK, // scorpion
+    MOB_AI_ATTACK, // hulk
+    MOB_AI_ATTACK, // ghost
+    MOB_AI_KONG,   // kong
+    MOB_AI_REAPER, // reaper
+    MOB_AI_WEED,   // weed
+    MOB_AI_NONE,   // bomb
+    MOB_AI_NONE,   // vase1
+    MOB_AI_NONE,   // vase2
+    MOB_AI_NONE,   // chest
+};
 
 void init(void);
-void beginmobanim(void);
+void do_turn(void);
+void pass_turn(void);
+void begin_mob_anim(void);
 void move_player(void);
+void mobdir(u8 index, u8 dir);
+void mobwalk(u8 index, u8 dir);
+void mobbump(u8 index, u8 dir);
+void do_ai(void);
+void do_ai_weeds(void);
+u8 do_mob_ai(u8 index);
+u8 ai_tcheck(u8 index);
+void ai_donextstep(u8 index);
+void sight(void);
+void calcdist_ai(u8 from, u8 to);
 void animate_mobs(void);
-void endmobanim(void);
+void end_mob_anim(void);
 void set_mob_tile_during_vbl(u8 pos, u8 tile);
 void vbl_interrupt(void);
 
@@ -348,7 +455,6 @@ void fadein(void);
 
 void addmob(MobType type, u8 pos);
 void addpickup(PickupType type, u8 pos);
-void mobwalk(u8 index, u8 pos);
 
 // Map generation
 void mapgen(void);
@@ -387,13 +493,13 @@ u8 ds_find(u8 id);
 u8 getpos(u8 cand);
 u8 randint(u8 mx);
 
-
-Map tmap;    // Tile map
-Map roommap; // Room/void map
-Map distmap; // Distance map
-Map mobmap;  // Mob map
-Map sigmap;  // Signature map (tracks neighbors) **only used during mapgen
-Map tempmap; // Temp map (used for carving)      **only used during mapgen
+Map tmap;     // Tile map
+Map roommap;  // Room/void map
+Map distmap;  // Distance map
+Map mobmap;   // Mob map
+Map sigmap;   // Signature map (tracks neighbors) **only used during mapgen
+Map tempmap;  // Temp map (used for carving)      **only used during mapgen
+Map sightmap; // Sight from player
 
 // The following data structures is used for rooms as well as union-find
 // algorithm; see https://en.wikipedia.org/wiki/Disjoint-set_data_structure
@@ -432,6 +538,10 @@ u8 mob_dx[MAX_MOBS], mob_dy[MAX_MOBS];
 u8 mob_move_timer[MAX_MOBS];
 MobAnimState mob_anim_state[MAX_MOBS];
 u8 mob_flip[MAX_MOBS];
+MobAI mob_task[MAX_MOBS];
+u8 mob_target_pos[MAX_MOBS];
+u8 mob_ai_cool[MAX_MOBS];
+u8 mob_active[MAX_MOBS];
 u8 num_mobs;
 
 // TODO: how big to make these arrays?
@@ -442,6 +552,9 @@ u16 last_tile_addr;    // last tile address in HL for {mob_,}tile_code
 u8 last_tile_val;      // last tile value in A for {mob_,}tile_code
 u8 tile_timer; // timer for animating tiles (every TILE_ANIM_SPEED frames)
 u8 tile_inc;   // either 0 or TILE_ANIM_FRAME_DIFF, for two frames of animation
+
+Turn turn;
+u8 noturn;
 
 u8 key;
 
@@ -464,17 +577,18 @@ void main(void) {
       fadeout();
       IE_REG &= ~VBL_IFLAG;
       mapgen();
-      beginmobanim(); // Reset the mob anims so they don't draw on this new map
+      // Reset the mob anims so they don't draw on this new map
+      begin_mob_anim();
       IE_REG |= VBL_IFLAG;
       wait_vbl_done(); // wait to copy tiles
       set_bkg_tiles(2, 1, MAP_WIDTH, MAP_HEIGHT, tmap);
       fadein();
     }
 
-    beginmobanim();
-    move_player();
+    begin_mob_anim();
+    do_turn();
     animate_mobs();
-    endmobanim();
+    end_mob_anim();
     wait_vbl_done();
   }
 }
@@ -503,13 +617,16 @@ void init(void) {
   num_mobs = 0;
   addmob(MOB_TYPE_PLAYER, 0);
 
+  turn = TURN_PLAYER;
+  noturn = 0;
+
   tile_inc = 0;
   tile_timer = TILE_ANIM_SPEED;
   tile_code[0] = mob_tile_code[0] = 0xc9; // ret
   add_VBL(vbl_interrupt);
 }
 
-void beginmobanim(void) {
+void begin_mob_anim(void) {
   last_tile_addr = 0;
   last_tile_val = 0xff;
   tile_code_end = 1;
@@ -518,62 +635,299 @@ void beginmobanim(void) {
   mob_tile_code[0] = 0xc9;  // ret
 }
 
-void endmobanim(void) {
+void end_mob_anim(void) {
   mob_tile_code[tile_code_end++] = 0xf1; // pop af
   mob_tile_code[tile_code_end++] = 0xc9; // ret
   mob_tile_code[0] = 0xf5; // push af
 }
 
+void do_turn(void) {
+  switch (turn) {
+  case TURN_PLAYER:
+    move_player();
+    break;
+
+  case TURN_AI:
+    turn = TURN_AI_WAIT;
+    do_ai();
+    break;
+
+  case TURN_WEEDS:
+    turn = TURN_WEEDS_WAIT;
+    do_ai_weeds();
+    break;
+  }
+}
+
+void pass_turn(void) {
+  switch (turn) {
+  case TURN_PLAYER_WAIT:
+    if (noturn) {
+      turn = TURN_PLAYER;
+      noturn = 0;
+    } else {
+      turn = TURN_AI;
+    }
+    break;
+
+  case TURN_AI_WAIT:
+    turn = TURN_WEEDS;
+    break;
+
+  case TURN_WEEDS_WAIT:
+    turn = TURN_PLAYER;
+    break;
+  }
+}
+
 void move_player(void) {
-  u8 pos, newpos, dir, valid;
+  u8 pos, dir;
   // XXX
   if (mob_move_timer[PLAYER_MOB] == 0) {
     if (key & (J_LEFT | J_RIGHT | J_UP | J_DOWN)) {
-      pos = mob_pos[PLAYER_MOB];
-      valid = validmap[pos];
       if (key & J_LEFT) {
-        dir = 0;
-        valid = (valid & VALID_L);
-        mob_flip[PLAYER_MOB] = 1;
+        dir = DIR_LEFT;
       } else if (key & J_RIGHT) {
-        dir = 1;
-        valid = (valid & VALID_R);
-        mob_flip[PLAYER_MOB] = 0;
+        dir = DIR_RIGHT;
       } else if (key & J_UP) {
-        dir = 2;
-        valid = (valid & VALID_U);
-      } else if (key & J_DOWN) {
-        dir = 3;
-        valid = (valid & VALID_D);
-      }
-
-      newpos = pos + dirpos[dir];
-
-      mob_x[PLAYER_MOB] = POS_TO_X(pos);
-      mob_y[PLAYER_MOB] = POS_TO_Y(pos);
-      mob_dx[PLAYER_MOB] = dirx[dir];
-      mob_dy[PLAYER_MOB] = diry[dir];
-
-      set_mob_tile_during_vbl(pos, tmap[pos]);
-      if (!valid || IS_WALL_TILE(tmap[newpos])) {
-        // bump
-        mob_move_timer[PLAYER_MOB] = BUMP_TIME;
-        mob_anim_state[PLAYER_MOB] = MOB_ANIM_STATE_BUMP1;
+        dir = DIR_UP;
       } else {
-        // walk
-        mob_move_timer[PLAYER_MOB] = WALK_TIME;
-        mob_anim_state[PLAYER_MOB] = MOB_ANIM_STATE_WALK;
-        mob_pos[PLAYER_MOB] = newpos;
-        mob_anim_speed[PLAYER_MOB] = mob_anim_timer[PLAYER_MOB] = 3;
-        mobmap[pos] = 0;
-        mobmap[newpos] = PLAYER_MOB + 1;
+        dir = DIR_DOWN;
       }
+
+      pos = mob_pos[PLAYER_MOB];
+      mobdir(PLAYER_MOB, dir);
+      if (!(validmap[pos] & dirvalid[dir]) ||
+          IS_WALL_TILE(tmap[(u8)(pos + dirpos[dir])])) {
+        mobbump(PLAYER_MOB, dir);
+        noturn = 1;
+      } else {
+        mobwalk(PLAYER_MOB, dir);
+      }
+      turn = TURN_PLAYER_WAIT;
     }
   }
 }
 
+void mobdir(u8 index, u8 dir) {
+  if (dir == DIR_LEFT) {
+    mob_flip[index] = 1;
+  } else if (dir == DIR_RIGHT) {
+    mob_flip[index] = 0;
+  }
+}
+
+void mobwalk(u8 index, u8 dir) {
+  u8 pos, newpos;
+
+  pos = mob_pos[index];
+  mob_x[index] = POS_TO_X(pos);
+  mob_y[index] = POS_TO_Y(pos);
+  mob_dx[index] = dirx[dir];
+  mob_dy[index] = diry[dir];
+  set_mob_tile_during_vbl(pos, tmap[pos]);
+
+  mob_move_timer[index] = WALK_TIME;
+  mob_anim_state[index] = MOB_ANIM_STATE_WALK;
+  mob_pos[index] = newpos = pos + dirpos[dir];
+  mob_anim_speed[index] = mob_anim_timer[index] = 3;
+  mobmap[pos] = 0;
+  mobmap[newpos] = index + 1;
+}
+
+void mobbump(u8 index, u8 dir) {
+  u8 pos = mob_pos[index];
+  mob_x[index] = POS_TO_X(pos);
+  mob_y[index] = POS_TO_Y(pos);
+  mob_dx[index] = dirx[dir];
+  mob_dy[index] = diry[dir];
+  set_mob_tile_during_vbl(pos, tmap[pos]);
+
+  mob_move_timer[index] = BUMP_TIME;
+  mob_anim_state[index] = MOB_ANIM_STATE_BUMP1;
+}
+
+void do_ai(void) {
+  u8 moving = 0;
+  u8 i;
+  for (i = 0; i < num_mobs; ++i) {
+    if (mob_type[i] != MOB_TYPE_WEED) {
+      moving |= do_mob_ai(i);
+    }
+  }
+  if (!moving) {
+    pass_turn();
+  }
+}
+
+void do_ai_weeds(void) {
+  u8 moving = 0;
+  u8 i;
+  for (i = 0; i < num_mobs; ++i) {
+    if (mob_type[i] == MOB_TYPE_WEED) {
+      moving |= do_mob_ai(i);
+    }
+  }
+  if (!moving) {
+    pass_turn();
+  }
+}
+
+u8 do_mob_ai(u8 index) {
+  switch (mob_task[index]) {
+    case MOB_AI_NONE:
+      break;
+
+    case MOB_AI_WAIT:
+      if (sightmap[mob_pos[index]]) {
+        mob_task[index] = mob_ai_active[mob_type[index]];
+        mob_target_pos[index] = mob_pos[PLAYER_MOB];
+        mob_ai_cool[index] = 0;
+        mob_active[index] = 1;
+      }
+      break;
+
+    case MOB_AI_WEED:
+      break;
+
+    case MOB_AI_REAPER:
+      break;
+
+    case MOB_AI_ATTACK:
+      if (ai_tcheck(index)) {
+        ai_donextstep(index);
+      }
+      return 1;
+
+    case MOB_AI_QUEEN:
+      break;
+
+    case MOB_AI_KONG:
+      break;
+  }
+  return 0;
+}
+
+u8 ai_tcheck(u8 index) {
+  ++mob_ai_cool[index];
+  if (sightmap[mob_pos[index]]) {
+    mob_target_pos[index] = mob_pos[PLAYER_MOB];
+    mob_ai_cool[index] = 0;
+  }
+  if (mob_target_pos[index] == mob_pos[index] ||
+      mob_ai_cool[index] > AI_COOL_TIME) {
+    mob_task[index] = MOB_AI_WAIT;
+    mob_active[index] = 0;
+    return 0;
+  }
+  return 1;
+}
+
+void ai_donextstep(u8 index) {
+  u8 pos, newpos, bestval, bestdir, dist, valid;
+  pos = mob_pos[index];
+  calcdist_ai(pos, mob_target_pos[index]);
+  bestval = bestdir = 255;
+  valid = validmap[pos];
+
+  newpos = DIR_L(pos);
+  if ((valid & VALID_L) && !IS_SMARTMOB(tmap[newpos], newpos) &&
+      (dist = distmap[newpos]) && dist < bestval) {
+    bestval = dist;
+    bestdir = 0;
+  }
+  newpos = DIR_R(pos);
+  if ((valid & VALID_R) && !IS_SMARTMOB(tmap[newpos], newpos) &&
+      (dist = distmap[newpos]) && dist < bestval) {
+    bestval = dist;
+    bestdir = 1;
+  }
+  newpos = DIR_U(pos);
+  if ((valid & VALID_U) && !IS_SMARTMOB(tmap[newpos], newpos) &&
+      (dist = distmap[newpos]) && dist < bestval) {
+    bestval = dist;
+    bestdir = 2;
+  }
+  newpos = DIR_D(pos);
+  if ((valid & VALID_D) && !IS_SMARTMOB(tmap[newpos], newpos) &&
+      (dist = distmap[newpos]) && dist < bestval) {
+    bestval = dist;
+    bestdir = 3;
+  }
+  if (bestdir != 255) {
+    mobwalk(index, bestdir);
+  }
+}
+
+void sight(void) {
+  u8 nppos, oppos, diff, head, oldtail, newtail, sig;
+  memset(sightmap, 0, sizeof(sightmap));
+
+  oppos = mob_pos[PLAYER_MOB];
+
+  cands[head = 0] = 0;
+  newtail = 1;
+  do {
+    oldtail = newtail;
+    do {
+      diff = cands[head++];
+      sightmap[nppos = (u8)(oppos + diff)] = 1;
+      if (!IS_OPAQUE_TILE(tmap[nppos])) {
+        sig = sightsig[(u8)(68 + diff)] & validmap[nppos];
+        if (sig & VALID_UL) { cands[newtail++] = DIR_UL(diff); }
+        if (sig & VALID_U)  { cands[newtail++] = DIR_U (diff); }
+        if (sig & VALID_UR) { cands[newtail++] = DIR_UR(diff); }
+        if (sig & VALID_L)  { cands[newtail++] = DIR_L (diff); }
+        if (sig & VALID_R)  { cands[newtail++] = DIR_R (diff); }
+        if (sig & VALID_DL) { cands[newtail++] = DIR_DL(diff); }
+        if (sig & VALID_D)  { cands[newtail++] = DIR_D (diff); }
+        if (sig & VALID_DR) { cands[newtail++] = DIR_DR(diff); }
+      }
+    } while(head != oldtail);
+  } while (oldtail != newtail);
+}
+
+void calcdist_ai(u8 from, u8 to) {
+  u8 pos, head, oldtail, newtail, valid, dist, newpos;
+  cands[head = 0] = pos = to;
+  newtail = 1;
+
+  memset(distmap, 0, sizeof(distmap));
+  dist = 0;
+
+  do {
+    oldtail = newtail;
+    ++dist;
+    do {
+      pos = cands[head++];
+      if (!distmap[pos]) {
+        distmap[pos] = dist;
+        valid = validmap[pos];
+        if ((valid & VALID_U) && !distmap[newpos = DIR_U(pos)]) {
+          if (newpos == from) { return; }
+          if (!IS_MOB_AI(tmap[newpos], newpos)) { cands[newtail++] = newpos; }
+        }
+        if ((valid & VALID_L) && !distmap[newpos = DIR_L(pos)]) {
+          if (newpos == from) { return; }
+          if (!IS_MOB_AI(tmap[newpos], newpos)) { cands[newtail++] = newpos; }
+        }
+        if ((valid & VALID_R) && !distmap[newpos = DIR_R(pos)]) {
+          if (newpos == from) { return; }
+          if (!IS_MOB_AI(tmap[newpos], newpos)) { cands[newtail++] = newpos; }
+        }
+        if ((valid & VALID_D) && !distmap[newpos = DIR_D(pos)]) {
+          if (newpos == from) { return; }
+          if (!IS_MOB_AI(tmap[newpos], newpos)) { cands[newtail++] = newpos; }
+        }
+      }
+    } while (head != oldtail);
+  } while (oldtail != newtail);
+}
+
 void animate_mobs(void) {
-  u8 i, dotile, frame;
+  u8 i, dotile, frame, animdone;
+
+  animdone = 1;
 
   // Loop through all mobs, update animations
   for (i = 0; i < num_mobs; ++i) {
@@ -599,6 +953,7 @@ void animate_mobs(void) {
       }
 
       if (mob_move_timer[i]) {
+        animdone = 0;
         mob_x[i] += mob_dx[i];
         mob_y[i] += mob_dy[i];
         move_sprite(i, mob_x[i], mob_y[i]);
@@ -613,17 +968,15 @@ void animate_mobs(void) {
               break;
 
             case MOB_ANIM_STATE_WALK:
+              if (i == PLAYER_MOB) {
+                sight();
+              }
               mob_anim_speed[i] = mob_anim_orig_speed[mob_type[i]];
               // fallthrough
 
             case MOB_ANIM_STATE_BUMP2:
-              mob_anim_state[i] = MOB_ANIM_STATE_WAIT;
-              mob_move_timer[i] = WAIT_TIME;
-              mob_dx[i] = mob_dy[i] = 0;
-              break;
-
-            case MOB_ANIM_STATE_WAIT:
               mob_anim_state[i] = MOB_ANIM_STATE_NONE;
+              mob_dx[i] = mob_dy[i] = 0;
               break;
           }
         }
@@ -632,6 +985,10 @@ void animate_mobs(void) {
         set_mob_tile_during_vbl(mob_pos[i], frame);
       }
     }
+  }
+
+  if (animdone) {
+    pass_turn();
   }
 }
 
@@ -698,7 +1055,11 @@ void addmob(MobType type, u8 pos) {
   mob_anim_frame[num_mobs] = mob_anim_start[type];
   mob_move_timer[num_mobs] = 0;
   mob_anim_state[num_mobs] = MOB_ANIM_STATE_NONE;
+  mob_task[num_mobs] = mob_ai_wait[type];
   mob_flip[num_mobs] = 0;
+  mob_target_pos[num_mobs] = 0;
+  mob_ai_cool[num_mobs] = 0;
+  mob_active[num_mobs] = 0;
   ++num_mobs;
   mobmap[pos] = num_mobs; // index+1
 }
@@ -747,6 +1108,9 @@ void mapgen(void) {
                 dummy[6] + dummy[7] + dummy[8] + dummy[9] + dummy[10] + dummy[11];
   }
   endtileanim();
+
+  // XXX
+  sight();
 }
 
 void mapgeninit(void) {
@@ -1554,6 +1918,7 @@ void decoration(void) {
           tmap[pos] = TILE_SAW1;
           sigwall(pos);
           addtileanim(pos, TILE_SAW1);
+          // TODO: what to do about removing animations on broken saws?
         }
 
         ++pos;
