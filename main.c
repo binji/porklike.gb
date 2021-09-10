@@ -14,11 +14,12 @@ typedef int16_t s16;
 typedef uint16_t u16;
 typedef void (*vfp)(void);
 
-#define MAX_DS_SET 64  /* XXX can be smaller */
+#define MAX_DS_SET 64 /* XXX can be smaller */
 #define MAX_ROOMS 4
 #define MAX_VOIDS 10 /* XXX Figure out what this should be */
 #define MAX_CANDS 256
 #define MAX_MOBS 32  /* XXX Figure out what this should be */
+#define MAX_FLOATS 8 /* For now; we'll probably want more */
 
 #define PLAYER_MOB 0
 
@@ -33,6 +34,7 @@ typedef void (*vfp)(void);
 
 #define WALK_TIME 8
 #define BUMP_TIME 4
+#define FLOAT_TIME 70
 
 #define AI_COOL_TIME 8
 
@@ -430,6 +432,11 @@ const MobAI mob_ai_active[] = {
     MOB_AI_NONE,   // chest
 };
 
+const u8 float_diff_y[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0,
+                           1, 0, 0, 0, 1, 0, 0, 1, 0, 1, 0, 1, 1, 1, 1, 1};
+
 void init(void);
 void do_turn(void);
 void pass_turn(void);
@@ -449,6 +456,9 @@ void animate_mobs(void);
 void end_mob_anim(void);
 void set_mob_tile_during_vbl(u8 pos, u8 tile);
 void vbl_interrupt(void);
+
+void addfloat(u8 pos, u8 tile);
+void update_floats(void);
 
 void fadeout(void);
 void fadein(void);
@@ -553,6 +563,9 @@ u8 last_tile_val;      // last tile value in A for {mob_,}tile_code
 u8 tile_timer; // timer for animating tiles (every TILE_ANIM_SPEED frames)
 u8 tile_inc;   // either 0 or TILE_ANIM_FRAME_DIFF, for two frames of animation
 
+u8 float_time[MAX_FLOATS];
+u8 num_floats;
+
 Turn turn;
 u8 noturn;
 
@@ -589,6 +602,7 @@ void main(void) {
     do_turn();
     animate_mobs();
     end_mob_anim();
+    update_floats();
     wait_vbl_done();
   }
 }
@@ -619,6 +633,8 @@ void init(void) {
 
   turn = TURN_PLAYER;
   noturn = 0;
+
+  num_floats = 0;
 
   tile_inc = 0;
   tile_timer = TILE_ANIM_SPEED;
@@ -780,6 +796,7 @@ u8 do_mob_ai(u8 index) {
 
     case MOB_AI_WAIT:
       if (sightmap[mob_pos[index]]) {
+        addfloat(mob_pos[index], 0xe);
         mob_task[index] = mob_ai_active[mob_type[index]];
         mob_target_pos[index] = mob_pos[PLAYER_MOB];
         mob_ai_cool[index] = 0;
@@ -816,6 +833,7 @@ u8 ai_tcheck(u8 index) {
   }
   if (mob_target_pos[index] == mob_pos[index] ||
       mob_ai_cool[index] > AI_COOL_TIME) {
+    addfloat(mob_pos[index], 0xf);
     mob_task[index] = MOB_AI_WAIT;
     mob_active[index] = 0;
     return 0;
@@ -1021,6 +1039,37 @@ void vbl_interrupt(void) {
   }
 
   ((vfp)mob_tile_code)();
+}
+
+void addfloat(u8 pos, u8 tile) {
+  shadow_OAM[32 + num_floats].x = POS_TO_X(pos);
+  shadow_OAM[32 + num_floats].y = POS_TO_Y(pos);
+  shadow_OAM[32 + num_floats].tile = tile;
+  float_time[num_floats] = FLOAT_TIME;
+  ++num_floats;
+}
+
+void update_floats(void) {
+  u8 i;
+  for (i = 0; i < num_floats;) {
+    --float_time[i];
+    if (float_time[i] == 0) {
+      --num_floats;
+      if (num_floats) {
+        shadow_OAM[32 + i].x = shadow_OAM[32 + num_floats].x;
+        shadow_OAM[32 + i].y = shadow_OAM[32 + num_floats].y;
+        shadow_OAM[32 + i].tile = shadow_OAM[32 + num_floats].tile;
+        float_time[i] = float_time[num_floats];
+        hide_sprite(32 + num_floats);
+      } else {
+        hide_sprite(32 + i);
+      }
+      continue;
+    } else {
+      shadow_OAM[32 + i].y -= float_diff_y[float_time[i]];
+    }
+    ++i;
+  }
 }
 
 void fadeout(void) {
