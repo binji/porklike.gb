@@ -11,4 +11,5 @@ python ref/bin2c.py shared.bin -t -o tileshared.c
 python ref/bin2c.py sprites.bin -t -o tilesprites.c
 python ref/bin2c.py map.bin -o map.c
 python ref/bin2c.py flags.bin -o flags.c
-../gbdk/bin/lcc -Wa-l -Wl-m main.c -o main.gb
+../gbdk/bin/lcc -Wa-l main.c -c -o main.o
+../gbdk/bin/lcc -Wl-m main.o -o main.gb

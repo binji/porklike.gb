@@ -79,14 +79,14 @@ typedef void (*vfp)(void);
 #define MASK_R   0b10111111
 #define MASK_L   0b01111111
 
-#define DIR_UL(pos)   ((u8)(pos + 239))
-#define DIR_U(pos)    ((u8)(pos + 240))
-#define DIR_UR(pos)   ((u8)(pos + 241))
-#define DIR_L(pos)    ((u8)(pos + 255))
-#define DIR_R(pos)    ((u8)(pos + 1))
-#define DIR_DL(pos)   ((u8)(pos + 15))
-#define DIR_D(pos)    ((u8)(pos + 16))
-#define DIR_DR(pos)   ((u8)(pos + 17))
+#define POS_UL(pos)   ((u8)(pos + 239))
+#define POS_U(pos)    ((u8)(pos + 240))
+#define POS_UR(pos)   ((u8)(pos + 241))
+#define POS_L(pos)    ((u8)(pos + 255))
+#define POS_R(pos)    ((u8)(pos + 1))
+#define POS_DL(pos)   ((u8)(pos + 15))
+#define POS_D(pos)    ((u8)(pos + 16))
+#define POS_DR(pos)   ((u8)(pos + 17))
 
 #define TILE_EMPTY 1
 #define TILE_WALL 2
@@ -454,7 +454,7 @@ void sight(void);
 void calcdist_ai(u8 from, u8 to);
 void animate_mobs(void);
 void end_mob_anim(void);
-void set_mob_tile_during_vbl(u8 pos, u8 tile);
+void set_tile_during_vbl(u8 pos, u8 tile);
 void vbl_interrupt(void);
 
 void addfloat(u8 pos, u8 tile);
@@ -465,6 +465,8 @@ void fadein(void);
 
 void addmob(MobType type, u8 pos);
 void addpickup(PickupType type, u8 pos);
+
+void initdtmap(void);
 
 // Map generation
 void mapgen(void);
@@ -503,13 +505,15 @@ u8 ds_find(u8 id);
 u8 getpos(u8 cand);
 u8 randint(u8 mx);
 
-Map tmap;     // Tile map
+Map tmap;     // Tile map (everything unfogged)
+Map dtmap;    // Display tile map (w/ fogged tiles)
 Map roommap;  // Room/void map
 Map distmap;  // Distance map
 Map mobmap;   // Mob map
 Map sigmap;   // Signature map (tracks neighbors) **only used during mapgen
 Map tempmap;  // Temp map (used for carving)      **only used during mapgen
 Map sightmap; // Sight from player
+Map fogmap;   // Tiles player hasn't seen
 
 // The following data structures is used for rooms as well as union-find
 // algorithm; see https://en.wikipedia.org/wiki/Disjoint-set_data_structure
@@ -571,6 +575,8 @@ u8 noturn;
 
 u8 key;
 
+u8 doupdatemap;
+
 u16 myclock;
 void tim_interrupt(void) { ++myclock; }
 
@@ -578,8 +584,9 @@ void main(void) {
   init();
   mapgen();
 
-  set_bkg_tiles(2, 1, MAP_WIDTH, MAP_HEIGHT, tmap);
+  doupdatemap = 1;
   LCDC_REG = 0b10000011;  // display on, bg on, obj on
+  fadein();
 
   while(1) {
     key = joypad();
@@ -593,8 +600,7 @@ void main(void) {
       // Reset the mob anims so they don't draw on this new map
       begin_mob_anim();
       IE_REG |= VBL_IFLAG;
-      wait_vbl_done(); // wait to copy tiles
-      set_bkg_tiles(2, 1, MAP_WIDTH, MAP_HEIGHT, tmap);
+      doupdatemap = 1;
       fadein();
     }
 
@@ -611,7 +617,7 @@ void init(void) {
   DISPLAY_OFF;
 
    // 0:LightGray 1:DarkGray 2:Black 3:White
-  BGP_REG = OBP0_REG = OBP1_REG = fadepal[3];
+  BGP_REG = OBP0_REG = OBP1_REG = fadepal[0];
 
   add_TIM(tim_interrupt);
   TMA_REG = 0;      // Divide clock by 256 => 16Hz
@@ -630,6 +636,8 @@ void init(void) {
 
   num_mobs = 0;
   addmob(MOB_TYPE_PLAYER, 0);
+
+  doupdatemap = 0;
 
   turn = TURN_PLAYER;
   noturn = 0;
@@ -741,7 +749,7 @@ void mobwalk(u8 index, u8 dir) {
   mob_y[index] = POS_TO_Y(pos);
   mob_dx[index] = dirx[dir];
   mob_dy[index] = diry[dir];
-  set_mob_tile_during_vbl(pos, tmap[pos]);
+  set_tile_during_vbl(pos, dtmap[pos]);
 
   mob_move_timer[index] = WALK_TIME;
   mob_anim_state[index] = MOB_ANIM_STATE_WALK;
@@ -757,7 +765,7 @@ void mobbump(u8 index, u8 dir) {
   mob_y[index] = POS_TO_Y(pos);
   mob_dx[index] = dirx[dir];
   mob_dy[index] = diry[dir];
-  set_mob_tile_during_vbl(pos, tmap[pos]);
+  set_tile_during_vbl(pos, dtmap[pos]);
 
   mob_move_timer[index] = BUMP_TIME;
   mob_anim_state[index] = MOB_ANIM_STATE_BUMP1;
@@ -848,25 +856,25 @@ void ai_donextstep(u8 index) {
   bestval = bestdir = 255;
   valid = validmap[pos];
 
-  newpos = DIR_L(pos);
+  newpos = POS_L(pos);
   if ((valid & VALID_L) && !IS_SMARTMOB(tmap[newpos], newpos) &&
       (dist = distmap[newpos]) && dist < bestval) {
     bestval = dist;
     bestdir = 0;
   }
-  newpos = DIR_R(pos);
+  newpos = POS_R(pos);
   if ((valid & VALID_R) && !IS_SMARTMOB(tmap[newpos], newpos) &&
       (dist = distmap[newpos]) && dist < bestval) {
     bestval = dist;
     bestdir = 1;
   }
-  newpos = DIR_U(pos);
+  newpos = POS_U(pos);
   if ((valid & VALID_U) && !IS_SMARTMOB(tmap[newpos], newpos) &&
       (dist = distmap[newpos]) && dist < bestval) {
     bestval = dist;
     bestdir = 2;
   }
-  newpos = DIR_D(pos);
+  newpos = POS_D(pos);
   if ((valid & VALID_D) && !IS_SMARTMOB(tmap[newpos], newpos) &&
       (dist = distmap[newpos]) && dist < bestval) {
     bestval = dist;
@@ -878,28 +886,60 @@ void ai_donextstep(u8 index) {
 }
 
 void sight(void) {
-  u8 nppos, oppos, diff, head, oldtail, newtail, sig;
+  u8 ppos, pos, adjpos, diff, head, oldtail, newtail, sig, valid, first;
   memset(sightmap, 0, sizeof(sightmap));
 
-  oppos = mob_pos[PLAYER_MOB];
+  ppos = mob_pos[PLAYER_MOB];
 
   cands[head = 0] = 0;
   newtail = 1;
+  first = 1;
   do {
     oldtail = newtail;
     do {
       diff = cands[head++];
-      sightmap[nppos = (u8)(oppos + diff)] = 1;
-      if (!IS_OPAQUE_TILE(tmap[nppos])) {
-        sig = sightsig[(u8)(68 + diff)] & validmap[nppos];
-        if (sig & VALID_UL) { cands[newtail++] = DIR_UL(diff); }
-        if (sig & VALID_U)  { cands[newtail++] = DIR_U (diff); }
-        if (sig & VALID_UR) { cands[newtail++] = DIR_UR(diff); }
-        if (sig & VALID_L)  { cands[newtail++] = DIR_L (diff); }
-        if (sig & VALID_R)  { cands[newtail++] = DIR_R (diff); }
-        if (sig & VALID_DL) { cands[newtail++] = DIR_DL(diff); }
-        if (sig & VALID_D)  { cands[newtail++] = DIR_D (diff); }
-        if (sig & VALID_DR) { cands[newtail++] = DIR_DR(diff); }
+      sightmap[pos = (u8)(ppos + diff)] = 1;
+
+      // Unfog this tile
+      if (fogmap[pos]) {
+        set_tile_during_vbl(pos, dtmap[pos] = tmap[pos]);
+        fogmap[pos] = 0;
+      }
+
+      if (first || !IS_OPAQUE_TILE(tmap[pos])) {
+        first = 0;
+        // Unfog neighbors
+        valid = validmap[pos];
+        if ((valid & VALID_U) && fogmap[adjpos = POS_U(pos)] &&
+            IS_WALL_TILE(tmap[adjpos])) {
+          set_tile_during_vbl(adjpos, dtmap[adjpos] = tmap[adjpos]);
+          fogmap[adjpos] = 0;
+        }
+        if ((valid & VALID_L) && fogmap[adjpos = POS_L(pos)] &&
+            IS_WALL_TILE(tmap[adjpos])) {
+          set_tile_during_vbl(adjpos, dtmap[adjpos] = tmap[adjpos]);
+          fogmap[adjpos] = 0;
+        }
+        if ((valid & VALID_R) && fogmap[adjpos = POS_R(pos)] &&
+            IS_WALL_TILE(tmap[adjpos])) {
+          set_tile_during_vbl(adjpos, dtmap[adjpos] = tmap[adjpos]);
+          fogmap[adjpos] = 0;
+        }
+        if ((valid & VALID_D) && fogmap[adjpos = POS_D(pos)] &&
+            IS_WALL_TILE(tmap[adjpos])) {
+          set_tile_during_vbl(adjpos, dtmap[adjpos] = tmap[adjpos]);
+          fogmap[adjpos] = 0;
+        }
+
+        sig = sightsig[(u8)(68 + diff)] & valid;
+        if (sig & VALID_UL) { cands[newtail++] = POS_UL(diff); }
+        if (sig & VALID_U)  { cands[newtail++] = POS_U (diff); }
+        if (sig & VALID_UR) { cands[newtail++] = POS_UR(diff); }
+        if (sig & VALID_L)  { cands[newtail++] = POS_L (diff); }
+        if (sig & VALID_R)  { cands[newtail++] = POS_R (diff); }
+        if (sig & VALID_DL) { cands[newtail++] = POS_DL(diff); }
+        if (sig & VALID_D)  { cands[newtail++] = POS_D (diff); }
+        if (sig & VALID_DR) { cands[newtail++] = POS_DR(diff); }
       }
     } while(head != oldtail);
   } while (oldtail != newtail);
@@ -921,19 +961,19 @@ void calcdist_ai(u8 from, u8 to) {
       if (!distmap[pos]) {
         distmap[pos] = dist;
         valid = validmap[pos];
-        if ((valid & VALID_U) && !distmap[newpos = DIR_U(pos)]) {
+        if ((valid & VALID_U) && !distmap[newpos = POS_U(pos)]) {
           if (newpos == from) { return; }
           if (!IS_MOB_AI(tmap[newpos], newpos)) { cands[newtail++] = newpos; }
         }
-        if ((valid & VALID_L) && !distmap[newpos = DIR_L(pos)]) {
+        if ((valid & VALID_L) && !distmap[newpos = POS_L(pos)]) {
           if (newpos == from) { return; }
           if (!IS_MOB_AI(tmap[newpos], newpos)) { cands[newtail++] = newpos; }
         }
-        if ((valid & VALID_R) && !distmap[newpos = DIR_R(pos)]) {
+        if ((valid & VALID_R) && !distmap[newpos = POS_R(pos)]) {
           if (newpos == from) { return; }
           if (!IS_MOB_AI(tmap[newpos], newpos)) { cands[newtail++] = newpos; }
         }
-        if ((valid & VALID_D) && !distmap[newpos = DIR_D(pos)]) {
+        if ((valid & VALID_D) && !distmap[newpos = POS_D(pos)]) {
           if (newpos == from) { return; }
           if (!IS_MOB_AI(tmap[newpos], newpos)) { cands[newtail++] = newpos; }
         }
@@ -949,8 +989,8 @@ void animate_mobs(void) {
 
   // Loop through all mobs, update animations
   for (i = 0; i < num_mobs; ++i) {
-    // TODO: mob must be drawn if it is on top of an animating tile, and it
-    // updated this frame.
+    if (fogmap[mob_pos[i]]) { continue; }
+
     dotile = 0;
     if (tile_timer == 1 && IS_ANIMATED_TILE(tmap[mob_pos[i]])) {
       dotile = 1;
@@ -1000,7 +1040,7 @@ void animate_mobs(void) {
         }
       } else {
         hide_sprite(i);
-        set_mob_tile_during_vbl(mob_pos[i], frame);
+        set_tile_during_vbl(mob_pos[i], frame);
       }
     }
   }
@@ -1010,7 +1050,7 @@ void animate_mobs(void) {
   }
 }
 
-void set_mob_tile_during_vbl(u8 pos, u8 tile) {
+void set_tile_during_vbl(u8 pos, u8 tile) {
   u16 addr = POS_TO_ADDR(pos);
   u8 *ptr = mob_tile_code + tile_code_end;
   if (tile_code_end == 1 || (addr >> 8) != (last_tile_addr >> 8)) {
@@ -1032,6 +1072,10 @@ void set_mob_tile_during_vbl(u8 pos, u8 tile) {
 }
 
 void vbl_interrupt(void) {
+  if (doupdatemap) {
+    set_bkg_tiles(2, 1, MAP_WIDTH, MAP_HEIGHT, dtmap);
+    doupdatemap = 0;
+  }
   if (--tile_timer == 0) {
     tile_timer = TILE_ANIM_SPEED;
     tile_inc ^= TILE_ANIM_FRAME_DIFF;
@@ -1119,16 +1163,27 @@ void addpickup(PickupType pick, u8 pos) {
   (void)pos;
 }
 
+void initdtmap(void) {
+  u8 pos = 0;
+  do {
+    dtmap[pos] = fogmap[pos] ? 0 : tmap[pos];
+  } while(++pos);
+}
+
 void mapgen(void) {
+  u8 fog;
   num_mobs = 1;
   mapgeninit();
   begintileanim();
   if (floor == 0) {
+    fog = 0;
     copymap(0);
     addmob(MOB_TYPE_CHEST, 119);  // x=7,y=7
   } else if (floor == 10) {
+    fog = 0;
     copymap(1);
   } else {
+    fog = 1;
     TIMESTART;
     roomgen();
     TIMEDIFF(1);
@@ -1157,9 +1212,9 @@ void mapgen(void) {
                 dummy[6] + dummy[7] + dummy[8] + dummy[9] + dummy[10] + dummy[11];
   }
   endtileanim();
-
-  // XXX
+  memset(fogmap, fog, sizeof(fogmap));
   sight();
+  initdtmap();
 }
 
 void mapgeninit(void) {
@@ -1229,7 +1284,7 @@ void roomgen(void) {
         // This tile is above a room or the bottom edge; we subtract one from
         // the value below to track whether it is far enough away to fit a room
         // of height `h`.
-        val = tempmap[DIR_D(pos)];
+        val = tempmap[POS_D(pos)];
         if (val) { --val; }
       } else {
         // This tile is on the bottom edge of the map.
@@ -1242,7 +1297,7 @@ void roomgen(void) {
         // the room.
         val = w + 1;
       } else if (valid & VALID_R) {
-        val = distmap[DIR_R(pos)];
+        val = distmap[POS_R(pos)];
         if (val) {
           // This tile is to the left of a room or the right edge of the map.
           // We also update the "height" map in this case to extend out the
@@ -1260,7 +1315,7 @@ void roomgen(void) {
           // 000000012   222222222    .........
           //
           --val;
-          tempmap[pos] = tempmap[DIR_R(pos)];
+          tempmap[pos] = tempmap[POS_R(pos)];
         } else {
           val = 0;
           if (!tempmap[pos]) {
@@ -1357,10 +1412,10 @@ void copymap(u8 index) {
         ds_sizes[ds_nextid] = 1;
 
         valid = validmap[pos];
-        if (valid & VALID_U) { ds_union(ds_nextid, ds_sets[DIR_U(pos)]); }
-        if (valid & VALID_L) { ds_union(ds_nextid, ds_sets[DIR_L(pos)]); }
-        if (valid & VALID_R) { ds_union(ds_nextid, ds_sets[DIR_R(pos)]); }
-        if (valid & VALID_D) { ds_union(ds_nextid, ds_sets[DIR_D(pos)]); }
+        if (valid & VALID_U) { ds_union(ds_nextid, ds_sets[POS_U(pos)]); }
+        if (valid & VALID_L) { ds_union(ds_nextid, ds_sets[POS_L(pos)]); }
+        if (valid & VALID_R) { ds_union(ds_nextid, ds_sets[POS_R(pos)]); }
+        if (valid & VALID_D) { ds_union(ds_nextid, ds_sets[POS_D(pos)]); }
         break;
     }
   } while (++pos);
@@ -1399,10 +1454,10 @@ void mazeworms(void) {
       // tile can be connect to another region (since it would not be
       // carvable). So we only need to merge regions here.
       valid = validmap[pos];
-      if (valid & VALID_U) { ds_union(ds_nextid, ds_sets[DIR_U(pos)]); }
-      if (valid & VALID_L) { ds_union(ds_nextid, ds_sets[DIR_L(pos)]); }
-      if (valid & VALID_R) { ds_union(ds_nextid, ds_sets[DIR_R(pos)]); }
-      if (valid & VALID_D) { ds_union(ds_nextid, ds_sets[DIR_D(pos)]); }
+      if (valid & VALID_U) { ds_union(ds_nextid, ds_sets[POS_U(pos)]); }
+      if (valid & VALID_L) { ds_union(ds_nextid, ds_sets[POS_L(pos)]); }
+      if (valid & VALID_R) { ds_union(ds_nextid, ds_sets[POS_R(pos)]); }
+      if (valid & VALID_D) { ds_union(ds_nextid, ds_sets[POS_D(pos)]); }
     }
   } while(num_cands > 1);
 }
@@ -1424,18 +1479,18 @@ void update_carve1(u8 pos) {
 }
 
 u8 nexttoroom4(u8 pos, u8 valid) {
-  return ((valid & VALID_U) && roommap[DIR_U(pos)]) ||
-         ((valid & VALID_L) && roommap[DIR_L(pos)]) ||
-         ((valid & VALID_R) && roommap[DIR_R(pos)]) ||
-         ((valid & VALID_D) && roommap[DIR_D(pos)]);
+  return ((valid & VALID_U) && roommap[POS_U(pos)]) ||
+         ((valid & VALID_L) && roommap[POS_L(pos)]) ||
+         ((valid & VALID_R) && roommap[POS_R(pos)]) ||
+         ((valid & VALID_D) && roommap[POS_D(pos)]);
 }
 
 u8 nexttoroom8(u8 pos, u8 valid) {
   return nexttoroom4(pos, valid) ||
-         ((valid & VALID_UL) && roommap[DIR_UL(pos)]) ||
-         ((valid & VALID_UR) && roommap[DIR_UR(pos)]) ||
-         ((valid & VALID_DL) && roommap[DIR_DL(pos)]) ||
-         ((valid & VALID_DR) && roommap[DIR_DR(pos)]);
+         ((valid & VALID_UL) && roommap[POS_UL(pos)]) ||
+         ((valid & VALID_UR) && roommap[POS_UR(pos)]) ||
+         ((valid & VALID_DL) && roommap[POS_DL(pos)]) ||
+         ((valid & VALID_DR) && roommap[POS_DR(pos)]);
 }
 
 void digworm(u8 pos) {
@@ -1454,14 +1509,14 @@ void digworm(u8 pos) {
 
     // Update neighbors
     valid = validmap[pos];
-    if (valid & VALID_UL) { update_carve1(DIR_UL(pos)); }
-    if (valid & VALID_U)  { update_carve1(DIR_U (pos)); }
-    if (valid & VALID_UR) { update_carve1(DIR_UR(pos)); }
-    if (valid & VALID_L)  { update_carve1(DIR_L (pos)); }
-    if (valid & VALID_R)  { update_carve1(DIR_R (pos)); }
-    if (valid & VALID_DL) { update_carve1(DIR_DL(pos)); }
-    if (valid & VALID_D)  { update_carve1(DIR_D (pos)); }
-    if (valid & VALID_DR) { update_carve1(DIR_DR(pos)); }
+    if (valid & VALID_UL) { update_carve1(POS_UL(pos)); }
+    if (valid & VALID_U)  { update_carve1(POS_U (pos)); }
+    if (valid & VALID_UR) { update_carve1(POS_UR(pos)); }
+    if (valid & VALID_L)  { update_carve1(POS_L (pos)); }
+    if (valid & VALID_R)  { update_carve1(POS_R (pos)); }
+    if (valid & VALID_DL) { update_carve1(POS_DL(pos)); }
+    if (valid & VALID_D)  { update_carve1(POS_D (pos)); }
+    if (valid & VALID_DR) { update_carve1(POS_DR(pos)); }
 
     // Update the disjoint set
     ds_sets[pos] = ds_nextid;
@@ -1473,10 +1528,10 @@ void digworm(u8 pos) {
         ((URAND() & 1) && step > 2)) {
       step = 0;
       num_dirs = 0;
-      if ((valid & VALID_L) && tempmap[DIR_L(pos)]) { cands[num_dirs++] = 0; }
-      if ((valid & VALID_R) && tempmap[DIR_R(pos)]) { cands[num_dirs++] = 1; }
-      if ((valid & VALID_U) && tempmap[DIR_U(pos)]) { cands[num_dirs++] = 2; }
-      if ((valid & VALID_D) && tempmap[DIR_D(pos)]) { cands[num_dirs++] = 3; }
+      if ((valid & VALID_L) && tempmap[POS_L(pos)]) { cands[num_dirs++] = 0; }
+      if ((valid & VALID_R) && tempmap[POS_R(pos)]) { cands[num_dirs++] = 1; }
+      if ((valid & VALID_U) && tempmap[POS_U(pos)]) { cands[num_dirs++] = 2; }
+      if ((valid & VALID_D) && tempmap[POS_D(pos)]) { cands[num_dirs++] = 3; }
       if (num_dirs == 0) return;
       dir = cands[randint(num_dirs)];
     }
@@ -1512,10 +1567,10 @@ void carvedoors(void) {
 
       // Update neighbors
       u8 valid = validmap[pos];
-      if (valid & VALID_U) { update_door1(DIR_U(pos)); }
-      if (valid & VALID_L) { update_door1(DIR_L(pos)); }
-      if (valid & VALID_R) { update_door1(DIR_R(pos)); }
-      if (valid & VALID_D) { update_door1(DIR_D(pos)); }
+      if (valid & VALID_U) { update_door1(POS_U(pos)); }
+      if (valid & VALID_L) { update_door1(POS_L(pos)); }
+      if (valid & VALID_R) { update_door1(POS_R(pos)); }
+      if (valid & VALID_D) { update_door1(POS_D(pos)); }
     }
 
     // Remove this tile from the carvable map
@@ -1600,19 +1655,19 @@ void calcdist(u8 pos) {
       pos = cands[head++];
       valid = validmap[pos];
       sig = ~sigmap[pos] & valid;
-      if (!distmap[newpos = DIR_U(pos)]) {
+      if (!distmap[newpos = POS_U(pos)]) {
         if (valid & VALID_U) { distmap[newpos] = dist; }
         if (sig & VALID_U) { cands[newtail++] = newpos; }
       }
-      if (!distmap[newpos = DIR_L(pos)]) {
+      if (!distmap[newpos = POS_L(pos)]) {
         if (valid & VALID_L) { distmap[newpos] = dist; }
         if (sig & VALID_L) { cands[newtail++] = newpos; }
       }
-      if (!distmap[newpos = DIR_R(pos)]) {
+      if (!distmap[newpos = POS_R(pos)]) {
         if (valid & VALID_R) { distmap[newpos] = dist; }
         if (sig & VALID_R) { cands[newtail++] = newpos; }
       }
-      if (!distmap[newpos = DIR_D(pos)]) {
+      if (!distmap[newpos = POS_D(pos)]) {
         if (valid & VALID_D) { distmap[newpos] = dist; }
         if (sig & VALID_D) { cands[newtail++] = newpos; }
       }
@@ -1736,14 +1791,14 @@ void fillends(void) {
       tempmap[pos] = 0;
 
       valid = validmap[pos];
-      if (valid & VALID_UL) { update_fill1(DIR_UL(pos)); }
-      if (valid & VALID_U)  { update_fill1(DIR_U (pos)); }
-      if (valid & VALID_UR) { update_fill1(DIR_UR(pos)); }
-      if (valid & VALID_L)  { update_fill1(DIR_L (pos)); }
-      if (valid & VALID_R)  { update_fill1(DIR_R (pos)); }
-      if (valid & VALID_DL) { update_fill1(DIR_DL(pos)); }
-      if (valid & VALID_D)  { update_fill1(DIR_D (pos)); }
-      if (valid & VALID_DR) { update_fill1(DIR_DR(pos)); }
+      if (valid & VALID_UL) { update_fill1(POS_UL(pos)); }
+      if (valid & VALID_U)  { update_fill1(POS_U (pos)); }
+      if (valid & VALID_UR) { update_fill1(POS_UR(pos)); }
+      if (valid & VALID_L)  { update_fill1(POS_L (pos)); }
+      if (valid & VALID_R)  { update_fill1(POS_R (pos)); }
+      if (valid & VALID_DL) { update_fill1(POS_DL(pos)); }
+      if (valid & VALID_D)  { update_fill1(POS_D (pos)); }
+      if (valid & VALID_DR) { update_fill1(POS_DR(pos)); }
     }
   } while (num_cands);
 }
@@ -1779,8 +1834,8 @@ void prettywalls(void) {
       }
       tmap[pos] = tile;
     } else if (tmap[pos] == TILE_EMPTY && (validmap[pos] & VALID_U) &&
-               IS_WALL_TILE(tmap[DIR_U(pos)])) {
-      tmap[pos] = IS_CRACKED_WALL_TILE(tmap[DIR_U(pos)])
+               IS_WALL_TILE(tmap[POS_U(pos)])) {
+      tmap[pos] = IS_CRACKED_WALL_TILE(tmap[POS_U(pos)])
                       ? TILE_WALL_FACE_CRACKED
                       : TILE_WALL_FACE;
     }
@@ -1810,16 +1865,16 @@ void voids(void) {
             valid = validmap[pos];
 
             // TODO: handle void exits
-            if ((valid & VALID_U) && !tmap[newpos = DIR_U(pos)]) {
+            if ((valid & VALID_U) && !tmap[newpos = POS_U(pos)]) {
               cands[newtail++] = newpos;
             }
-            if ((valid & VALID_L) && !tmap[newpos = DIR_L(pos)]) {
+            if ((valid & VALID_L) && !tmap[newpos = POS_L(pos)]) {
               cands[newtail++] = newpos;
             }
-            if ((valid & VALID_R) && !tmap[newpos = DIR_R(pos)]) {
+            if ((valid & VALID_R) && !tmap[newpos = POS_R(pos)]) {
               cands[newtail++] = newpos;
             }
-            if ((valid & VALID_D) && !tmap[newpos = DIR_D(pos)]) {
+            if ((valid & VALID_D) && !tmap[newpos = POS_D(pos)]) {
               cands[newtail++] = newpos;
             }
           }
@@ -2056,10 +2111,10 @@ void spawnmobs(void) {
 
 u8 no_mob_neighbors(u8 pos) {
   u8 valid = validmap[pos];
-  return !(((valid & VALID_U) && mobmap[DIR_U(pos)]) ||
-           ((valid & VALID_L) && mobmap[DIR_L(pos)]) ||
-           ((valid & VALID_R) && mobmap[DIR_R(pos)]) ||
-           ((valid & VALID_D) && mobmap[DIR_D(pos)]));
+  return !(((valid & VALID_U) && mobmap[POS_U(pos)]) ||
+           ((valid & VALID_L) && mobmap[POS_L(pos)]) ||
+           ((valid & VALID_R) && mobmap[POS_R(pos)]) ||
+           ((valid & VALID_D) && mobmap[POS_D(pos)]));
 }
 
 void mapset(u8* pos, u8 w, u8 h, u8 val) {
@@ -2090,26 +2145,26 @@ void sigrect_empty(u8 pos, u8 w, u8 h) {
 
 void sigempty(u8 pos) {
   u8 valid = validmap[pos];
-  if (valid & VALID_UL) { sigmap[DIR_UL(pos)] &= MASK_DR; }
-  if (valid & VALID_U)  { sigmap[DIR_U (pos)] &= MASK_D; }
-  if (valid & VALID_UR) { sigmap[DIR_UR(pos)] &= MASK_DL; }
-  if (valid & VALID_L)  { sigmap[DIR_L (pos)] &= MASK_R; }
-  if (valid & VALID_R)  { sigmap[DIR_R (pos)] &= MASK_L; }
-  if (valid & VALID_DL) { sigmap[DIR_DL(pos)] &= MASK_UR; }
-  if (valid & VALID_D)  { sigmap[DIR_D (pos)] &= MASK_U; }
-  if (valid & VALID_DR) { sigmap[DIR_DR(pos)] &= MASK_UL; }
+  if (valid & VALID_UL) { sigmap[POS_UL(pos)] &= MASK_DR; }
+  if (valid & VALID_U)  { sigmap[POS_U (pos)] &= MASK_D; }
+  if (valid & VALID_UR) { sigmap[POS_UR(pos)] &= MASK_DL; }
+  if (valid & VALID_L)  { sigmap[POS_L (pos)] &= MASK_R; }
+  if (valid & VALID_R)  { sigmap[POS_R (pos)] &= MASK_L; }
+  if (valid & VALID_DL) { sigmap[POS_DL(pos)] &= MASK_UR; }
+  if (valid & VALID_D)  { sigmap[POS_D (pos)] &= MASK_U; }
+  if (valid & VALID_DR) { sigmap[POS_DR(pos)] &= MASK_UL; }
 }
 
 void sigwall(u8 pos) {
   u8 valid = validmap[pos];
-  if (valid & VALID_UL) { sigmap[DIR_UL(pos)] |= VALID_DR; }
-  if (valid & VALID_U)  { sigmap[DIR_U (pos)] |= VALID_D; }
-  if (valid & VALID_UR) { sigmap[DIR_UR(pos)] |= VALID_DL; }
-  if (valid & VALID_L)  { sigmap[DIR_L (pos)] |= VALID_R; }
-  if (valid & VALID_R)  { sigmap[DIR_R (pos)] |= VALID_L; }
-  if (valid & VALID_DL) { sigmap[DIR_DL(pos)] |= VALID_UR; }
-  if (valid & VALID_D)  { sigmap[DIR_D (pos)] |= VALID_U; }
-  if (valid & VALID_DR) { sigmap[DIR_DR(pos)] |= VALID_UL; }
+  if (valid & VALID_UL) { sigmap[POS_UL(pos)] |= VALID_DR; }
+  if (valid & VALID_U)  { sigmap[POS_U (pos)] |= VALID_D; }
+  if (valid & VALID_UR) { sigmap[POS_UR(pos)] |= VALID_DL; }
+  if (valid & VALID_L)  { sigmap[POS_L (pos)] |= VALID_R; }
+  if (valid & VALID_R)  { sigmap[POS_R (pos)] |= VALID_L; }
+  if (valid & VALID_DL) { sigmap[POS_DL(pos)] |= VALID_UR; }
+  if (valid & VALID_D)  { sigmap[POS_D (pos)] |= VALID_U; }
+  if (valid & VALID_DR) { sigmap[POS_DR(pos)] |= VALID_UL; }
 }
 
 u8 sigmatch(u16 pos, u8* sig, u8* mask) {
