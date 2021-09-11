@@ -901,7 +901,7 @@ void do_ai_weeds(void) {
 }
 
 u8 do_mob_ai(u8 index) {
-  u8 pos, mob, dir;
+  u8 pos, mob, dir, valid;
   pos = mob_pos[index];
   switch (mob_task[index]) {
     case MOB_AI_NONE:
@@ -918,7 +918,21 @@ u8 do_mob_ai(u8 index) {
       break;
 
     case MOB_AI_WEED:
-      break;
+      valid = validmap[pos];
+      if ((valid & VALID_L) && (mob = mobmap[POS_L(pos)])) {
+        dir = 0;
+      } else if ((valid & VALID_R) && (mob = mobmap[POS_R(pos)])) {
+        dir = 1;
+      } else if ((valid & VALID_U) && (mob = mobmap[POS_U(pos)])) {
+        dir = 2;
+      } else if ((valid & VALID_D) && (mob = mobmap[POS_D(pos)])) {
+        dir = 3;
+      } else {
+        return 0;
+      }
+      mobbump(index, dir);
+      hitmob(mob - 1, 1);
+      return 1;
 
     case MOB_AI_REAPER:
       break;
