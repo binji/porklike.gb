@@ -21,6 +21,10 @@ typedef void (*vfp)(void);
 #define MAX_MOBS 32  /* XXX Figure out what this should be */
 #define MAX_FLOATS 8 /* For now; we'll probably want more */
 
+// TODO: how big to make these arrays?
+#define TILE_CODE_SIZE 128
+#define MOB_TILE_CODE_SIZE 256
+
 #define PLAYER_MOB 0
 
 #define MAP_WIDTH 16
@@ -612,15 +616,14 @@ u8 mob_charge[MAX_MOBS];  // only used by queen
 u8 mob_hp[MAX_MOBS];
 u8 num_mobs;
 
-// TODO: how big to make these arrays?
-u8 tile_code[128];     // code for animating tiles
-u8 mob_tile_code[256]; // code for animating mobs
-u8 tile_code_end;      // next available index in tile_code
-u16 last_tile_addr;    // last tile address in HL for tile_code
-u8 last_tile_val;      // last tile value in A for tile_code
+u8 tile_code[TILE_CODE_SIZE];         // code for animating tiles
+u8 mob_tile_code[MOB_TILE_CODE_SIZE]; // code for animating mobs
+u8 tile_code_end;                     // next available index in tile_code
+u16 last_tile_addr;                   // last tile address in HL for tile_code
+u8 last_tile_val;                     // last tile value in A for tile_code
 u8 tile_timer; // timer for animating tiles (every TILE_ANIM_SPEED frames)
 u8 tile_inc;   // either 0 or TILE_ANIM_FRAME_DIFF, for two frames of animation
-u8 mob_tile_code_end;  // next available index in mob_tile_code
+u8 mob_tile_code_end;   // next available index in mob_tile_code
 u16 mob_last_tile_addr; // last tile address in HL for mob_tile_code
 u8 mob_last_tile_val;   // last tile value in A for mob_tile_code
 
@@ -633,6 +636,7 @@ u8 noturn;
 u8 key;
 
 u8 doupdatemap;
+u8 num_sprites;
 
 u16 myclock;
 void tim_interrupt(void) { ++myclock; }
@@ -700,6 +704,7 @@ void init(void) {
   noturn = 0;
 
   num_floats = 0;
+  num_sprites = 0;
 
   tile_inc = 0;
   tile_timer = TILE_ANIM_SPEED;
@@ -735,7 +740,7 @@ void do_turn(void) {
 
   case TURN_WEEDS:
     turn = TURN_WEEDS_WAIT;
-    do_ai_weeds();
+    do_ai();
     break;
   }
 }
@@ -881,20 +886,7 @@ void do_ai(void) {
   u8 moving = 0;
   u8 i;
   for (i = 0; i < num_mobs; ++i) {
-    if (mob_type[i] != MOB_TYPE_WEED) {
-      moving |= do_mob_ai(i);
-    }
-  }
-  if (!moving) {
-    pass_turn();
-  }
-}
-
-void do_ai_weeds(void) {
-  u8 moving = 0;
-  u8 i;
-  for (i = 0; i < num_mobs; ++i) {
-    if (mob_type[i] == MOB_TYPE_WEED) {
+    if ((mob_type[i] == MOB_TYPE_WEED) == (turn == TURN_WEEDS_WAIT)) {
       moving |= do_mob_ai(i);
     }
   }
@@ -1208,9 +1200,11 @@ void calcdist_ai(u8 from, u8 to) {
 }
 
 void animate_mobs(void) {
-  u8 i, dotile, frame, animdone;
+  u8 i, dotile, frame, animdone, last_num_sprites;
 
   animdone = 1;
+  last_num_sprites = num_sprites;
+  num_sprites = MAX_FLOATS;  // Start mob sprites after floats
 
   // Loop through all mobs, update animations
   for (i = 0; i < num_mobs; ++i) {
@@ -1239,14 +1233,15 @@ void animate_mobs(void) {
         animdone = 0;
         mob_x[i] += mob_dx[i];
         mob_y[i] += mob_dy[i];
-        set_sprite_tile(i, frame);
 
         --mob_move_timer[i];
         if (mob_anim_state[i] == MOB_ANIM_STATE_HOP4) {
           mob_y[i] += hopy4[mob_move_timer[i]];
         }
 
-        move_sprite(i, mob_x[i], mob_y[i]);
+        set_sprite_tile(num_sprites, frame);
+        move_sprite(num_sprites, mob_x[i], mob_y[i]);
+        ++num_sprites;
 
         if (mob_move_timer[i] == 0) {
           switch (mob_anim_state[i]) {
@@ -1267,14 +1262,19 @@ void animate_mobs(void) {
             case MOB_ANIM_STATE_HOP4:
               mob_anim_state[i] = MOB_ANIM_STATE_NONE;
               mob_dx[i] = mob_dy[i] = 0;
+              set_tile_during_vbl(mob_pos[i], frame);
               break;
           }
         }
       } else {
-        hide_sprite(i);
         set_tile_during_vbl(mob_pos[i], frame);
       }
     }
+  }
+
+  // Hide the rest of the sprites
+  for (i = num_sprites; i < last_num_sprites; ++i) {
+    hide_sprite(i);
   }
 
   if (animdone) {
@@ -1318,9 +1318,9 @@ void vbl_interrupt(void) {
 }
 
 void addfloat(u8 pos, u8 tile) {
-  shadow_OAM[32 + num_floats].x = POS_TO_X(pos);
-  shadow_OAM[32 + num_floats].y = POS_TO_Y(pos);
-  shadow_OAM[32 + num_floats].tile = tile;
+  shadow_OAM[num_floats].x = POS_TO_X(pos);
+  shadow_OAM[num_floats].y = POS_TO_Y(pos);
+  shadow_OAM[num_floats].tile = tile;
   float_time[num_floats] = FLOAT_TIME;
   ++num_floats;
 }
@@ -1332,17 +1332,17 @@ void update_floats(void) {
     if (float_time[i] == 0) {
       --num_floats;
       if (num_floats) {
-        shadow_OAM[32 + i].x = shadow_OAM[32 + num_floats].x;
-        shadow_OAM[32 + i].y = shadow_OAM[32 + num_floats].y;
-        shadow_OAM[32 + i].tile = shadow_OAM[32 + num_floats].tile;
+        shadow_OAM[i].x = shadow_OAM[num_floats].x;
+        shadow_OAM[i].y = shadow_OAM[num_floats].y;
+        shadow_OAM[i].tile = shadow_OAM[num_floats].tile;
         float_time[i] = float_time[num_floats];
-        hide_sprite(32 + num_floats);
+        hide_sprite(num_floats);
       } else {
-        hide_sprite(32 + i);
+        hide_sprite(i);
       }
       continue;
     } else {
-      shadow_OAM[32 + i].y -= float_diff_y[float_time[i]];
+      shadow_OAM[i].y -= float_diff_y[float_time[i]];
     }
     ++i;
   }
