@@ -542,9 +542,9 @@ void prettywalls(void);
 void voids(void);
 void chests(void);
 void decoration(void);
-void begintileanim(void);
-void endtileanim(void);
-void addtileanim(u8 pos, u8 tile);
+void begin_tile_anim(void);
+void end_tile_anim(void);
+void add_tile_anim(u8 pos, u8 tile);
 void spawnmobs(void);
 u8 no_mob_neighbors(u8 pos);
 void mapset(u8* pos, u8 w, u8 h, u8 val);
@@ -616,10 +616,13 @@ u8 num_mobs;
 u8 tile_code[128];     // code for animating tiles
 u8 mob_tile_code[256]; // code for animating mobs
 u8 tile_code_end;      // next available index in tile_code
-u16 last_tile_addr;    // last tile address in HL for {mob_,}tile_code
-u8 last_tile_val;      // last tile value in A for {mob_,}tile_code
+u16 last_tile_addr;    // last tile address in HL for tile_code
+u8 last_tile_val;      // last tile value in A for tile_code
 u8 tile_timer; // timer for animating tiles (every TILE_ANIM_SPEED frames)
 u8 tile_inc;   // either 0 or TILE_ANIM_FRAME_DIFF, for two frames of animation
+u8 mob_tile_code_end;  // next available index in mob_tile_code
+u16 mob_last_tile_addr; // last tile address in HL for mob_tile_code
+u8 mob_last_tile_val;   // last tile value in A for mob_tile_code
 
 u8 float_time[MAX_FLOATS];
 u8 num_floats;
@@ -705,17 +708,17 @@ void init(void) {
 }
 
 void begin_mob_anim(void) {
-  last_tile_addr = 0;
-  last_tile_val = 0xff;
-  tile_code_end = 1;
+  mob_last_tile_addr = 0;
+  mob_last_tile_val = 0xff;
+  mob_tile_code_end = 1;
   // Initialize to ret so if a VBL occurs while we're setting the animation it
   // won't run off the end
   mob_tile_code[0] = 0xc9;  // ret
 }
 
 void end_mob_anim(void) {
-  mob_tile_code[tile_code_end++] = 0xf1; // pop af
-  mob_tile_code[tile_code_end++] = 0xc9; // ret
+  mob_tile_code[mob_tile_code_end++] = 0xf1; // pop af
+  mob_tile_code[mob_tile_code_end++] = 0xc9; // ret
   mob_tile_code[0] = 0xf5; // push af
 }
 
@@ -1100,6 +1103,10 @@ void sight(void) {
   u8 ppos, pos, adjpos, diff, head, oldtail, newtail, sig, valid, first;
   memset(sightmap, 0, sizeof(sightmap));
 
+  // Put a "ret" at the beginning of the tile animation code in case it is
+  // executed while we are modifying it.
+  tile_code[0] = 0xc9;
+
   ppos = mob_pos[PLAYER_MOB];
 
   cands[head = 0] = 0;
@@ -1115,6 +1122,11 @@ void sight(void) {
       if (fogmap[pos]) {
         set_tile_during_vbl(pos, dtmap[pos] = tmap[pos]);
         fogmap[pos] = 0;
+
+        // Potentially start animating this tile
+        if (IS_ANIMATED_TILE(tmap[pos])) {
+          add_tile_anim(pos, tmap[pos]);
+        }
       }
 
       if (first || !IS_OPAQUE_TILE(tmap[pos])) {
@@ -1154,6 +1166,10 @@ void sight(void) {
       }
     } while(head != oldtail);
   } while (oldtail != newtail);
+
+  // Put the epilog back on, and replace the "ret" with "push af"
+  end_tile_anim();
+  tile_code[0] = 0xf5;
 }
 
 void calcdist_ai(u8 from, u8 to) {
@@ -1268,8 +1284,8 @@ void animate_mobs(void) {
 
 void set_tile_during_vbl(u8 pos, u8 tile) {
   u16 addr = POS_TO_ADDR(pos);
-  u8 *ptr = mob_tile_code + tile_code_end;
-  if (tile_code_end == 1 || (addr >> 8) != (last_tile_addr >> 8)) {
+  u8 *ptr = mob_tile_code + mob_tile_code_end;
+  if (mob_tile_code_end == 1 || (addr >> 8) != (mob_last_tile_addr >> 8)) {
     *ptr++ = 0x21; // ld hl, addr
     *ptr++ = (u8)addr;
     *ptr++ = addr >> 8;
@@ -1277,14 +1293,14 @@ void set_tile_during_vbl(u8 pos, u8 tile) {
     *ptr++ = 0x2e; // ld l, lo(addr)
     *ptr++ = (u8)addr;
   }
-  last_tile_addr = addr;
-  if (tile != last_tile_val) {
+  mob_last_tile_addr = addr;
+  if (tile != mob_last_tile_val) {
     *ptr++ = 0x3e; // ld a, tile
     *ptr++ = tile;
-    last_tile_val = tile;
+    mob_last_tile_val = tile;
   }
   *ptr++ = 0x77; // ld (hl), a
-  tile_code_end = ptr - mob_tile_code;
+  mob_tile_code_end = ptr - mob_tile_code;
 }
 
 void vbl_interrupt(void) {
@@ -1417,7 +1433,7 @@ void mapgen(void) {
   u8 fog;
   num_mobs = 1;
   mapgeninit();
-  begintileanim();
+  begin_tile_anim();
   if (floor == 0) {
     fog = 0;
     copymap(0);
@@ -1454,7 +1470,7 @@ void mapgen(void) {
     dummy[12] = dummy[1] + dummy[2] + dummy[3] + dummy[4] + dummy[5] +
                 dummy[6] + dummy[7] + dummy[8] + dummy[9] + dummy[10] + dummy[11];
   }
-  endtileanim();
+  end_tile_anim();
   memset(fogmap, fog, sizeof(fogmap));
   sight();
   initdtmap();
@@ -1634,7 +1650,7 @@ void copymap(u8 index) {
 
       case TILE_TORCH_LEFT:
       case TILE_TORCH_RIGHT:
-        addtileanim(pos, tmap[pos]);
+        add_tile_anim(pos, tmap[pos]);
         goto empty;
 
       case TILE_HEART:
@@ -2232,10 +2248,8 @@ void decoration(void) {
                 IS_FREESTANDING(pos)) {
               if (w == 1) {
                 tmap[pos] = TILE_TORCH_RIGHT;
-                addtileanim(pos, TILE_TORCH_RIGHT);
               } else if (w == room_w[room]) {
                 tmap[pos] = TILE_TORCH_LEFT;
-                addtileanim(pos, TILE_TORCH_LEFT);
               }
             }
             break;
@@ -2264,7 +2278,6 @@ void decoration(void) {
             URAND() < 26) {
           tmap[pos] = TILE_SAW1;
           sigwall(pos);
-          addtileanim(pos, TILE_SAW1);
           // TODO: what to do about removing animations on broken saws?
         }
 
@@ -2279,7 +2292,7 @@ void decoration(void) {
   }
 }
 
-void begintileanim(void) {
+void begin_tile_anim(void) {
   u16 addr = (u16)&tile_inc;
   tile_code[0] = 0xf5; // push af
   tile_code[1] = 0xc5; // push bc
@@ -2292,14 +2305,14 @@ void begintileanim(void) {
   last_tile_val = 0;
 }
 
-void endtileanim(void) {
+void end_tile_anim(void) {
   u8 *ptr = tile_code + tile_code_end;
   *ptr++ = 0xc1; // pop bc
   *ptr++ = 0xf1; // pop af
   *ptr = 0xc9;   // ret
 }
 
-void addtileanim(u8 pos, u8 tile) {
+void add_tile_anim(u8 pos, u8 tile) {
   u8* ptr = tile_code + tile_code_end;
   u16 addr = POS_TO_ADDR(pos);
   if (tile_code_end == 6 || (addr >> 8) != (last_tile_addr >> 8)) {
