@@ -34,7 +34,9 @@ typedef void (*vfp)(void);
 
 #define WALK_TIME 8
 #define BUMP_TIME 4
+#define HOP_TIME 8
 #define FLOAT_TIME 70
+#define QUEEN_CHARGE_TIME 2
 
 #define AI_COOL_TIME 8
 
@@ -79,14 +81,15 @@ typedef void (*vfp)(void);
 #define MASK_R   0b10111111
 #define MASK_L   0b01111111
 
-#define POS_UL(pos)   ((u8)(pos + 239))
-#define POS_U(pos)    ((u8)(pos + 240))
-#define POS_UR(pos)   ((u8)(pos + 241))
-#define POS_L(pos)    ((u8)(pos + 255))
-#define POS_R(pos)    ((u8)(pos + 1))
-#define POS_DL(pos)   ((u8)(pos + 15))
-#define POS_D(pos)    ((u8)(pos + 16))
-#define POS_DR(pos)   ((u8)(pos + 17))
+#define POS_UL(pos)       ((u8)(pos + 239))
+#define POS_U(pos)        ((u8)(pos + 240))
+#define POS_UR(pos)       ((u8)(pos + 241))
+#define POS_L(pos)        ((u8)(pos + 255))
+#define POS_R(pos)        ((u8)(pos + 1))
+#define POS_DL(pos)       ((u8)(pos + 15))
+#define POS_D(pos)        ((u8)(pos + 16))
+#define POS_DR(pos)       ((u8)(pos + 17))
+#define POS_DIR(pos, dir) ((u8)(pos + dirpos[dir]))
 
 #define TILE_EMPTY 1
 #define TILE_WALL 2
@@ -113,6 +116,9 @@ typedef void (*vfp)(void);
 #define TILE_WALL_FACE_CRACKED 0x60
 #define TILE_STEPS 0x6a
 #define TILE_ENTRANCE 0x6b
+
+#define FLOAT_FOUND 0xe
+#define FLOAT_LOST 0xf
 
 typedef u8 Map[MAP_WIDTH * MAP_HEIGHT];
 
@@ -178,6 +184,7 @@ typedef enum MobAnimState {
   MOB_ANIM_STATE_WALK,
   MOB_ANIM_STATE_BUMP1,
   MOB_ANIM_STATE_BUMP2,
+  MOB_ANIM_STATE_HOP4,
 } MobAnimState;
 
 typedef enum MobAI {
@@ -201,6 +208,9 @@ const u8 dirx[] = {0xff, 1, 0, 0};       // L R U D
 const u8 diry[] = {0, 0, 0xff, 1};       // L R U D
 const u8 dirpos[] = {0xff, 1, 0xf0, 16}; // L R U D
 const u8 dirvalid[] = {VALID_L,VALID_R,VALID_U,VALID_D};
+
+// Movement is reversed since it is accessed backward
+const u8 hopy4[] = {1, 1, 1, 1, 0xff, 0xff, 0xff, 0xff};
 
 const u8 carvesig[] = {255, 223, 127, 191, 239, 0};
 const u8 carvemask[] = {0, 9, 3, 12, 6};
@@ -445,11 +455,13 @@ void move_player(void);
 void mobdir(u8 index, u8 dir);
 void mobwalk(u8 index, u8 dir);
 void mobbump(u8 index, u8 dir);
+void mobhop(u8 index, u8 pos);
 void do_ai(void);
 void do_ai_weeds(void);
 u8 do_mob_ai(u8 index);
 u8 ai_tcheck(u8 index);
-void ai_donextstep(u8 index);
+u8 ai_getnextstep(u8 index);
+u8 ai_getnextstep_rev(u8 index);
 void sight(void);
 void calcdist_ai(u8 from, u8 to);
 void animate_mobs(void);
@@ -542,20 +554,21 @@ u8 startpos;
 u8 cands[MAX_CANDS];
 u8 num_cands;
 
-u8 mob_anim_frame[MAX_MOBS];
-u8 mob_anim_timer[MAX_MOBS];
-u8 mob_anim_speed[MAX_MOBS];
 MobType mob_type[MAX_MOBS];
+u8 mob_anim_frame[MAX_MOBS]; // Index into mob_anim_frames
+u8 mob_anim_timer[MAX_MOBS]; // 0..mob_anim_speed[type], how long between frames
+u8 mob_anim_speed[MAX_MOBS]; // current anim speed (changes when moving)
 u8 mob_pos[MAX_MOBS];
-u8 mob_x[MAX_MOBS], mob_y[MAX_MOBS];
-u8 mob_dx[MAX_MOBS], mob_dy[MAX_MOBS];
-u8 mob_move_timer[MAX_MOBS];
-MobAnimState mob_anim_state[MAX_MOBS];
-u8 mob_flip[MAX_MOBS];
-MobAI mob_task[MAX_MOBS];
-u8 mob_target_pos[MAX_MOBS];
-u8 mob_ai_cool[MAX_MOBS];
-u8 mob_active[MAX_MOBS];
+u8 mob_x[MAX_MOBS], mob_y[MAX_MOBS];   // x,y location of sprite
+u8 mob_dx[MAX_MOBS], mob_dy[MAX_MOBS]; // dx,dy moving sprite
+u8 mob_move_timer[MAX_MOBS];           // timer for sprite animation
+MobAnimState mob_anim_state[MAX_MOBS]; // sprite animation state
+u8 mob_flip[MAX_MOBS];                 // 0=facing right 1=facing left
+MobAI mob_task[MAX_MOBS];              // AI routine
+u8 mob_target_pos[MAX_MOBS];           // where the mob last saw the player
+u8 mob_ai_cool[MAX_MOBS]; // cooldown time while mob is searching for player
+u8 mob_active[MAX_MOBS];  // 0=inactive 1=active
+u8 mob_charge[MAX_MOBS];  // only used by queen
 u8 num_mobs;
 
 // TODO: how big to make these arrays?
@@ -722,7 +735,7 @@ void move_player(void) {
       pos = mob_pos[PLAYER_MOB];
       mobdir(PLAYER_MOB, dir);
       if (!(validmap[pos] & dirvalid[dir]) ||
-          IS_WALL_TILE(tmap[(u8)(pos + dirpos[dir])])) {
+          IS_WALL_TILE(tmap[POS_DIR(pos, dir)])) {
         mobbump(PLAYER_MOB, dir);
         noturn = 1;
       } else {
@@ -753,7 +766,7 @@ void mobwalk(u8 index, u8 dir) {
 
   mob_move_timer[index] = WALK_TIME;
   mob_anim_state[index] = MOB_ANIM_STATE_WALK;
-  mob_pos[index] = newpos = pos + dirpos[dir];
+  mob_pos[index] = newpos = POS_DIR(pos, dir);
   mob_anim_speed[index] = mob_anim_timer[index] = 3;
   mobmap[pos] = 0;
   mobmap[newpos] = index + 1;
@@ -765,10 +778,27 @@ void mobbump(u8 index, u8 dir) {
   mob_y[index] = POS_TO_Y(pos);
   mob_dx[index] = dirx[dir];
   mob_dy[index] = diry[dir];
-  set_tile_during_vbl(pos, dtmap[pos]);
 
   mob_move_timer[index] = BUMP_TIME;
   mob_anim_state[index] = MOB_ANIM_STATE_BUMP1;
+}
+
+void mobhop(u8 index, u8 newpos) {
+  u8 pos, oldx, oldy, newx, newy;
+  pos = mob_pos[index];
+  mob_x[index] = oldx = POS_TO_X(pos);
+  mob_y[index] = oldy = POS_TO_Y(pos);
+  newx = POS_TO_X(newpos);
+  newy = POS_TO_Y(newpos);
+
+  mob_dx[index] = (s8)(newx - oldx) >> 3;
+  mob_dy[index] = (s8)(newy - oldy) >> 3;
+
+  mob_move_timer[index] = HOP_TIME;
+  mob_anim_state[index] = MOB_ANIM_STATE_HOP4;
+  mob_pos[index] = newpos;
+  mobmap[pos] = 0;
+  mobmap[newpos] = index + 1;
 }
 
 void do_ai(void) {
@@ -798,13 +828,15 @@ void do_ai_weeds(void) {
 }
 
 u8 do_mob_ai(u8 index) {
+  u8 pos, mob, dir;
+  pos = mob_pos[index];
   switch (mob_task[index]) {
     case MOB_AI_NONE:
       break;
 
     case MOB_AI_WAIT:
-      if (sightmap[mob_pos[index]]) {
-        addfloat(mob_pos[index], 0xe);
+      if (sightmap[pos]) {
+        addfloat(pos, FLOAT_FOUND);
         mob_task[index] = mob_ai_active[mob_type[index]];
         mob_target_pos[index] = mob_pos[PLAYER_MOB];
         mob_ai_cool[index] = 0;
@@ -820,11 +852,39 @@ u8 do_mob_ai(u8 index) {
 
     case MOB_AI_ATTACK:
       if (ai_tcheck(index)) {
-        ai_donextstep(index);
+        dir = ai_getnextstep(index);
+        if (dir != 255) {
+          mobwalk(index, dir);
+          return 1;
+        }
       }
-      return 1;
+      break;
 
     case MOB_AI_QUEEN:
+      if (!sightmap[pos]) {
+        mob_task[index] = MOB_AI_WAIT;
+        mob_active[index] = 0;
+        addfloat(pos, FLOAT_LOST);
+      } else {
+        mob_target_pos[index] = mob_pos[PLAYER_MOB];
+        if (mob_charge[index] == 0) {
+          dir = ai_getnextstep(index);
+          if (dir != 255) {
+            mob = num_mobs;
+            addmob(MOB_TYPE_SLIME, pos);
+            mobhop(mob, POS_DIR(pos, dir));
+            mob_charge[index] = QUEEN_CHARGE_TIME;
+            return 1;
+          }
+        } else {
+          --mob_charge[index];
+          dir = ai_getnextstep_rev(index);
+          if (dir != 255) {
+            mobwalk(index, dir);
+            return 1;
+          }
+        }
+      }
       break;
 
     case MOB_AI_KONG:
@@ -841,7 +901,7 @@ u8 ai_tcheck(u8 index) {
   }
   if (mob_target_pos[index] == mob_pos[index] ||
       mob_ai_cool[index] > AI_COOL_TIME) {
-    addfloat(mob_pos[index], 0xf);
+    addfloat(mob_pos[index], FLOAT_LOST);
     mob_task[index] = MOB_AI_WAIT;
     mob_active[index] = 0;
     return 0;
@@ -849,7 +909,7 @@ u8 ai_tcheck(u8 index) {
   return 1;
 }
 
-void ai_donextstep(u8 index) {
+u8 ai_getnextstep(u8 index) {
   u8 pos, newpos, bestval, bestdir, dist, valid;
   pos = mob_pos[index];
   calcdist_ai(pos, mob_target_pos[index]);
@@ -880,9 +940,43 @@ void ai_donextstep(u8 index) {
     bestval = dist;
     bestdir = 3;
   }
-  if (bestdir != 255) {
-    mobwalk(index, bestdir);
+  return bestdir;
+}
+
+// TODO: combine with above?
+u8 ai_getnextstep_rev(u8 index) {
+  u8 pos, newpos, bestval, bestdir, dist, valid;
+  pos = mob_pos[index];
+  calcdist_ai(pos, mob_target_pos[index]);
+  bestval = 0;
+  bestdir = 255;
+  valid = validmap[pos];
+
+  newpos = POS_L(pos);
+  if ((valid & VALID_L) && !IS_SMARTMOB(tmap[newpos], newpos) &&
+      (dist = distmap[newpos]) && dist > bestval) {
+    bestval = dist;
+    bestdir = 0;
   }
+  newpos = POS_R(pos);
+  if ((valid & VALID_R) && !IS_SMARTMOB(tmap[newpos], newpos) &&
+      (dist = distmap[newpos]) && dist > bestval) {
+    bestval = dist;
+    bestdir = 1;
+  }
+  newpos = POS_U(pos);
+  if ((valid & VALID_U) && !IS_SMARTMOB(tmap[newpos], newpos) &&
+      (dist = distmap[newpos]) && dist > bestval) {
+    bestval = dist;
+    bestdir = 2;
+  }
+  newpos = POS_D(pos);
+  if ((valid & VALID_D) && !IS_SMARTMOB(tmap[newpos], newpos) &&
+      (dist = distmap[newpos]) && dist > bestval) {
+    bestval = dist;
+    bestdir = 3;
+  }
+  return bestdir;
 }
 
 void sight(void) {
@@ -946,40 +1040,38 @@ void sight(void) {
 }
 
 void calcdist_ai(u8 from, u8 to) {
-  u8 pos, head, oldtail, newtail, valid, dist, newpos;
+  u8 pos, head, oldtail, newtail, valid, dist, newpos, maxdist;
   cands[head = 0] = pos = to;
   newtail = 1;
 
   memset(distmap, 0, sizeof(distmap));
   dist = 0;
+  maxdist = 255;
 
   do {
     oldtail = newtail;
     ++dist;
     do {
       pos = cands[head++];
+      if (pos == from) { maxdist = dist + 1; }
       if (!distmap[pos]) {
         distmap[pos] = dist;
         valid = validmap[pos];
         if ((valid & VALID_U) && !distmap[newpos = POS_U(pos)]) {
-          if (newpos == from) { return; }
           if (!IS_MOB_AI(tmap[newpos], newpos)) { cands[newtail++] = newpos; }
         }
         if ((valid & VALID_L) && !distmap[newpos = POS_L(pos)]) {
-          if (newpos == from) { return; }
           if (!IS_MOB_AI(tmap[newpos], newpos)) { cands[newtail++] = newpos; }
         }
         if ((valid & VALID_R) && !distmap[newpos = POS_R(pos)]) {
-          if (newpos == from) { return; }
           if (!IS_MOB_AI(tmap[newpos], newpos)) { cands[newtail++] = newpos; }
         }
         if ((valid & VALID_D) && !distmap[newpos = POS_D(pos)]) {
-          if (newpos == from) { return; }
           if (!IS_MOB_AI(tmap[newpos], newpos)) { cands[newtail++] = newpos; }
         }
       }
     } while (head != oldtail);
-  } while (oldtail != newtail);
+  } while (oldtail != newtail && dist != maxdist);
 }
 
 void animate_mobs(void) {
@@ -1014,9 +1106,16 @@ void animate_mobs(void) {
         animdone = 0;
         mob_x[i] += mob_dx[i];
         mob_y[i] += mob_dy[i];
-        move_sprite(i, mob_x[i], mob_y[i]);
         set_sprite_tile(i, frame);
-        if (--mob_move_timer[i] == 0) {
+
+        --mob_move_timer[i];
+        if (mob_anim_state[i] == MOB_ANIM_STATE_HOP4) {
+          mob_y[i] += hopy4[mob_move_timer[i]];
+        }
+
+        move_sprite(i, mob_x[i], mob_y[i]);
+
+        if (mob_move_timer[i] == 0) {
           switch (mob_anim_state[i]) {
             case MOB_ANIM_STATE_BUMP1:
               mob_anim_state[i] = MOB_ANIM_STATE_BUMP2;
@@ -1026,13 +1125,13 @@ void animate_mobs(void) {
               break;
 
             case MOB_ANIM_STATE_WALK:
-              if (i == PLAYER_MOB) {
-                sight();
-              }
+              if (i == PLAYER_MOB) { sight(); }
               mob_anim_speed[i] = mob_anim_orig_speed[mob_type[i]];
-              // fallthrough
+              goto done;
 
+            done:
             case MOB_ANIM_STATE_BUMP2:
+            case MOB_ANIM_STATE_HOP4:
               mob_anim_state[i] = MOB_ANIM_STATE_NONE;
               mob_dx[i] = mob_dy[i] = 0;
               break;
@@ -1524,7 +1623,7 @@ void digworm(u8 pos) {
 
     // Continue in the current direction, unless we can't carve. Also randomly
     // change direction after 3 or more steps.
-    if (!((valid & dirvalid[dir]) && tempmap[(u8)(pos + dirpos[dir])]) ||
+    if (!((valid & dirvalid[dir]) && tempmap[POS_DIR(pos, dir)]) ||
         ((URAND() & 1) && step > 2)) {
       step = 0;
       num_dirs = 0;
@@ -1535,7 +1634,7 @@ void digworm(u8 pos) {
       if (num_dirs == 0) return;
       dir = cands[randint(num_dirs)];
     }
-    pos += dirpos[dir];
+    pos = POS_DIR(pos, dir);
     ++step;
   } while(1);
 }
