@@ -497,6 +497,7 @@ void hitmob(u8 index, u8 dmg);
 void do_ai(void);
 void do_ai_weeds(void);
 u8 do_mob_ai(u8 index);
+u8 ai_dobump(u8 index);
 u8 ai_tcheck(u8 index);
 u8 ai_getnextstep(u8 index);
 u8 ai_getnextstep_rev(u8 index);
@@ -923,7 +924,9 @@ u8 do_mob_ai(u8 index) {
       break;
 
     case MOB_AI_ATTACK:
-      if (ai_tcheck(index)) {
+      if (ai_dobump(index)) {
+        return 1;
+      } else if (ai_tcheck(index)) {
         dir = ai_getnextstep(index);
         if (dir != 255) {
           mobwalk(index, dir);
@@ -962,6 +965,33 @@ u8 do_mob_ai(u8 index) {
 
     case MOB_AI_KONG:
       break;
+  }
+  return 0;
+}
+
+u8 ai_dobump(u8 index) {
+  u8 pos, diff, dir;
+  pos = mob_pos[index];
+  diff = mob_pos[PLAYER_MOB] - pos;
+
+  // Use sightmap as a quick check to determine whether this mob is close to
+  // the player.
+  if (sightmap[pos]) {
+    if (diff == 0xff) { // left
+      dir = 0;
+    } else if (diff == 1) { // right
+      dir = 1;
+    } else if (diff == 0xf0) { // up
+      dir = 2;
+    } else if (diff == 0x10) { // down
+      dir = 3;
+    } else {
+      return 0;
+    }
+
+    mobbump(index, dir);
+    hitmob(PLAYER_MOB, 1);
+    return 1;
   }
   return 0;
 }
@@ -1334,23 +1364,26 @@ void addmob(MobType type, u8 pos) {
 void delmob(u8 index) {
   mobmap[mob_pos[index]] = 0;
   --num_mobs;
-  mob_type[index] = mob_type[num_mobs];
-  mob_anim_frame[index] = mob_anim_frame[num_mobs];
-  mob_anim_timer[index] = mob_anim_timer[num_mobs];
-  mob_anim_speed[index] = mob_anim_speed[num_mobs];
-  mob_pos[index] = mob_pos[num_mobs];
-  mob_x[index] = mob_x[num_mobs];
-  mob_y[index] = mob_y[num_mobs];
-  mob_dx[index] = mob_dx[num_mobs];
-  mob_move_timer[index] = mob_move_timer[num_mobs];
-  mob_anim_state[index] = mob_anim_state[num_mobs];
-  mob_flip[index] = mob_flip[num_mobs];
-  mob_task[index] = mob_task[num_mobs];
-  mob_target_pos[index] = mob_target_pos[num_mobs];
-  mob_ai_cool[index] = mob_ai_cool[num_mobs];
-  mob_active[index] = mob_active[num_mobs];
-  mob_charge[index] = mob_charge[num_mobs];
-  mob_hp[index] = mob_hp[num_mobs];
+  if (index != num_mobs) {
+    mob_type[index] = mob_type[num_mobs];
+    mob_anim_frame[index] = mob_anim_frame[num_mobs];
+    mob_anim_timer[index] = mob_anim_timer[num_mobs];
+    mob_anim_speed[index] = mob_anim_speed[num_mobs];
+    mob_pos[index] = mob_pos[num_mobs];
+    mob_x[index] = mob_x[num_mobs];
+    mob_y[index] = mob_y[num_mobs];
+    mob_dx[index] = mob_dx[num_mobs];
+    mob_move_timer[index] = mob_move_timer[num_mobs];
+    mob_anim_state[index] = mob_anim_state[num_mobs];
+    mob_flip[index] = mob_flip[num_mobs];
+    mob_task[index] = mob_task[num_mobs];
+    mob_target_pos[index] = mob_target_pos[num_mobs];
+    mob_ai_cool[index] = mob_ai_cool[num_mobs];
+    mob_active[index] = mob_active[num_mobs];
+    mob_charge[index] = mob_charge[num_mobs];
+    mob_hp[index] = mob_hp[num_mobs];
+    mobmap[mob_pos[index]] = index + 1;
+  }
 }
 
 void addpickup(PickupType pick, u8 pos) {
