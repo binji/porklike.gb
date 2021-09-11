@@ -41,6 +41,7 @@ typedef void (*vfp)(void);
 #define AI_COOL_TIME 8
 
 #define IS_WALL_TILE(tile) (flags_bin[tile] & 1)
+#define IS_SPECIAL_TILE(tile) (flags_bin[tile] & 2)
 #define IS_WALL_OR_SPECIAL_TILE(tile) (flags_bin[tile] & 3)
 #define IS_OPAQUE_TILE(tile) (flags_bin[tile] & 4)
 #define TILE_HAS_CRACKED_VARIANT(tile) (flags_bin[tile] & 0b01000000)
@@ -51,6 +52,7 @@ typedef void (*vfp)(void);
 #define CAN_CARVE(pos) sigmatch((pos), carvesig, carvemask)
 #define IS_FREESTANDING(pos) sigmatch((pos), freesig, freemask)
 
+#define IS_MOB(pos) (mobmap[pos])
 #define IS_SMARTMOB(tile, pos) ((flags_bin[tile] & 3) || mobmap[pos])
 #define IS_MOB_AI(tile, pos)                                                   \
   ((flags_bin[tile] & 3) || (mobmap[pos] && !mob_active[mobmap[pos] - 1]))
@@ -360,7 +362,7 @@ const u8 mob_plan_floor[] = {
     70, // total
 };
 
-const u8 mob_anim_frames[] = {
+const u8 mob_type_anim_frames[] = {
     0x99, 0x9a, 0x9b, 0x9c,                   // player
     0x80, 0x81, 0x80, 0x82,                   // slime
     0x86, 0x87, 0x88, 0x89,                   // queen
@@ -377,7 +379,24 @@ const u8 mob_anim_frames[] = {
     0x53,                                     // chest
 };
 
-const u8 mob_anim_start[] = {
+const u8 mob_type_hp[] = {
+    5,  // player
+    1,  // slime
+    1,  // queen
+    1,  // scorpion
+    2,  // hulk
+    1,  // ghost
+    1,  // kong
+    10, // reaper
+    1,  // weed
+    1,  // bomb
+    1,  // vase1
+    1,  // vase2
+    1,  // chest
+    1,  // total
+};
+
+const u8 mob_type_anim_start[] = {
     0,  // player
     4,  // slime
     8,  // queen
@@ -394,7 +413,7 @@ const u8 mob_anim_start[] = {
     52, // total
 };
 
-const u8 mob_anim_orig_speed[] = {
+const u8 mob_type_anim_speed[] = {
     24, // player
     12, // slime
     12, // queen
@@ -410,7 +429,7 @@ const u8 mob_anim_orig_speed[] = {
     255, // chest
 };
 
-const MobAI mob_ai_wait[] = {
+const MobAI mob_type_ai_wait[] = {
     MOB_AI_NONE,   // player
     MOB_AI_WAIT,   // slime
     MOB_AI_WAIT,   // queen
@@ -426,7 +445,7 @@ const MobAI mob_ai_wait[] = {
     MOB_AI_NONE,   // chest
 };
 
-const MobAI mob_ai_active[] = {
+const MobAI mob_type_ai_active[] = {
     MOB_AI_NONE,   // player
     MOB_AI_ATTACK, // slime
     MOB_AI_QUEEN,  // queen
@@ -442,10 +461,28 @@ const MobAI mob_ai_active[] = {
     MOB_AI_NONE,   // chest
 };
 
+const u8 mob_type_object[] = {
+    0, // player
+    0, // slime
+    0, // queen
+    0, // scorpion
+    0, // hulk
+    0, // ghost
+    0, // kong
+    0, // reaper
+    0, // weed
+    0, // bomb
+    1, // vase1
+    1, // vase2
+    1, // chest
+};
+
 const u8 float_diff_y[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0,
                            1, 0, 0, 0, 1, 0, 0, 1, 0, 1, 0, 1, 1, 1, 1, 1};
+
+const u8 float_dmg[] = {0, 0x1e, 0x2e, 0x3d};
 
 void init(void);
 void do_turn(void);
@@ -456,6 +493,7 @@ void mobdir(u8 index, u8 dir);
 void mobwalk(u8 index, u8 dir);
 void mobbump(u8 index, u8 dir);
 void mobhop(u8 index, u8 pos);
+void hitmob(u8 index, u8 dmg);
 void do_ai(void);
 void do_ai_weeds(void);
 u8 do_mob_ai(u8 index);
@@ -476,6 +514,7 @@ void fadeout(void);
 void fadein(void);
 
 void addmob(MobType type, u8 pos);
+void delmob(u8 index);
 void addpickup(PickupType type, u8 pos);
 
 void initdtmap(void);
@@ -555,7 +594,7 @@ u8 cands[MAX_CANDS];
 u8 num_cands;
 
 MobType mob_type[MAX_MOBS];
-u8 mob_anim_frame[MAX_MOBS]; // Index into mob_anim_frames
+u8 mob_anim_frame[MAX_MOBS]; // Index into mob_type_anim_frames
 u8 mob_anim_timer[MAX_MOBS]; // 0..mob_anim_speed[type], how long between frames
 u8 mob_anim_speed[MAX_MOBS]; // current anim speed (changes when moving)
 u8 mob_pos[MAX_MOBS];
@@ -569,6 +608,7 @@ u8 mob_target_pos[MAX_MOBS];           // where the mob last saw the player
 u8 mob_ai_cool[MAX_MOBS]; // cooldown time while mob is searching for player
 u8 mob_active[MAX_MOBS];  // 0=inactive 1=active
 u8 mob_charge[MAX_MOBS];  // only used by queen
+u8 mob_hp[MAX_MOBS];
 u8 num_mobs;
 
 // TODO: how big to make these arrays?
@@ -718,8 +758,7 @@ void pass_turn(void) {
 }
 
 void move_player(void) {
-  u8 pos, dir;
-  // XXX
+  u8 dir, pos, newpos, tile;
   if (mob_move_timer[PLAYER_MOB] == 0) {
     if (key & (J_LEFT | J_RIGHT | J_UP | J_DOWN)) {
       if (key & J_LEFT) {
@@ -733,13 +772,22 @@ void move_player(void) {
       }
 
       pos = mob_pos[PLAYER_MOB];
+      newpos = POS_DIR(pos, dir);
       mobdir(PLAYER_MOB, dir);
-      if (!(validmap[pos] & dirvalid[dir]) ||
-          IS_WALL_TILE(tmap[POS_DIR(pos, dir)])) {
+      if (IS_MOB(newpos)) {
+        mobbump(PLAYER_MOB, dir);
+        hitmob(mobmap[newpos] - 1, 1);
+      } else if (validmap[pos] & dirvalid[dir]) {
+        tile = tmap[newpos];
+        if (IS_WALL_TILE(tile)) {
+          mobbump(PLAYER_MOB, dir);
+          noturn = 1;
+        } else {
+          mobwalk(PLAYER_MOB, dir);
+        }
+      } else {
         mobbump(PLAYER_MOB, dir);
         noturn = 1;
-      } else {
-        mobwalk(PLAYER_MOB, dir);
       }
       turn = TURN_PLAYER_WAIT;
     }
@@ -778,6 +826,7 @@ void mobbump(u8 index, u8 dir) {
   mob_y[index] = POS_TO_Y(pos);
   mob_dx[index] = dirx[dir];
   mob_dy[index] = diry[dir];
+  set_tile_during_vbl(pos, dtmap[pos]);
 
   mob_move_timer[index] = BUMP_TIME;
   mob_anim_state[index] = MOB_ANIM_STATE_BUMP1;
@@ -799,6 +848,29 @@ void mobhop(u8 index, u8 newpos) {
   mob_pos[index] = newpos;
   mobmap[pos] = 0;
   mobmap[newpos] = index + 1;
+}
+
+void hitmob(u8 index, u8 dmg) {
+  u8 pos = mob_pos[index];
+  if (mob_type_object[mob_type[index]]) {
+    // TODO: handle chest, bomb
+    // TODO: turn tile into dirt tile
+    // TODO: randomly drop pickup or slime
+    delmob(index);
+    set_tile_during_vbl(pos, dtmap[pos] = tmap[pos] = dirt_tiles[rand() & 3]);
+  } else {
+    // TODO: flash mob for 10 frames
+    addfloat(pos, float_dmg[dmg]);
+
+    if (mob_hp[index] <= dmg) {
+      // TODO: drop key, if any
+      // TODO: restore to 5hp if reaper killed, and drop key
+      delmob(index);
+      set_tile_during_vbl(pos, dtmap[pos]);
+    } else {
+      mob_hp[index] -= dmg;
+    }
+  }
 }
 
 void do_ai(void) {
@@ -837,7 +909,7 @@ u8 do_mob_ai(u8 index) {
     case MOB_AI_WAIT:
       if (sightmap[pos]) {
         addfloat(pos, FLOAT_FOUND);
-        mob_task[index] = mob_ai_active[mob_type[index]];
+        mob_task[index] = mob_type_ai_active[mob_type[index]];
         mob_target_pos[index] = mob_pos[PLAYER_MOB];
         mob_ai_cool[index] = 0;
         mob_active[index] = 1;
@@ -873,6 +945,7 @@ u8 do_mob_ai(u8 index) {
             mob = num_mobs;
             addmob(MOB_TYPE_SLIME, pos);
             mobhop(mob, POS_DIR(pos, dir));
+            mobmap[pos] = index + 1; // Fix mobmap back to queen
             mob_charge[index] = QUEEN_CHARGE_TIME;
             return 1;
           }
@@ -1090,14 +1163,14 @@ void animate_mobs(void) {
 
     if (--mob_anim_timer[i] == 0) {
       mob_anim_timer[i] = mob_anim_speed[i];
-      if (++mob_anim_frame[i] == mob_anim_start[mob_type[i] + 1]) {
-        mob_anim_frame[i] = mob_anim_start[mob_type[i]];
+      if (++mob_anim_frame[i] == mob_type_anim_start[mob_type[i] + 1]) {
+        mob_anim_frame[i] = mob_type_anim_start[mob_type[i]];
       }
       dotile = 1;
     }
 
     if (dotile || mob_move_timer[i]) {
-      frame = mob_anim_frames[mob_anim_frame[i]];
+      frame = mob_type_anim_frames[mob_anim_frame[i]];
       if (mob_flip[i]) {
         frame += TILE_FLIP_DIFF;
       }
@@ -1126,7 +1199,7 @@ void animate_mobs(void) {
 
             case MOB_ANIM_STATE_WALK:
               if (i == PLAYER_MOB) { sight(); }
-              mob_anim_speed[i] = mob_anim_orig_speed[mob_type[i]];
+              mob_anim_speed[i] = mob_type_anim_speed[mob_type[i]];
               goto done;
 
             done:
@@ -1241,19 +1314,43 @@ u8 dummy[13];
 
 void addmob(MobType type, u8 pos) {
   mob_type[num_mobs] = type;
-  mob_pos[num_mobs] = pos;
+  mob_anim_frame[num_mobs] = mob_type_anim_start[type];
   mob_anim_timer[num_mobs] = 1;
-  mob_anim_speed[num_mobs] = mob_anim_orig_speed[type];
-  mob_anim_frame[num_mobs] = mob_anim_start[type];
+  mob_anim_speed[num_mobs] = mob_type_anim_speed[type];
+  mob_pos[num_mobs] = pos;
   mob_move_timer[num_mobs] = 0;
   mob_anim_state[num_mobs] = MOB_ANIM_STATE_NONE;
-  mob_task[num_mobs] = mob_ai_wait[type];
   mob_flip[num_mobs] = 0;
+  mob_task[num_mobs] = mob_type_ai_wait[type];
   mob_target_pos[num_mobs] = 0;
   mob_ai_cool[num_mobs] = 0;
   mob_active[num_mobs] = 0;
+  mob_charge[num_mobs] = 0;
+  mob_hp[num_mobs] = mob_type_hp[type];
   ++num_mobs;
   mobmap[pos] = num_mobs; // index+1
+}
+
+void delmob(u8 index) {
+  mobmap[mob_pos[index]] = 0;
+  --num_mobs;
+  mob_type[index] = mob_type[num_mobs];
+  mob_anim_frame[index] = mob_anim_frame[num_mobs];
+  mob_anim_timer[index] = mob_anim_timer[num_mobs];
+  mob_anim_speed[index] = mob_anim_speed[num_mobs];
+  mob_pos[index] = mob_pos[num_mobs];
+  mob_x[index] = mob_x[num_mobs];
+  mob_y[index] = mob_y[num_mobs];
+  mob_dx[index] = mob_dx[num_mobs];
+  mob_move_timer[index] = mob_move_timer[num_mobs];
+  mob_anim_state[index] = mob_anim_state[num_mobs];
+  mob_flip[index] = mob_flip[num_mobs];
+  mob_task[index] = mob_task[num_mobs];
+  mob_target_pos[index] = mob_target_pos[num_mobs];
+  mob_ai_cool[index] = mob_ai_cool[num_mobs];
+  mob_active[index] = mob_active[num_mobs];
+  mob_charge[index] = mob_charge[num_mobs];
+  mob_hp[index] = mob_hp[num_mobs];
 }
 
 void addpickup(PickupType pick, u8 pos) {
@@ -1334,7 +1431,7 @@ void mapgeninit(void) {
   start_room = 0;
 
   mob_anim_timer[PLAYER_MOB] = 1;
-  mob_anim_speed[num_mobs] = mob_anim_orig_speed[MOB_TYPE_PLAYER];
+  mob_anim_speed[num_mobs] = mob_type_anim_speed[MOB_TYPE_PLAYER];
   mob_move_timer[PLAYER_MOB] = 0;
   mob_flip[PLAYER_MOB] = 0;
 }
