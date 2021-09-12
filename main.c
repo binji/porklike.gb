@@ -18,8 +18,9 @@ typedef void (*vfp)(void);
 #define MAX_ROOMS 4
 #define MAX_VOIDS 10 /* XXX Figure out what this should be */
 #define MAX_CANDS 256
-#define MAX_MOBS 32  /* XXX Figure out what this should be */
-#define MAX_FLOATS 8 /* For now; we'll probably want more */
+#define MAX_MOBS 32    /* XXX Figure out what this should be */
+#define MAX_PICKUPS 16 /* XXX Figure out what this should be */
+#define MAX_FLOATS 8   /* For now; we'll probably want more */
 
 // TODO: how big to make these arrays?
 #define TILE_CODE_SIZE 128
@@ -38,11 +39,14 @@ typedef void (*vfp)(void);
 
 #define WALK_TIME 8
 #define BUMP_TIME 4
-#define HOP_TIME 8
+#define MOB_HOP_TIME 8
+#define PICK_HOP_TIME 8
 #define FLOAT_TIME 70
 #define QUEEN_CHARGE_TIME 2
 
 #define AI_COOL_TIME 8
+
+#define PICKUP_SPEED 6
 
 #define IS_WALL_TILE(tile) (flags_bin[tile] & 1)
 #define IS_SPECIAL_TILE(tile) (flags_bin[tile] & 2)
@@ -215,8 +219,11 @@ const u8 diry[] = {0, 0, 0xff, 1};       // L R U D
 const u8 dirpos[] = {0xff, 1, 0xf0, 16}; // L R U D
 const u8 dirvalid[] = {VALID_L,VALID_R,VALID_U,VALID_D};
 
-// Movement is reversed since it is accessed backward
+// Movement is reversed since it is accessed backward. Stored as differences
+// from the last position instead of absolute offset.
 const u8 hopy4[] = {1, 1, 1, 1, 0xff, 0xff, 0xff, 0xff};
+const u8 hopy12[] = {4, 4, 3, 1, 0xff, 0xfd, 0xfc, 0xfc};
+const u8 pickbounce[] = {1, 0, 0, 0xff, 0xff, 0, 0, 1};
 
 const u8 carvesig[] = {255, 223, 127, 191, 239, 0};
 const u8 carvemask[] = {0, 9, 3, 12, 6};
@@ -366,23 +373,6 @@ const u8 mob_plan_floor[] = {
     70, // total
 };
 
-const u8 mob_type_anim_frames[] = {
-    0x99, 0x9a, 0x9b, 0x9c,                   // player
-    0x80, 0x81, 0x80, 0x82,                   // slime
-    0x86, 0x87, 0x88, 0x89,                   // queen
-    0x8a, 0x8b, 0x8a, 0x8c,                   // scorpion
-    0x83, 0x84, 0x83, 0x85,                   // hulk
-    0x8d, 0x8e, 0x8f, 0x8e,                   // ghost
-    0x90, 0x91, 0x92, 0x93,                   // kong
-    0x9d, 0x9e, 0x9f, 0xa0,                   // reaper
-    0x94, 0x95, 0x96, 0x95,                   // weed
-    0x97, 0x97, 0x97, 0x97, 0x97, 0x97, 0x97, //
-    0x97, 0x97, 0x97, 0x97, 0x97, 0x98,       // bomb
-    0x59,                                     // vase1
-    0x5f,                                     // vase2
-    0x53,                                     // chest
-};
-
 const u8 mob_type_hp[] = {
     5,  // player
     1,  // slime
@@ -398,6 +388,23 @@ const u8 mob_type_hp[] = {
     1,  // vase2
     1,  // chest
     1,  // total
+};
+
+const u8 mob_type_anim_frames[] = {
+    0x99, 0x9a, 0x9b, 0x9c,                   // player
+    0x80, 0x81, 0x80, 0x82,                   // slime
+    0x86, 0x87, 0x88, 0x89,                   // queen
+    0x8a, 0x8b, 0x8a, 0x8c,                   // scorpion
+    0x83, 0x84, 0x83, 0x85,                   // hulk
+    0x8d, 0x8e, 0x8f, 0x8e,                   // ghost
+    0x90, 0x91, 0x92, 0x93,                   // kong
+    0x9d, 0x9e, 0x9f, 0xa0,                   // reaper
+    0x94, 0x95, 0x96, 0x95,                   // weed
+    0x97, 0x97, 0x97, 0x97, 0x97, 0x97, 0x97, //
+    0x97, 0x97, 0x97, 0x97, 0x97, 0x98,       // bomb
+    0x59,                                     // vase1
+    0x5f,                                     // vase2
+    0x53,                                     // chest
 };
 
 const u8 mob_type_anim_start[] = {
@@ -481,6 +488,42 @@ const u8 mob_type_object[] = {
     1, // chest
 };
 
+const u8 pick_type_anim_frames[] = {
+    0xc3, 0xc4, 0xc5, 0xc4, 0xc3, 0xc3, 0xc3, 0xc3, // heart
+    0xc6, 0xc7, 0xc8, 0xc7, 0xc6, 0xc6, 0xc6, 0xc6, // key
+    0xc9, 0xca, 0xcb, 0xca, 0xc9, 0xc9, 0xc9, 0xc9, // pickup ring
+};
+
+const u8 pick_type_anim_start[] = {
+    0,  // PICKUP_TYPE_HEART,
+    8,  // PICKUP_TYPE_KEY,
+    16, // PICKUP_TYPE_JUMP,
+    16, // PICKUP_TYPE_BOLT,
+    16, // PICKUP_TYPE_PUSH,
+    16, // PICKUP_TYPE_GRAPPLE,
+    16, // PICKUP_TYPE_SPEAR,
+    16, // PICKUP_TYPE_SMASH,
+    16, // PICKUP_TYPE_HOOK,
+    16, // PICKUP_TYPE_SPIN,
+    16, // PICKUP_TYPE_SUPLEX,
+    16, // PICKUP_TYPE_SLAP,
+};
+
+const u8 pick_type_sprite_tile[] = {
+    0,    // PICKUP_TYPE_HEART,
+    0,    // PICKUP_TYPE_KEY,
+    0x14, // PICKUP_TYPE_JUMP,
+    0x15, // PICKUP_TYPE_BOLT,
+    0x16, // PICKUP_TYPE_PUSH,
+    0x17, // PICKUP_TYPE_GRAPPLE,
+    0x18, // PICKUP_TYPE_SPEAR,
+    0x19, // PICKUP_TYPE_SMASH,
+    0x1a, // PICKUP_TYPE_HOOK,
+    0x1b, // PICKUP_TYPE_SPIN,
+    0x1c, // PICKUP_TYPE_SUPLEX,
+    0x1d, // PICKUP_TYPE_SLAP,
+};
+
 const u8 float_diff_y[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0,
@@ -488,15 +531,42 @@ const u8 float_diff_y[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 
 const u8 float_dmg[] = {0, 0x1e, 0x2e, 0x3d};
 
+// Drop position offsets checked by distance, up to -8 + 7 in both directions
+const u8 drop_diff[] = {
+    0x00, 0xff, 0xf0, 0x01, 0x10, 0x0f, 0xfe, 0xef, 0xe0, 0xf1, 0x02, 0x11,
+    0x20, 0x21, 0x12, 0x03, 0xf2, 0xe1, 0xd0, 0xdf, 0xee, 0xfd, 0x0e, 0x1f,
+    0x30, 0x40, 0x2f, 0x1e, 0x0d, 0xfc, 0xed, 0xde, 0xcf, 0xc0, 0xd1, 0xe2,
+    0xf3, 0x04, 0x13, 0x22, 0x31, 0x41, 0x50, 0x3f, 0x2e, 0x1d, 0x0c, 0xfb,
+    0xec, 0xdd, 0xce, 0xbf, 0xb0, 0xc1, 0xd2, 0xe3, 0xf4, 0x05, 0x14, 0x23,
+    0x32, 0x33, 0x24, 0x15, 0x06, 0xf5, 0xe4, 0xd3, 0xc2, 0xb1, 0xa0, 0xaf,
+    0xbe, 0xcd, 0xdc, 0xeb, 0xfa, 0x0b, 0x1c, 0x2d, 0x3e, 0x4f, 0x60, 0x51,
+    0x42, 0x43, 0x34, 0x25, 0x16, 0x07, 0xf6, 0xe5, 0xd4, 0xc3, 0xb2, 0xa1,
+    0x90, 0x9f, 0xae, 0xbd, 0xcc, 0xdb, 0xea, 0xf9, 0x0a, 0x1b, 0x2c, 0x3d,
+    0x4e, 0x5f, 0x70, 0x61, 0x52, 0x53, 0x44, 0x35, 0x26, 0x17, 0xf7, 0xe6,
+    0xd5, 0xc4, 0xb3, 0xa2, 0x91, 0x80, 0x8f, 0x9e, 0xad, 0xbc, 0xcb, 0xda,
+    0xe9, 0xf8, 0x09, 0x1a, 0x2b, 0x3c, 0x4d, 0x5e, 0x6f, 0x71, 0x62, 0x63,
+    0x54, 0x45, 0x36, 0x27, 0xe7, 0xd6, 0xc5, 0xb4, 0xa3, 0x92, 0x81, 0x7f,
+    0x8e, 0x9d, 0xac, 0xbb, 0xca, 0xd9, 0xe8, 0x08, 0x19, 0x2a, 0x3b, 0x4c,
+    0x5d, 0x6e, 0x72, 0x73, 0x64, 0x55, 0x46, 0x37, 0xd7, 0xc6, 0xb5, 0xa4,
+    0x93, 0x82, 0x7e, 0x8d, 0x9c, 0xab, 0xba, 0xc9, 0xd8, 0x18, 0x29, 0x3a,
+    0x4b, 0x5c, 0x6d, 0x6c, 0x5b, 0x4a, 0x39, 0x28, 0xc8, 0xb9, 0xaa, 0x9b,
+    0x8c, 0x7d, 0x83, 0x94, 0xa5, 0xb6, 0xc7, 0x47, 0x56, 0x65, 0x74, 0x75,
+    0x66, 0x57, 0xb7, 0xa6, 0x95, 0x84, 0x7c, 0x8b, 0x9a, 0xa9, 0xb8, 0x38,
+    0x49, 0x5a, 0x6b, 0x6a, 0x59, 0x48, 0xa8, 0x99, 0x8a, 0x7b, 0x85, 0x96,
+    0xa7, 0x67, 0x76, 0x77, 0x69, 0x58, 0x98, 0x89, 0x7a, 0x86, 0x97, 0x87,
+    0x79, 0x88, 0x68, 0x78,
+};
+
 void init(void);
 void do_turn(void);
 void pass_turn(void);
-void begin_mob_anim(void);
+void begin_animate(void);
 void move_player(void);
 void mobdir(u8 index, u8 dir);
 void mobwalk(u8 index, u8 dir);
 void mobbump(u8 index, u8 dir);
 void mobhop(u8 index, u8 pos);
+void pickhop(u8 index, u8 pos);
 void hitmob(u8 index, u8 dmg);
 void do_ai(void);
 void do_ai_weeds(void);
@@ -507,8 +577,8 @@ u8 ai_getnextstep(u8 index);
 u8 ai_getnextstep_rev(u8 index);
 void sight(void);
 void calcdist_ai(u8 from, u8 to);
-void animate_mobs(void);
-void end_mob_anim(void);
+void do_animate(void);
+void end_animate(void);
 void set_tile_during_vbl(u8 pos, u8 tile);
 void vbl_interrupt(void);
 
@@ -520,7 +590,10 @@ void fadein(void);
 
 void addmob(MobType type, u8 pos);
 void delmob(u8 index);
-void addpickup(PickupType type, u8 pos);
+void addpick(PickupType type, u8 pos);
+void droppick(PickupType type, u8 pos);
+void droppick_rnd(u8 pos);
+u8 dropspot(u8 pos);
 
 void initdtmap(void);
 
@@ -566,6 +639,7 @@ Map dtmap;    // Display tile map (w/ fogged tiles)
 Map roommap;  // Room/void map
 Map distmap;  // Distance map
 Map mobmap;   // Mob map
+Map pickmap;  // Pickup map
 Map sigmap;   // Signature map (tracks neighbors) **only used during mapgen
 Map tempmap;  // Temp map (used for carving)      **only used during mapgen
 Map sightmap; // Sight from player
@@ -616,6 +690,15 @@ u8 mob_charge[MAX_MOBS];  // only used by queen
 u8 mob_hp[MAX_MOBS];
 u8 num_mobs;
 
+PickupType pick_type[MAX_PICKUPS];
+u8 pick_pos[MAX_PICKUPS];
+u8 pick_anim_frame[MAX_PICKUPS];             // Index into pick_type_anim_frames
+u8 pick_anim_timer[MAX_PICKUPS];             // 0..pick_type_anim_speed[type]
+u8 pick_x[MAX_PICKUPS], pick_y[MAX_PICKUPS]; // x,y location of sprite
+u8 pick_dx[MAX_PICKUPS], pick_dy[MAX_PICKUPS]; // dx,dy moving sprite
+u8 pick_move_timer[MAX_PICKUPS];               // timer for sprite animation
+u8 num_picks;
+
 u8 tile_code[TILE_CODE_SIZE];         // code for animating tiles
 u8 mob_tile_code[MOB_TILE_CODE_SIZE]; // code for animating mobs
 u8 tile_code_end;                     // next available index in tile_code
@@ -636,7 +719,7 @@ u8 noturn;
 u8 key;
 
 u8 doupdatemap;
-u8 num_sprites;
+u8 num_sprites, last_num_sprites;
 
 u16 myclock;
 void tim_interrupt(void) { ++myclock; }
@@ -658,17 +741,18 @@ void main(void) {
       fadeout();
       IE_REG &= ~VBL_IFLAG;
       mapgen();
-      // Reset the mob anims so they don't draw on this new map
-      begin_mob_anim();
+      // Reset the animations so they don't draw on this new map
+      begin_animate();
+      end_animate();
       IE_REG |= VBL_IFLAG;
       doupdatemap = 1;
       fadein();
     }
 
-    begin_mob_anim();
+    begin_animate();
     do_turn();
-    animate_mobs();
-    end_mob_anim();
+    do_animate();
+    end_animate();
     update_floats();
     wait_vbl_done();
   }
@@ -695,6 +779,7 @@ void init(void) {
   set_bkg_data(0x80, SHARED_TILES, shared_bin);
   init_bkg(0);
 
+  num_picks = 0;
   num_mobs = 0;
   addmob(MOB_TYPE_PLAYER, 0);
 
@@ -712,16 +797,24 @@ void init(void) {
   add_VBL(vbl_interrupt);
 }
 
-void begin_mob_anim(void) {
+void begin_animate(void) {
   mob_last_tile_addr = 0;
   mob_last_tile_val = 0xff;
   mob_tile_code_end = 1;
   // Initialize to ret so if a VBL occurs while we're setting the animation it
   // won't run off the end
   mob_tile_code[0] = 0xc9;  // ret
+  num_sprites = MAX_FLOATS;  // Start mob sprites after floats
 }
 
-void end_mob_anim(void) {
+void end_animate(void) {
+  // Hide the rest of the sprites
+  u8 i;
+  for (i = num_sprites; i < last_num_sprites; ++i) {
+    hide_sprite(i);
+  }
+  last_num_sprites = num_sprites;
+
   mob_tile_code[mob_tile_code_end++] = 0xf1; // pop af
   mob_tile_code[mob_tile_code_end++] = 0xc9; // ret
   mob_tile_code[0] = 0xf5; // push af
@@ -852,11 +945,28 @@ void mobhop(u8 index, u8 newpos) {
   mob_dx[index] = (s8)(newx - oldx) >> 3;
   mob_dy[index] = (s8)(newy - oldy) >> 3;
 
-  mob_move_timer[index] = HOP_TIME;
+  mob_move_timer[index] = MOB_HOP_TIME;
   mob_anim_state[index] = MOB_ANIM_STATE_HOP4;
   mob_pos[index] = newpos;
   mobmap[pos] = 0;
   mobmap[newpos] = index + 1;
+}
+
+void pickhop(u8 index, u8 newpos) {
+  u8 pos, oldx, oldy, newx, newy;
+  pos = pick_pos[index];
+  pick_x[index] = oldx = POS_TO_X(pos);
+  pick_y[index] = oldy = POS_TO_Y(pos);
+  newx = POS_TO_X(newpos);
+  newy = POS_TO_Y(newpos);
+
+  pick_dx[index] = (s8)(newx - oldx) >> 3;
+  pick_dy[index] = (s8)(newy - oldy) >> 3;
+
+  pick_move_timer[index] = PICK_HOP_TIME;
+  pick_pos[index] = newpos;
+  pickmap[pos] = 0;
+  pickmap[newpos] = index + 1;
 }
 
 void hitmob(u8 index, u8 dmg) {
@@ -866,6 +976,7 @@ void hitmob(u8 index, u8 dmg) {
     // TODO: turn tile into dirt tile
     // TODO: randomly drop pickup or slime
     delmob(index);
+    droppick_rnd(pos); // XXX
     set_tile_during_vbl(pos, dtmap[pos] = tmap[pos] = dirt_tiles[rand() & 3]);
   } else {
     // TODO: flash mob for 10 frames
@@ -1199,12 +1310,62 @@ void calcdist_ai(u8 from, u8 to) {
   } while (oldtail != newtail && dist != maxdist);
 }
 
-void animate_mobs(void) {
-  u8 i, dotile, frame, animdone, last_num_sprites;
+void do_animate(void) {
+  u8 i, dotile, sprite, frame, animdone;
 
   animdone = 1;
-  last_num_sprites = num_sprites;
-  num_sprites = MAX_FLOATS;  // Start mob sprites after floats
+
+  // Loop through all pickups
+  for (i = 0; i < num_picks; ++i) {
+    if (fogmap[pick_pos[i]]) { continue; }
+
+    dotile = 0;
+    if (tile_timer == 1 && IS_ANIMATED_TILE(tmap[pick_pos[i]])) {
+      dotile = 1;
+    }
+
+    sprite = pick_type_sprite_tile[pick_type[i]];
+    if (--pick_anim_timer[i] == 0) {
+      pick_anim_timer[i] = PICKUP_SPEED;
+
+      // bounce the sprite (if not a heart or key)
+      if (sprite) {
+        pick_y[i] += pickbounce[pick_anim_frame[i] & 7];
+      }
+
+      // All pickups have 8 frames
+      if ((++pick_anim_frame[i] & 7) == 0) {
+        pick_anim_frame[i] -= 8;
+      }
+
+      dotile = 1;
+    }
+
+    if (sprite) {
+      set_sprite_tile(num_sprites, sprite);
+      move_sprite(num_sprites, pick_x[i], pick_y[i]);
+      ++num_sprites;
+    }
+
+    if (dotile || pick_move_timer[i]) {
+      frame = pick_type_anim_frames[pick_anim_frame[i]];
+      if (pick_move_timer[i]) {
+        animdone = 0;
+        set_sprite_tile(num_sprites, frame);
+        move_sprite(num_sprites, pick_x[i], pick_y[i]);
+        ++num_sprites;
+
+        pick_x[i] += pick_dx[i];
+        pick_y[i] += pick_dy[i] + hopy12[--pick_move_timer[i]];
+
+        if (pick_move_timer[i] == 0) {
+          set_tile_during_vbl(pick_pos[i], frame);
+        }
+      } else {
+        set_tile_during_vbl(pick_pos[i], frame);
+      }
+    }
+  }
 
   // Loop through all mobs, update animations
   for (i = 0; i < num_mobs; ++i) {
@@ -1231,6 +1392,10 @@ void animate_mobs(void) {
 
       if (mob_move_timer[i]) {
         animdone = 0;
+        set_sprite_tile(num_sprites, frame);
+        move_sprite(num_sprites, mob_x[i], mob_y[i]);
+        ++num_sprites;
+
         mob_x[i] += mob_dx[i];
         mob_y[i] += mob_dy[i];
 
@@ -1238,10 +1403,6 @@ void animate_mobs(void) {
         if (mob_anim_state[i] == MOB_ANIM_STATE_HOP4) {
           mob_y[i] += hopy4[mob_move_timer[i]];
         }
-
-        set_sprite_tile(num_sprites, frame);
-        move_sprite(num_sprites, mob_x[i], mob_y[i]);
-        ++num_sprites;
 
         if (mob_move_timer[i] == 0) {
           switch (mob_anim_state[i]) {
@@ -1270,11 +1431,6 @@ void animate_mobs(void) {
         set_tile_during_vbl(mob_pos[i], frame);
       }
     }
-  }
-
-  // Hide the rest of the sprites
-  for (i = num_sprites; i < last_num_sprites; ++i) {
-    hide_sprite(i);
   }
 
   if (animdone) {
@@ -1403,6 +1559,7 @@ void delmob(u8 index) {
     mob_x[index] = mob_x[num_mobs];
     mob_y[index] = mob_y[num_mobs];
     mob_dx[index] = mob_dx[num_mobs];
+    mob_dy[index] = mob_dy[num_mobs];
     mob_move_timer[index] = mob_move_timer[num_mobs];
     mob_anim_state[index] = mob_anim_state[num_mobs];
     mob_flip[index] = mob_flip[num_mobs];
@@ -1416,10 +1573,67 @@ void delmob(u8 index) {
   }
 }
 
-void addpickup(PickupType pick, u8 pos) {
-  // TODO
-  (void)pick;
+void addpick(PickupType type, u8 pos) {
+  pick_type[num_picks] = type;
+  pick_anim_frame[num_picks] = pick_type_anim_start[type];
+  pick_anim_timer[num_picks] = 1;
+  pick_pos[num_picks] = pos;
+  pick_move_timer[num_picks] = 0;
+  ++num_picks;
+  pickmap[pos] = num_picks; // index+1
+}
+
+// TODO: optimize
+u8 is_valid(u8 pos, u8 diff) __preserves_regs(b, c) {
   (void)pos;
+  (void)diff;
+  __asm__(
+    "  ldhl sp, #3\n"
+    "  ld a, (hl)\n"
+    "  ld e, a\n"
+    "  rlc a\n"
+    "  jr C, 1$\n"
+    "  dec hl\n"
+    "  ld a, (hl)\n"
+    "  add a, e\n"
+    "  ld e, a\n"
+    "  jr 2$\n"
+    "1$:\n"
+    "  ld a, e\n"
+    "  cpl\n"
+    "  inc a\n"
+    "  ld e, a\n"
+    "  dec hl\n"
+    "  ld a, (hl)\n"
+    "  sub a, e\n"
+    "  ld e, a\n"
+    "2$:\n"
+    "  ld a, #0\n"
+    "  daa\n"
+    "  ret Z\n"
+    "  ld e, #0\n"
+  );
+}
+
+u8 dropspot(u8 pos) {
+  u8 i = 0, newpos;
+  do {
+    if ((newpos = is_valid(pos, drop_diff[i])) &&
+        !(IS_SMARTMOB(tmap[newpos], newpos) || pickmap[newpos])) {
+      return newpos;
+    }
+  } while (++i);
+  return 0;
+}
+
+void droppick(PickupType type, u8 pos) {
+  u8 droppos = dropspot(pos);
+  addpick(type, pos);
+  pickhop(num_picks - 1, droppos);
+}
+
+void droppick_rnd(u8 pos) {
+  droppick(randint(10) + 2, pos);
 }
 
 void initdtmap(void) {
@@ -1431,6 +1645,7 @@ void initdtmap(void) {
 
 void mapgen(void) {
   u8 fog;
+  num_picks = 0;
   num_mobs = 1;
   mapgeninit();
   begin_tile_anim();
@@ -1999,7 +2214,7 @@ void startend(void) {
   if (dogate) {
     tmap[gatepos] = TILE_GOAL;
     if (floor < 9) {
-      addpickup(PICKUP_TYPE_HEART, heartpos);
+      addpick(PICKUP_TYPE_HEART, heartpos);
     }
   }
 }
