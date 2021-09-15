@@ -21,6 +21,7 @@ typedef void (*vfp)(void);
 #define MAX_MOBS 32    /* XXX Figure out what this should be */
 #define MAX_PICKUPS 16 /* XXX Figure out what this should be */
 #define MAX_FLOATS 8   /* For now; we'll probably want more */
+#define MAX_EQUIPS 4
 
 // TODO: how big to make these arrays?
 #define TILE_CODE_SIZE 128
@@ -30,12 +31,19 @@ typedef void (*vfp)(void);
 
 #define MAP_WIDTH 16
 #define MAP_HEIGHT 16
+#define INV_WIDTH 16
+#define INV_HEIGHT 13
+#define INV_HP_ADDR 0x9c22
+#define INV_KEYS_ADDR 0x9c25
+#define INV_FLOOR_ADDR 0x9c2d
+#define INV_EQUIP_ADDR 0x9c63
 
 #define TILE_ANIM_SPEED 8
 #define TILE_ANIM_FRAME_DIFF 16
-#define TILE_FLIP_DIFF 0x22
+#define TILE_FLIP_DIFF 0x21
 
 #define FADE_TIME 8
+#define INV_ANIM_TIME 43
 
 #define WALK_TIME 8
 #define BUMP_TIME 4
@@ -47,6 +55,7 @@ typedef void (*vfp)(void);
 #define AI_COOL_TIME 8
 
 #define PICKUP_SPEED 6
+#define PICKUP_CHARGES 2
 
 #define IS_WALL_TILE(tile) (flags_bin[tile] & 1)
 #define IS_SPECIAL_TILE(tile) (flags_bin[tile] & 2)
@@ -67,9 +76,11 @@ typedef void (*vfp)(void);
 
 #define URAND() ((u8)rand())
 
-#define POS_TO_ADDR(pos) (0x9822 + (((pos)&0xf0) << 1) + ((pos)&0xf))
+#define MAP_X_OFFSET 2
+#define MAP_Y_OFFSET 0
+#define POS_TO_ADDR(pos) (0x9802 + (((pos)&0xf0) << 1) + ((pos)&0xf))
 #define POS_TO_X(pos) (((pos & 0xf) << 3) + 24)
-#define POS_TO_Y(pos) (((pos & 0xf0) >> 1) + 24)
+#define POS_TO_Y(pos) (((pos & 0xf0) >> 1) + 16)
 
 #define VALID_UL 0b00000001
 #define VALID_DL 0b00000010
@@ -101,31 +112,38 @@ typedef void (*vfp)(void);
 #define POS_DR(pos)       ((u8)(pos + 17))
 #define POS_DIR(pos, dir) ((u8)(pos + dirpos[dir]))
 
+#define TILE_NONE 0
 #define TILE_EMPTY 1
 #define TILE_WALL 2
-#define TILE_WALL_FACE 3
+#define TILE_WALL_FACE_CRACKED 3
+#define TILE_WALL_FACE 4
 #define TILE_WALL_FACE_PLANT 5
-#define TILE_TELEPORTER 6
-#define TILE_CARPET 7
-#define TILE_VOID1 9
-#define TILE_VOID2 10
-#define TILE_END 0xd
-#define TILE_START 0xe
-#define TILE_GOAL 0x3e
-#define TILE_TORCH_LEFT 0x3f
+#define TILE_TELEPORTER 7
+#define TILE_CARPET 8
+#define TILE_VOID1 0xa
+#define TILE_VOID2 0xb
+#define TILE_END 0xe
+#define TILE_START 0xf
+#define TILE_GOAL 0x3f
+#define TILE_TORCH_LEFT 0x40
 #define TILE_TORCH_RIGHT 0x41
-#define TILE_HEART 0x42
-#define TILE_DIRT1 0x43
-#define TILE_DIRT2 0x44
-#define TILE_DIRT3 0x48
-#define TILE_PLANT1 0xb
-#define TILE_PLANT2 0xc
-#define TILE_PLANT3 0x47
-#define TILE_FIXED_WALL 0x4a
-#define TILE_SAW1 0x4e
-#define TILE_WALL_FACE_CRACKED 0x60
-#define TILE_STEPS 0x6a
-#define TILE_ENTRANCE 0x6b
+#define TILE_HEART 0x48
+#define TILE_DIRT1 0x6a
+#define TILE_DIRT2 0x6b
+#define TILE_DIRT3 0x6c
+#define TILE_PLANT1 0xc
+#define TILE_PLANT2 0xd
+#define TILE_PLANT3 0x5c
+#define TILE_FIXED_WALL 0x47
+#define TILE_SAW1 0x42
+#define TILE_STEPS 0x60
+#define TILE_ENTRANCE 0x61
+
+#define TILE_WALLSIG_BASE 0xf
+#define TILE_CRACKED_DIFF 0x34
+
+#define TILE_0 0xe5
+#define TILE_1 0xe6
 
 #define FLOAT_FOUND 0xe
 #define FLOAT_LOST 0xf
@@ -187,6 +205,8 @@ typedef enum PickupType {
   PICKUP_TYPE_SPIN,
   PICKUP_TYPE_SUPLEX,
   PICKUP_TYPE_SLAP,
+  PICKUP_TYPE_FULL, // Used to display "full!" message
+  PICKUP_TYPE_NONE = 0,
 } PickupType;
 
 typedef enum MobAnimState {
@@ -402,9 +422,9 @@ const u8 mob_type_anim_frames[] = {
     0x94, 0x95, 0x96, 0x95,                   // weed
     0x97, 0x97, 0x97, 0x97, 0x97, 0x97, 0x97, //
     0x97, 0x97, 0x97, 0x97, 0x97, 0x98,       // bomb
-    0x59,                                     // vase1
-    0x5f,                                     // vase2
-    0x53,                                     // chest
+    0x4a,                                     // vase1
+    0x4b,                                     // vase2
+    0x4c,                                     // chest
 };
 
 const u8 mob_type_anim_start[] = {
@@ -489,9 +509,9 @@ const u8 mob_type_object[] = {
 };
 
 const u8 pick_type_anim_frames[] = {
-    0xc3, 0xc4, 0xc5, 0xc4, 0xc3, 0xc3, 0xc3, 0xc3, // heart
-    0xc6, 0xc7, 0xc8, 0xc7, 0xc6, 0xc6, 0xc6, 0xc6, // key
-    0xc9, 0xca, 0xcb, 0xca, 0xc9, 0xc9, 0xc9, 0xc9, // pickup ring
+    0xc2, 0xc3, 0xc4, 0xc3, 0xc2, 0xc2, 0xc2, 0xc2, // heart
+    0xc5, 0xc6, 0xc7, 0xc6, 0xc5, 0xc5, 0xc5, 0xc5, // key
+    0xc8, 0xc9, 0xca, 0xc9, 0xc8, 0xc8, 0xc8, 0xc8, // pickup ring
 };
 
 const u8 pick_type_anim_start[] = {
@@ -524,12 +544,76 @@ const u8 pick_type_sprite_tile[] = {
     0x1d, // PICKUP_TYPE_SLAP,
 };
 
+const u8 pick_type_name_tile[] = {
+    212, 223, 215, 218, 255, 239, 231, 240,                // JUMP (2)
+    204, 217, 214, 222, 255, 239, 231, 240,                // BOLT (2)
+    218, 223, 221, 210, 255, 239, 231, 240,                // PUSH (2)
+    209, 220, 203, 218, 218, 214, 207, 255, 239, 231, 240, // GRAPPLE (2)
+    221, 218, 207, 203, 220, 255, 239, 231, 240,           // SPEAR (2)
+    221, 215, 203, 221, 210, 255, 239, 231, 240,           // SMASH (2)
+    210, 217, 217, 213, 255, 239, 231, 240,                // HOOK (2)
+    221, 218, 211, 216, 255, 239, 231, 240,                // SPIN (2)
+    221, 223, 218, 214, 207, 226, 255, 239, 231, 240,      // SUPLEX (2)
+    221, 214, 203, 218, 255, 239, 231, 240,                // SLAP (2)
+};
+
+const u8 pick_type_name_start[] = {0, 0, 0, 8, 16, 24, 35, 44, 53, 61, 69, 79};
+
 const u8 float_diff_y[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0,
                            1, 0, 0, 0, 1, 0, 0, 1, 0, 1, 0, 1, 1, 1, 1, 1};
 
 const u8 float_dmg[] = {0, 0x1e, 0x2e, 0x3d};
+
+const u8 float_pick_type_tiles[] = {
+    0x1f,                   // PICKUP_TYPE_HEART,
+    0x3d, 0x3e,             // PICKUP_TYPE_KEY,
+    0x20, 0x21, 0x22,       // PICKUP_TYPE_JUMP,
+    0x23, 0x24, 0x25,       // PICKUP_TYPE_BOLT,
+    0x26, 0x27, 0x28,       // PICKUP_TYPE_PUSH,
+    0x29, 0x2a, 0x2b, 0x2c, // PICKUP_TYPE_GRAPPLE,
+    0x2f, 0x30, 0x31,       // PICKUP_TYPE_SPEAR,
+    0x32, 0x33, 0x34,       // PICKUP_TYPE_SMASH,
+    0x35, 0x36, 0x28,       // PICKUP_TYPE_HOOK,
+    0x2f, 0x37, 0x38,       // PICKUP_TYPE_SPIN,
+    0x3a, 0x2b, 0x3b, 0x28, // PICKUP_TYPE_SUPLEX,
+    0x3c, 0x2a, 0x22,       // PICKUP_TYPE_SLAP,
+    0x3f, 0x40, 0x41,       // PICKUP_TYPE_FULL
+};
+
+const u8 float_pick_type_start[] = {
+    0,  // PICKUP_TYPE_HEART,
+    1,  // PICKUP_TYPE_KEY,
+    3,  // PICKUP_TYPE_JUMP,
+    6,  // PICKUP_TYPE_BOLT,
+    9,  // PICKUP_TYPE_PUSH,
+    12, // PICKUP_TYPE_GRAPPLE,
+    16, // PICKUP_TYPE_SPEAR,
+    19, // PICKUP_TYPE_SMASH,
+    22, // PICKUP_TYPE_HOOK,
+    25, // PICKUP_TYPE_SPIN,
+    28, // PICKUP_TYPE_SUPLEX,
+    32, // PICKUP_TYPE_SLAP,
+    35, // PICKUP_TYPE_FULL
+    38, // total
+};
+
+const u8 float_pick_type_x_offset[] = {
+    0,    // PICKUP_TYPE_HEART,
+    0xfe, // PICKUP_TYPE_KEY,
+    0xfc, // PICKUP_TYPE_JUMP,
+    0xfc, // PICKUP_TYPE_BOLT,
+    0xfc, // PICKUP_TYPE_PUSH,
+    0xf6, // PICKUP_TYPE_GRAPPLE,
+    0xfa, // PICKUP_TYPE_SPEAR,
+    0xfa, // PICKUP_TYPE_SMASH,
+    0xfc, // PICKUP_TYPE_HOOK,
+    0xfc, // PICKUP_TYPE_SPIN,
+    0xf8, // PICKUP_TYPE_SUPLEX,
+    0xfc, // PICKUP_TYPE_SLAP,
+    0xfb, // PICKUP_TYPE_FULL
+};
 
 // Drop position offsets checked by distance, up to -8 + 7 in both directions
 const u8 drop_diff[] = {
@@ -557,6 +641,35 @@ const u8 drop_diff[] = {
     0x79, 0x88, 0x68, 0x78,
 };
 
+const u8 inventory_map[] = {
+    241, 242, 242, 243, 242, 242, 243, 242, 242, 242, 242, 242, 242, 242, 242,
+    244, 245, 228, 234, 246, 197, 229, 246, 208, 214, 217, 217, 220, 255, 229,
+    255, 247, 248, 249, 249, 250, 249, 249, 250, 249, 249, 249, 249, 249, 249,
+    249, 249, 251, 245, 255, 255, 219, 219, 219, 255, 255, 255, 255, 255, 255,
+    255, 255, 255, 247, 245, 255, 255, 219, 219, 219, 255, 255, 255, 255, 255,
+    255, 255, 255, 255, 247, 245, 255, 255, 219, 219, 219, 255, 255, 255, 255,
+    255, 255, 255, 255, 255, 247, 245, 255, 255, 219, 219, 219, 255, 255, 255,
+    255, 255, 255, 255, 255, 255, 247, 248, 249, 249, 249, 249, 249, 249, 249,
+    249, 249, 249, 249, 249, 249, 249, 251, 245, 255, 255, 255, 255, 255, 255,
+    255, 255, 255, 255, 255, 255, 255, 255, 247, 245, 255, 255, 255, 255, 255,
+    255, 255, 255, 255, 255, 255, 255, 255, 255, 247, 245, 255, 255, 255, 255,
+    255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 247, 245, 255, 255, 255,
+    255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 247, 252, 253, 253,
+    253, 253, 253, 253, 253, 253, 253, 253, 253, 253, 253, 253, 254,
+};
+
+const u8 inventory_up_y[] = {
+    40, 41, 41, 41, 41, 41, 41, 41, 42, 42, 42,  43,  43,  43, 44,
+    44, 45, 45, 46, 47, 47, 48, 49, 50, 51, 53,  54,  56,  58, 60,
+    62, 64, 67, 70, 74, 77, 82, 86, 91, 97, 104, 111, 119,
+};
+
+const u8 inventory_down_y[] = {
+    128, 127, 127, 127, 127, 127, 127, 127, 126, 126, 126, 125, 125, 125, 124,
+    124, 123, 123, 122, 121, 121, 120, 119, 118, 117, 115, 114, 112, 110, 108,
+    106, 104, 101, 98,  94,  91,  86,  82,  77,  71,  64,  57,  49,
+};
+
 void init(void);
 void do_turn(void);
 void pass_turn(void);
@@ -580,10 +693,16 @@ void calcdist_ai(u8 from, u8 to);
 void do_animate(void);
 void end_animate(void);
 void set_tile_during_vbl(u8 pos, u8 tile);
+void set_digit_tile_during_vbl(u16 addr, u8 value);
+void set_tile_range_during_vbl(u16 addr, u8* source, u8 len);
 void vbl_interrupt(void);
+
+void trigger_step(u8 index);
 
 void addfloat(u8 pos, u8 tile);
 void update_floats(void);
+
+void inv_animate(void);
 
 void fadeout(void);
 void fadein(void);
@@ -591,6 +710,7 @@ void fadein(void);
 void addmob(MobType type, u8 pos);
 void delmob(u8 index);
 void addpick(PickupType type, u8 pos);
+void delpick(u8 index);
 void droppick(PickupType type, u8 pos);
 void droppick_rnd(u8 pos);
 u8 dropspot(u8 pos);
@@ -666,7 +786,7 @@ u8 void_num_walls[MAX_VOIDS]; // Number of walls in a void region
 u8 num_voids;
 
 u8 start_room;
-u8 floor;
+u8 floor, floor_tile[2];
 u8 startpos;
 
 u8 cands[MAX_CANDS];
@@ -716,10 +836,17 @@ u8 num_floats;
 Turn turn;
 u8 noturn;
 
-u8 key;
+u8 joy;
 
 u8 doupdatemap;
 u8 num_sprites, last_num_sprites;
+
+u8 inv_anim_up;
+u8 inv_anim_timer;
+
+u8 equip_type[MAX_EQUIPS];
+u8 equip_charge[MAX_EQUIPS];
+u8 num_keys;
 
 u16 myclock;
 void tim_interrupt(void) { ++myclock; }
@@ -729,14 +856,14 @@ void main(void) {
   mapgen();
 
   doupdatemap = 1;
-  LCDC_REG = 0b10000011;  // display on, bg on, obj on
+  LCDC_REG = 0b11100011;  // display on, window/bg/obj on, window@9c00
   fadein();
 
   while(1) {
-    key = joypad();
+    joy = joypad();
 
     // XXX
-    if (key & J_START) {
+    if (joy & J_START) {
       if (++floor == 11) { floor = 0; }
       fadeout();
       IE_REG &= ~VBL_IFLAG;
@@ -744,11 +871,19 @@ void main(void) {
       // Reset the animations so they don't draw on this new map
       begin_animate();
       end_animate();
+      if (floor == 10) {
+        floor_tile[0] = TILE_1;
+        floor_tile[1] = TILE_0;
+      } else {
+        floor_tile[0] = TILE_0 + floor;
+        floor_tile[1] = 0;
+      }
       IE_REG |= VBL_IFLAG;
       doupdatemap = 1;
       fadein();
     }
 
+    inv_animate();
     begin_animate();
     do_turn();
     do_animate();
@@ -758,10 +893,13 @@ void main(void) {
   }
 }
 
+extern u16 s__DATA, l__DATA;
+
 void init(void) {
   DISPLAY_OFF;
+  // TODO: clear WRAM to 0
 
-   // 0:LightGray 1:DarkGray 2:Black 3:White
+  // 0:LightGray 1:DarkGray 2:Black 3:White
   BGP_REG = OBP0_REG = OBP1_REG = fadepal[0];
 
   add_TIM(tim_interrupt);
@@ -777,7 +915,11 @@ void init(void) {
   set_sprite_data(0, SPRITES_TILES, sprites_bin);
   set_bkg_data(0, BG_TILES, bg_bin);
   set_bkg_data(0x80, SHARED_TILES, shared_bin);
+  set_win_tiles(0, 0, INV_WIDTH, INV_HEIGHT, inventory_map);
   init_bkg(0);
+
+  WX_REG = 23;
+  WY_REG = 128;
 
   num_picks = 0;
   num_mobs = 0;
@@ -785,11 +927,20 @@ void init(void) {
 
   doupdatemap = 0;
 
+  floor_tile[0] = TILE_0;
+  floor_tile[1] = 0;
+
   turn = TURN_PLAYER;
   noturn = 0;
 
   num_floats = 0;
   num_sprites = 0;
+
+  inv_anim_up = 0;
+  inv_anim_timer = 0;
+
+  equip_type[0] = equip_type[1] = equip_type[2] = equip_type[3] = 0;
+  equip_charge[0] = equip_charge[1] = equip_charge[2] = equip_charge[3] = 0;
 
   tile_inc = 0;
   tile_timer = TILE_ANIM_SPEED;
@@ -862,12 +1013,12 @@ void pass_turn(void) {
 void move_player(void) {
   u8 dir, pos, newpos, tile;
   if (mob_move_timer[PLAYER_MOB] == 0) {
-    if (key & (J_LEFT | J_RIGHT | J_UP | J_DOWN)) {
-      if (key & J_LEFT) {
+    if (joy & (J_LEFT | J_RIGHT | J_UP | J_DOWN)) {
+      if (joy & J_LEFT) {
         dir = DIR_LEFT;
-      } else if (key & J_RIGHT) {
+      } else if (joy & J_RIGHT) {
         dir = DIR_RIGHT;
-      } else if (key & J_UP) {
+      } else if (joy & J_UP) {
         dir = DIR_UP;
       } else {
         dir = DIR_DOWN;
@@ -892,6 +1043,11 @@ void move_player(void) {
         noturn = 1;
       }
       turn = TURN_PLAYER_WAIT;
+    }
+
+    if ((joy & J_B) && !inv_anim_timer) {
+      inv_anim_timer = INV_ANIM_TIME;
+      inv_anim_up ^= 1;
     }
   }
 }
@@ -989,6 +1145,9 @@ void hitmob(u8 index, u8 dmg) {
       set_tile_during_vbl(pos, dtmap[pos]);
     } else {
       mob_hp[index] -= dmg;
+      if (index == PLAYER_MOB) {
+        set_digit_tile_during_vbl(INV_HP_ADDR, mob_hp[PLAYER_MOB]);
+      }
     }
   }
 }
@@ -1317,7 +1476,8 @@ void do_animate(void) {
 
   // Loop through all pickups
   for (i = 0; i < num_picks; ++i) {
-    if (fogmap[pick_pos[i]]) { continue; }
+    // Don't draw the pickup if it is fogged or a mob is standing on top of it
+    if (fogmap[pick_pos[i]] || mobmap[pick_pos[i]]) { continue; }
 
     dotile = 0;
     if (tile_timer == 1 && IS_ANIMATED_TILE(tmap[pick_pos[i]])) {
@@ -1341,7 +1501,12 @@ void do_animate(void) {
       dotile = 1;
     }
 
-    if (sprite) {
+    // Don't display pickups if the window would cover it; the bottom of the
+    // sprite would be pick_y[i] + 8, but sprites are offset by 16 already (as
+    // required by the hardware), so the actual position is pick_y[i] - 8.
+    // Since the pickups bounce by 1 pixel up and down, we also display them at
+    // WY_REG + 7 so they don't disappear while bouncing.
+    if (sprite && pick_y[i] <= WY_REG + 9) {
       set_sprite_tile(num_sprites, sprite);
       move_sprite(num_sprites, pick_x[i], pick_y[i]);
       ++num_sprites;
@@ -1414,7 +1579,7 @@ void do_animate(void) {
               break;
 
             case MOB_ANIM_STATE_WALK:
-              if (i == PLAYER_MOB) { sight(); }
+              trigger_step(i);
               mob_anim_speed[i] = mob_type_anim_speed[mob_type[i]];
               goto done;
 
@@ -1459,9 +1624,108 @@ void set_tile_during_vbl(u8 pos, u8 tile) {
   mob_tile_code_end = ptr - mob_tile_code;
 }
 
+void set_digit_tile_during_vbl(u16 addr, u8 value) {
+  u8 *ptr = mob_tile_code + mob_tile_code_end;
+  *ptr++ = 0x21; // ld hl, addr
+  *ptr++ = addr & 0xff;
+  *ptr++ = addr >> 8;
+  *ptr++ = 0x3e; // ld a, tile
+  *ptr++ = mob_last_tile_val = TILE_0 + value;
+  *ptr++ = 0x77; // ld (hl), a
+  mob_last_tile_addr = INV_HP_ADDR;
+  mob_tile_code_end = ptr - mob_tile_code;
+}
+
+void set_tile_range_during_vbl(u16 addr, u8* src, u8 len) {
+  u8 *dst = mob_tile_code + mob_tile_code_end;
+  *dst++ = 0x21; // ld hl, addr
+  *dst++ = addr & 0xff;
+  *dst++ = addr >> 8;
+  do {
+    *dst++ = 0x3e; // ld a, tile
+    *dst++ = *src++;
+    *dst++ = 0x22; // ld (hl+), a
+  } while(--len);
+  mob_last_tile_addr = *--src;
+  mob_tile_code_end = dst - mob_tile_code;
+}
+
+void trigger_step(u8 mob) {
+  u8 ptype, pindex, i, flt_start, flt_end, x, y, len;
+  u16 equip_addr;
+
+  if (mob == PLAYER_MOB) {
+    sight();
+
+    // Handle pickups
+    if ((pindex = pickmap[mob_pos[PLAYER_MOB]])) {
+      ptype = pick_type[--pindex];
+      if (ptype == PICKUP_TYPE_HEART) {
+        if (mob_hp[PLAYER_MOB] < 9) {
+          ++mob_hp[PLAYER_MOB];
+          set_digit_tile_during_vbl(INV_HP_ADDR, mob_hp[PLAYER_MOB]);
+        }
+      } else if (ptype == PICKUP_TYPE_KEY) {
+        if (num_keys < 9) {
+          ++num_keys;
+          set_digit_tile_during_vbl(INV_KEYS_ADDR, num_keys);
+        }
+      } else {
+        // Is there a free spot in the equip?
+        equip_addr = INV_EQUIP_ADDR;
+        len = pick_type_name_start[ptype + 1] - pick_type_name_start[ptype];
+        for (i = 0; i < MAX_EQUIPS; ++i) {
+          if (equip_type[i] == PICKUP_TYPE_NONE) {
+            // Use this slot
+            equip_type[i] = ptype;
+            equip_charge[i] = PICKUP_CHARGES;
+            set_tile_range_during_vbl(
+                equip_addr, pick_type_name_tile + pick_type_name_start[ptype],
+                len);
+            goto pickup;
+          } else if (equip_type[i] == ptype) {
+            // Increase charges
+            if (equip_charge[i] < 9) {
+              equip_charge[i] += PICKUP_CHARGES;
+              if (equip_charge[i] > 9) { equip_charge[i] = 9; }
+              set_digit_tile_during_vbl(equip_addr + len - 2, equip_charge[i]);
+            }
+            goto pickup;
+          }
+          equip_addr += 32;
+        }
+        // No room, display "full!"
+        ptype = PICKUP_TYPE_FULL;
+        goto done;
+      }
+
+    pickup:
+      delpick(pindex);
+
+    done:
+      flt_start = float_pick_type_start[ptype];
+      flt_end = float_pick_type_start[ptype + 1];
+      x = POS_TO_X(mob_pos[PLAYER_MOB]) + float_pick_type_x_offset[ptype];
+      y = POS_TO_Y(mob_pos[PLAYER_MOB]);
+
+      for (i = flt_start; i < flt_end; ++i) {
+        shadow_OAM[num_floats].x = x;
+        shadow_OAM[num_floats].y = y;
+        shadow_OAM[num_floats].tile = float_pick_type_tiles[i];
+        float_time[num_floats] = FLOAT_TIME;
+        ++num_floats;
+        x += 8;
+      }
+    }
+  }
+}
+
 void vbl_interrupt(void) {
   if (doupdatemap) {
-    set_bkg_tiles(2, 1, MAP_WIDTH, MAP_HEIGHT, dtmap);
+    // update floor number
+    *(u8 *)(INV_FLOOR_ADDR) = floor_tile[0];
+    *(u8 *)(INV_FLOOR_ADDR + 1) = floor_tile[1];
+    set_bkg_tiles(MAP_X_OFFSET, MAP_Y_OFFSET, MAP_WIDTH, MAP_HEIGHT, dtmap);
     doupdatemap = 0;
   }
   if (--tile_timer == 0) {
@@ -1501,6 +1765,14 @@ void update_floats(void) {
       shadow_OAM[i].y -= float_diff_y[float_time[i]];
     }
     ++i;
+  }
+}
+
+void inv_animate(void) {
+  if (inv_anim_timer) {
+    --inv_anim_timer;
+    WY_REG = inv_anim_up ? inventory_up_y[inv_anim_timer]
+                         : inventory_down_y[inv_anim_timer];
   }
 }
 
@@ -1581,6 +1853,23 @@ void addpick(PickupType type, u8 pos) {
   pick_move_timer[num_picks] = 0;
   ++num_picks;
   pickmap[pos] = num_picks; // index+1
+}
+
+void delpick(u8 index) {
+  pickmap[pick_pos[index]] = 0;
+  --num_picks;
+  if (index != num_picks) {
+    pick_type[index] = pick_type[num_picks];
+    pick_anim_frame[index] = pick_anim_frame[num_picks];
+    pick_anim_timer[index] = pick_anim_timer[num_picks];
+    pick_pos[index] = pick_pos[num_picks];
+    pick_x[index] = pick_x[num_picks];
+    pick_y[index] = pick_y[num_picks];
+    pick_dx[index] = pick_dx[num_picks];
+    pick_dy[index] = pick_dy[num_picks];
+    pick_move_timer[index] = pick_move_timer[num_picks];
+    pickmap[pick_pos[index]] = index + 1;
+  }
 }
 
 // TODO: optimize
@@ -1694,6 +1983,7 @@ void mapgen(void) {
 void mapgeninit(void) {
   memset(roommap, 0, sizeof(roommap));
   memset(mobmap, 0, sizeof(mobmap));
+  memset(pickmap, 0, sizeof(pickmap));
   memset(sigmap, 255, sizeof(sigmap));
   memset(ds_sets, 0, sizeof(ds_sets));
 
@@ -1835,9 +2125,27 @@ void roomgen(void) {
 }
 
 void copymap(u8 index) {
-  u8 pos, valid;
+  const u8 *src;
+  u8 *dst;
+  u8 pos, valid, i, w, h;
 
-  memcpy(tmap, map_bin + (index << 8), 256);
+  // Fill map with default tiles. TILE_NONE is used for floor0 and floor10, and
+  // TILE_WALL is used for all gate maps
+  memset(tmap, index < 2 ? TILE_NONE : TILE_WALL, 256);
+
+  // Each premade map only has a small rectangular region to copy (map_w by
+  // map_h tiles), and is offset by map_pos.
+  src = map_bin + map_start[index];
+  dst = tmap + map_pos[index];
+  w = map_w[index];
+  h = map_h[index];
+  do {
+    i = w;
+    do {
+      *dst++ = *src++;
+    } while (--i);
+    dst += MAP_WIDTH - w;
+  } while (--h);
 
   // Update signature map for empty tiles
   pos = 0;
@@ -2301,10 +2609,10 @@ void prettywalls(void) {
     if (tmap[pos] == TILE_WALL) {
       tile = sigmatch(pos, wallsig, wallmask);
       if (tile) {
-        tile += 14;
+        tile += TILE_WALLSIG_BASE;
       }
       if (TILE_HAS_CRACKED_VARIANT(tile) && !(URAND() & 7)) {
-        tile += 0x35;
+        tile += TILE_CRACKED_DIFF;
       }
       tmap[pos] = tile;
     } else if (tmap[pos] == TILE_EMPTY && (validmap[pos] & VALID_U) &&

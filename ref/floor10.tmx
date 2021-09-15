@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.5" tiledversion="1.6.0" orientation="orthogonal" renderorder="right-down" width="7" height="11" tilewidth="8" tileheight="8" infinite="0" nextlayerid="2" nextobjectid="1">
+ <tileset firstgid="1" source="bg.tsx"/>
+ <layer id="1" name="Tile Layer 1" width="7" height="11">
+  <data encoding="csv">
+17,18,18,18,18,18,19,
+33,3,3,3,3,3,35,
+33,3,3,3,3,3,35,
+33,5,5,5,5,5,35,
+33,65,78,79,80,82,35,
+33,2,94,95,96,2,35,
+33,81,110,111,112,66,35,
+33,2,2,2,2,2,35,
+49,21,97,97,97,20,51,
+1,33,2,16,2,35,1,
+1,49,50,50,50,51,1
+</data>
+ </layer>
+</map>
