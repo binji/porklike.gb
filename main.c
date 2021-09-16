@@ -29,6 +29,8 @@ typedef void (*vfp)(void);
 
 #define PLAYER_MOB 0
 
+#define NUM_GATE_MAPS 14
+
 #define MAP_WIDTH 16
 #define MAP_HEIGHT 16
 #define INV_WIDTH 16
@@ -51,6 +53,7 @@ typedef void (*vfp)(void);
 #define PICK_HOP_TIME 8
 #define FLOAT_TIME 70
 #define QUEEN_CHARGE_TIME 2
+#define OBJ1_PAL_TIME 8
 
 #define AI_COOL_TIME 8
 
@@ -75,6 +78,12 @@ typedef void (*vfp)(void);
   ((flags_bin[tile] & 3) || (mobmap[pos] && !mob_active[mobmap[pos] - 1]))
 
 #define URAND() ((u8)rand())
+#define URAND_10_PERCENT() (URAND() < 26)
+#define URAND_12_5_PERCENT() ((URAND() & 7) == 0)
+#define URAND_20_PERCENT() (URAND() < 51)
+#define URAND_25_PERCENT() ((URAND() & 3) == 0)
+#define URAND_33_PERCENT() (URAND() < 85)
+#define URAND_50_PERCENT() (URAND() & 1)
 
 #define MAP_X_OFFSET 2
 #define MAP_Y_OFFSET 0
@@ -120,14 +129,17 @@ typedef void (*vfp)(void);
 #define TILE_WALL_FACE_PLANT 5
 #define TILE_TELEPORTER 7
 #define TILE_CARPET 8
+#define TILE_CHEST_OPEN 9
 #define TILE_VOID1 0xa
 #define TILE_VOID2 0xb
 #define TILE_END 0xe
 #define TILE_START 0xf
-#define TILE_GOAL 0x3f
+#define TILE_GATE 0x3f
 #define TILE_TORCH_LEFT 0x40
 #define TILE_TORCH_RIGHT 0x41
 #define TILE_HEART 0x48
+#define TILE_RUG 0x59
+#define TILE_BOMB_EXPLODED 0x5b
 #define TILE_DIRT1 0x6a
 #define TILE_DIRT2 0x6b
 #define TILE_DIRT3 0x6c
@@ -189,6 +201,7 @@ typedef enum MobType {
   MOB_TYPE_VASE1,
   MOB_TYPE_VASE2,
   MOB_TYPE_CHEST,
+  MOB_TYPE_HEART_CHEST,
   NUM_MOB_TYPES,
 } MobType;
 
@@ -232,6 +245,17 @@ const u8 fadepal[] = {
     0b10111111, // 0:Black     1:Black    2:Black 3:DarkGray
     0b01111110, // 0:DarkGray  1:Black    2:Black 3:LightGray
     0b00111001, // 0:LightGray 1:DarkGray 2:Black 3:White
+};
+
+const u8 obj_pal1[] = {
+    0b00111001, // 0:LightGray 1:DarkGray 2:Black 3:White
+    0b00111001, // 0:LightGray 1:DarkGray 2:Black 3:White
+    0b00111001, // 0:LightGray 1:DarkGray 2:Black 3:White
+    0b00111001, // 0:LightGray 1:DarkGray 2:Black 3:White
+    0b00111001, // 0:LightGray 1:DarkGray 2:Black 3:White
+    0b01111001, // 0:LightGray 1:DarkGray 2:Black 3:White
+    0b10111001, // 0:LightGray 1:DarkGray 2:Black 3:White
+    0b01111001, // 0:LightGray 1:DarkGray 2:Black 3:White
 };
 
 const u8 dirx[] = {0xff, 1, 0, 0};       // L R U D
@@ -407,6 +431,7 @@ const u8 mob_type_hp[] = {
     1,  // vase1
     1,  // vase2
     1,  // chest
+    1,  // heart chest
     1,  // total
 };
 
@@ -425,6 +450,7 @@ const u8 mob_type_anim_frames[] = {
     0x4a,                                     // vase1
     0x4b,                                     // vase2
     0x4c,                                     // chest
+    0x4c,                                     // heart chest
 };
 
 const u8 mob_type_anim_start[] = {
@@ -441,7 +467,8 @@ const u8 mob_type_anim_start[] = {
     49, // vase1
     50, // vase2
     51, // chest
-    52, // total
+    52, // heart chest
+    53, // total
 };
 
 const u8 mob_type_anim_speed[] = {
@@ -458,6 +485,7 @@ const u8 mob_type_anim_speed[] = {
     255, // vase1
     255, // vase2
     255, // chest
+    255, // heart chest
 };
 
 const MobAI mob_type_ai_wait[] = {
@@ -474,6 +502,7 @@ const MobAI mob_type_ai_wait[] = {
     MOB_AI_NONE,   // vase1
     MOB_AI_NONE,   // vase2
     MOB_AI_NONE,   // chest
+    MOB_AI_NONE,   // heart chest
 };
 
 const MobAI mob_type_ai_active[] = {
@@ -490,6 +519,7 @@ const MobAI mob_type_ai_active[] = {
     MOB_AI_NONE,   // vase1
     MOB_AI_NONE,   // vase2
     MOB_AI_NONE,   // chest
+    MOB_AI_NONE,   // heart chest
 };
 
 const u8 mob_type_object[] = {
@@ -506,11 +536,29 @@ const u8 mob_type_object[] = {
     1, // vase1
     1, // vase2
     1, // chest
+    1, // heart chest
+};
+
+const u8 mob_type_key[] = {
+    0, // player
+    1, // slime
+    1, // queen
+    1, // scorpion
+    1, // hulk
+    1, // ghost
+    1, // kong
+    0, // reaper
+    0, // weed
+    0, // bomb
+    0, // vase1
+    0, // vase2
+    0, // chest
+    0, // heart chest
 };
 
 const u8 pick_type_anim_frames[] = {
-    0xc2, 0xc3, 0xc4, 0xc3, 0xc2, 0xc2, 0xc2, 0xc2, // heart
-    0xc5, 0xc6, 0xc7, 0xc6, 0xc5, 0xc5, 0xc5, 0xc5, // key
+    0xc2, 0xc3, 0xc2, 0xc4, 0xc2, 0xc2, 0xc2, 0xc2, // heart
+    0xc5, 0xc6, 0xc5, 0xc7, 0xc5, 0xc5, 0xc5, 0xc5, // key
     0xc8, 0xc9, 0xca, 0xc9, 0xc8, 0xc8, 0xc8, 0xc8, // pickup ring
 };
 
@@ -692,6 +740,7 @@ void sight(void);
 void calcdist_ai(u8 from, u8 to);
 void do_animate(void);
 void end_animate(void);
+void hide_float_sprites(void);
 void set_tile_during_vbl(u8 pos, u8 tile);
 void set_digit_tile_during_vbl(u16 addr, u8 value);
 void set_tile_range_during_vbl(u16 addr, u8* source, u8 len);
@@ -704,6 +753,7 @@ void update_floats(void);
 
 void inv_animate(void);
 
+void update_obj1_pal(void);
 void fadeout(void);
 void fadein(void);
 
@@ -809,6 +859,7 @@ u8 mob_active[MAX_MOBS];  // 0=inactive 1=active
 u8 mob_charge[MAX_MOBS];  // only used by queen
 u8 mob_hp[MAX_MOBS];
 u8 num_mobs;
+u8 key_mob;
 
 PickupType pick_type[MAX_PICKUPS];
 u8 pick_pos[MAX_PICKUPS];
@@ -838,7 +889,7 @@ u8 noturn;
 
 u8 joy;
 
-u8 doupdatemap;
+u8 doupdatemap, donextlevel;
 u8 num_sprites, last_num_sprites;
 
 u8 inv_anim_up;
@@ -847,6 +898,8 @@ u8 inv_anim_timer;
 u8 equip_type[MAX_EQUIPS];
 u8 equip_charge[MAX_EQUIPS];
 u8 num_keys;
+
+u8 obj_pal1_timer, obj_pal1_index;
 
 u16 myclock;
 void tim_interrupt(void) { ++myclock; }
@@ -862,8 +915,10 @@ void main(void) {
   while(1) {
     joy = joypad();
 
-    // XXX
-    if (joy & J_START) {
+    if (donextlevel || (joy & J_START)) {
+      donextlevel = 0;
+      hide_float_sprites();
+
       if (++floor == 11) { floor = 0; }
       fadeout();
       IE_REG &= ~VBL_IFLAG;
@@ -889,6 +944,7 @@ void main(void) {
     do_animate();
     end_animate();
     update_floats();
+    update_obj1_pal();
     wait_vbl_done();
   }
 }
@@ -901,6 +957,8 @@ void init(void) {
 
   // 0:LightGray 1:DarkGray 2:Black 3:White
   BGP_REG = OBP0_REG = OBP1_REG = fadepal[0];
+  obj_pal1_timer = OBJ1_PAL_TIME;
+  obj_pal1_index = 0;
 
   add_TIM(tim_interrupt);
   TMA_REG = 0;      // Divide clock by 256 => 16Hz
@@ -926,6 +984,7 @@ void init(void) {
   addmob(MOB_TYPE_PLAYER, 0);
 
   doupdatemap = 0;
+  donextlevel = 0;
 
   floor_tile[0] = TILE_0;
   floor_tile[1] = 0;
@@ -969,6 +1028,14 @@ void end_animate(void) {
   mob_tile_code[mob_tile_code_end++] = 0xf1; // pop af
   mob_tile_code[mob_tile_code_end++] = 0xc9; // ret
   mob_tile_code[0] = 0xf5; // push af
+}
+
+void hide_float_sprites(void) {
+  u8 i;
+  for (i = 0; i < num_floats; ++i) {
+    hide_sprite(i);
+  }
+  num_floats = 0;
 }
 
 void do_turn(void) {
@@ -1030,18 +1097,34 @@ void move_player(void) {
       if (IS_MOB(newpos)) {
         mobbump(PLAYER_MOB, dir);
         hitmob(mobmap[newpos] - 1, 1);
+        goto done;
       } else if (validmap[pos] & dirvalid[dir]) {
         tile = tmap[newpos];
         if (IS_WALL_TILE(tile)) {
-          mobbump(PLAYER_MOB, dir);
-          noturn = 1;
+          if (IS_SPECIAL_TILE(tile)) {
+            if (tile == TILE_GATE) {
+              // TODO: Display message if no key
+              if (num_keys > 0) {
+                --num_keys;
+                set_tile_during_vbl(newpos,
+                                    tmap[newpos] = dtmap[newpos] = TILE_EMPTY);
+                mobbump(PLAYER_MOB, dir);
+                sight();
+                goto done;
+              }
+            }
+          }
+          // fallthrough to bump below...
         } else {
           mobwalk(PLAYER_MOB, dir);
+          goto done;
         }
-      } else {
-        mobbump(PLAYER_MOB, dir);
-        noturn = 1;
       }
+
+      // Bump w/o taking a turn
+      mobbump(PLAYER_MOB, dir);
+      noturn = 1;
+    done:
       turn = TURN_PLAYER_WAIT;
     }
 
@@ -1126,22 +1209,57 @@ void pickhop(u8 index, u8 newpos) {
 }
 
 void hitmob(u8 index, u8 dmg) {
-  u8 pos = mob_pos[index];
+  u8 mob, percent, tile, slime, pos, is_heart_chest;
+  pos = mob_pos[index];
+
   if (mob_type_object[mob_type[index]]) {
-    // TODO: handle chest, bomb
-    // TODO: turn tile into dirt tile
-    // TODO: randomly drop pickup or slime
+    if (mob_type[index] == MOB_TYPE_CHEST) {
+      percent = 100;
+      tile = TILE_CHEST_OPEN;
+      slime = 0;
+    } else if (mob_type[index] == MOB_TYPE_BOMB) {
+      percent = 100;
+      tile = TILE_BOMB_EXPLODED;
+      slime = 0;
+      // TODO: explode
+    } else {
+      percent = 20;
+      tile = dirt_tiles[URAND() & 3];
+      slime = 1;
+    }
+
+    is_heart_chest = mob_type[index] == MOB_TYPE_HEART_CHEST;
     delmob(index);
-    droppick_rnd(pos); // XXX
-    set_tile_during_vbl(pos, dtmap[pos] = tmap[pos] = dirt_tiles[rand() & 3]);
+    if (!IS_SPECIAL_TILE(tmap[pos])) {
+      set_tile_during_vbl(pos, dtmap[pos] = tmap[pos] = tile);
+    }
+
+    if (randint(100) < percent) {
+      if (slime && URAND_20_PERCENT()) {
+        mob = num_mobs;
+        addmob(MOB_TYPE_SLIME, pos);
+        mobhop(mob, dropspot(pos));
+      } else if (is_heart_chest && URAND_20_PERCENT()) {
+        droppick(PICKUP_TYPE_HEART, pos);
+      } else {
+        droppick_rnd(pos);
+      }
+    }
   } else {
-    // TODO: flash mob for 10 frames
     addfloat(pos, float_dmg[dmg]);
 
     if (mob_hp[index] <= dmg) {
-      // TODO: drop key, if any
+      // drop key, if any.
+      // NOTE: This code is subtle; delmob() will update the
+      // key_mob, and droppick() must be called after delmob() so the pickup
+      // can be dropped where the mob was.
+      if (index + 1 == key_mob) {
+        delmob(index);
+        droppick(PICKUP_TYPE_KEY, pos);
+      } else {
+        delmob(index);
+      }
       // TODO: restore to 5hp if reaper killed, and drop key
-      delmob(index);
       set_tile_during_vbl(pos, dtmap[pos]);
     } else {
       mob_hp[index] -= dmg;
@@ -1470,7 +1588,7 @@ void calcdist_ai(u8 from, u8 to) {
 }
 
 void do_animate(void) {
-  u8 i, dotile, sprite, frame, animdone;
+  u8 i, dosprite, dotile, sprite, frame, animdone;
 
   animdone = 1;
 
@@ -1507,8 +1625,9 @@ void do_animate(void) {
     // Since the pickups bounce by 1 pixel up and down, we also display them at
     // WY_REG + 7 so they don't disappear while bouncing.
     if (sprite && pick_y[i] <= WY_REG + 9) {
-      set_sprite_tile(num_sprites, sprite);
       move_sprite(num_sprites, pick_x[i], pick_y[i]);
+      set_sprite_tile(num_sprites, sprite);
+      set_sprite_prop(num_sprites, 0);
       ++num_sprites;
     }
 
@@ -1516,8 +1635,9 @@ void do_animate(void) {
       frame = pick_type_anim_frames[pick_anim_frame[i]];
       if (pick_move_timer[i]) {
         animdone = 0;
-        set_sprite_tile(num_sprites, frame);
         move_sprite(num_sprites, pick_x[i], pick_y[i]);
+        set_sprite_tile(num_sprites, frame);
+        set_sprite_prop(num_sprites, 0);
         ++num_sprites;
 
         pick_x[i] += pick_dx[i];
@@ -1536,7 +1656,7 @@ void do_animate(void) {
   for (i = 0; i < num_mobs; ++i) {
     if (fogmap[mob_pos[i]]) { continue; }
 
-    dotile = 0;
+    dosprite = dotile = 0;
     if (tile_timer == 1 && IS_ANIMATED_TILE(tmap[mob_pos[i]])) {
       dotile = 1;
     }
@@ -1549,18 +1669,25 @@ void do_animate(void) {
       dotile = 1;
     }
 
-    if (dotile || mob_move_timer[i]) {
+    if (i + 1 == key_mob || mob_move_timer[i]) {
+      dosprite = 1;
+    }
+
+    if (dotile || dosprite) {
       frame = mob_type_anim_frames[mob_anim_frame[i]];
       if (mob_flip[i]) {
         frame += TILE_FLIP_DIFF;
       }
 
+      if (dosprite) {
+        move_sprite(num_sprites, mob_x[i], mob_y[i]);
+        set_sprite_tile(num_sprites, frame);
+        set_sprite_prop(num_sprites, i + 1 == key_mob ? S_PALETTE : 0);
+        ++num_sprites;
+      }
+
       if (mob_move_timer[i]) {
         animdone = 0;
-        set_sprite_tile(num_sprites, frame);
-        move_sprite(num_sprites, mob_x[i], mob_y[i]);
-        ++num_sprites;
-
         mob_x[i] += mob_dx[i];
         mob_y[i] += mob_dy[i];
 
@@ -1592,7 +1719,7 @@ void do_animate(void) {
               break;
           }
         }
-      } else {
+      } else if (dotile) {
         set_tile_during_vbl(mob_pos[i], frame);
       }
     }
@@ -1656,6 +1783,10 @@ void trigger_step(u8 mob) {
 
   if (mob == PLAYER_MOB) {
     sight();
+
+    if (tmap[mob_pos[PLAYER_MOB]] == TILE_END) {
+      donextlevel = 1;
+    }
 
     // Handle pickups
     if ((pindex = pickmap[mob_pos[PLAYER_MOB]])) {
@@ -1776,6 +1907,13 @@ void inv_animate(void) {
   }
 }
 
+void update_obj1_pal(void) {
+  if (--obj_pal1_timer == 0) {
+    obj_pal1_timer = OBJ1_PAL_TIME;
+    OBP1_REG = obj_pal1[obj_pal1_index = (obj_pal1_index + 1) & 7];
+  }
+}
+
 void fadeout(void) {
   u8 i, j;
   i = 3;
@@ -1806,6 +1944,8 @@ void addmob(MobType type, u8 pos) {
   mob_anim_timer[num_mobs] = 1;
   mob_anim_speed[num_mobs] = mob_type_anim_speed[type];
   mob_pos[num_mobs] = pos;
+  mob_x[num_mobs] = POS_TO_X(pos);
+  mob_y[num_mobs] = POS_TO_Y(pos);
   mob_move_timer[num_mobs] = 0;
   mob_anim_state[num_mobs] = MOB_ANIM_STATE_NONE;
   mob_flip[num_mobs] = 0;
@@ -1821,6 +1961,13 @@ void addmob(MobType type, u8 pos) {
 
 void delmob(u8 index) {
   mobmap[mob_pos[index]] = 0;
+
+  if (num_mobs == key_mob) {
+    key_mob = index + 1;
+  } else if (index + 1 == key_mob) {
+    key_mob = 0;
+  }
+
   --num_mobs;
   if (index != num_mobs) {
     mob_type[index] = mob_type[num_mobs];
@@ -2012,7 +2159,7 @@ void roomgen(void) {
 
   if (dogate) {
     // Pick a random gate map
-    copymap(2 + randint(14));
+    copymap(2 + randint(NUM_GATE_MAPS));
   } else {
     // Start with a completely empty map (all walls)
     memset(tmap, TILE_WALL, sizeof(tmap));
@@ -2163,7 +2310,7 @@ void copymap(u8 index) {
         mobmap[pos] = PLAYER_MOB + 1;
         goto empty;
 
-      case TILE_GOAL:
+      case TILE_GATE:
         // Temporarily change to stairs so the empty spaces behind the gate
         // can be part of the spanning graph created during the carvedoors()
         // step.
@@ -2178,6 +2325,7 @@ void copymap(u8 index) {
 
       case TILE_HEART:
         heartpos = pos;
+        tmap[pos] = TILE_RUG;
         goto empty;
 
       empty:
@@ -2307,7 +2455,7 @@ void digworm(u8 pos) {
     // Continue in the current direction, unless we can't carve. Also randomly
     // change direction after 3 or more steps.
     if (!((valid & dirvalid[dir]) && tempmap[POS_DIR(pos, dir)]) ||
-        ((URAND() & 1) && step > 2)) {
+        (URAND_50_PERCENT() && step > 2)) {
       step = 0;
       num_dirs = 0;
       if ((valid & VALID_L) && tempmap[POS_L(pos)]) { cands[num_dirs++] = 0; }
@@ -2520,7 +2668,7 @@ void startend(void) {
   mobmap[startpos] = PLAYER_MOB + 1;
 
   if (dogate) {
-    tmap[gatepos] = TILE_GOAL;
+    tmap[gatepos] = TILE_GATE;
     if (floor < 9) {
       addpick(PICKUP_TYPE_HEART, heartpos);
     }
@@ -2611,7 +2759,7 @@ void prettywalls(void) {
       if (tile) {
         tile += TILE_WALLSIG_BASE;
       }
-      if (TILE_HAS_CRACKED_VARIANT(tile) && !(URAND() & 7)) {
+      if (TILE_HAS_CRACKED_VARIANT(tile) && URAND_12_5_PERCENT()) {
         tile += TILE_CRACKED_DIFF;
       }
       tmap[pos] = tile;
@@ -2671,7 +2819,7 @@ void chests(void) {
   u8 has_teleporter, room, chest_pos, i, pos, cand0, cand1;
 
   // Teleporter in level if level >= 5 and rnd(5)<1 (20%)
-  has_teleporter = floor >= 5 && URAND() < 51;
+  has_teleporter = floor >= 5 && URAND_20_PERCENT();
 
   // Pick a random room
   room = randint(num_rooms);
@@ -2724,8 +2872,9 @@ void chests(void) {
   }
 
   for (i = 0; i < num_cands; ++i) {
-    addmob(MOB_TYPE_CHEST, cands[i]);
-    // TODO: randomly make some chests heart containers
+    addmob(floor >= 5 && URAND_20_PERCENT() ? MOB_TYPE_HEART_CHEST
+                                            : MOB_TYPE_CHEST,
+           cands[i]);
   }
 }
 
@@ -2767,7 +2916,7 @@ void decoration(void) {
             // fallthrough
 
           case ROOM_KIND_TORCH:
-            if (tile == TILE_EMPTY && (URAND() < 85) && (h & 1) &&
+            if (tile == TILE_EMPTY && URAND_33_PERCENT() && (h & 1) &&
                 IS_FREESTANDING(pos)) {
               if (w == 1) {
                 tmap[pos] = TILE_TORCH_RIGHT;
@@ -2785,7 +2934,7 @@ void decoration(void) {
             }
 
             if (!IS_SMARTMOB(tile, pos) && room + 1 != start_room &&
-                !(URAND() & 3) && no_mob_neighbors(pos) &&
+                URAND_25_PERCENT() && no_mob_neighbors(pos) &&
                 IS_FREESTANDING(pos)) {
               mob = plant_mobs[randint(sizeof(plant_mobs))];
               addmob(mob, pos);
@@ -2798,7 +2947,7 @@ void decoration(void) {
 
         if (kind != ROOM_KIND_PLANT && room + 1 != start_room &&
             tmap[pos] == TILE_EMPTY && !mobmap[pos] && IS_FREESTANDING(pos) &&
-            URAND() < 26) {
+            URAND_10_PERCENT()) {
           tmap[pos] = TILE_SAW1;
           sigwall(pos);
           // TODO: what to do about removing animations on broken saws?
@@ -2858,7 +3007,7 @@ void add_tile_anim(u8 pos, u8 tile) {
 }
 
 void spawnmobs(void) {
-  u8 pos, room, mobs;
+  u8 pos, room, mob, mobs, i;
 
   pos = 0;
   num_cands = 0;
@@ -2885,7 +3034,23 @@ void spawnmobs(void) {
 
   // TODO: pack mobs into avoid rooms
 
-  // TODO: give a mob a key, if this is a gate floor
+  // Give a mob a key, if this is a gate floor
+  if (dogate) {
+    num_cands = 0;
+    for (i = 0; i < num_mobs; ++i) {
+      if (mob_type_key[mob_type[i]]) { ++num_cands; }
+    }
+
+    i = 0;
+    mob = randint(num_cands);
+    while (1) {
+      if (mob_type_key[mob_type[i]] && mob-- == 0) { break; }
+      ++i;
+    }
+    key_mob = i + 1;
+  } else {
+    key_mob = 0;
+  }
 }
 
 u8 no_mob_neighbors(u8 pos) {
