@@ -24,6 +24,14 @@ typedef void (*vfp)(void);
 #define MAX_FLOATS 8   /* For now; we'll probably want more */
 #define MAX_EQUIPS 4
 
+#define BASE_FLOAT 18
+
+#define MSG_REAPER 0
+#define MSG_REAPER_Y 83
+#define MSG_KEY 18
+#define MSG_KEY_Y 80
+#define MSG_LEN 18
+
 // TODO: how big to make these arrays?
 #define TILE_CODE_SIZE 128
 #define MOB_TILE_CODE_SIZE 256
@@ -58,8 +66,10 @@ typedef void (*vfp)(void);
 #define OBJ1_PAL_TIME 8
 #define MOB_FLASH_TIME 20
 #define DEAD_MOB_TIME 10
+#define MSG_TIME 120
 
 #define AI_COOL_TIME 8
+#define REAPER_AWAKENS_STEPS 100
 
 #define PICKUP_SPEED 6
 #define PICKUP_CHARGES 2
@@ -609,7 +619,8 @@ const u8 pick_type_name_tile[] = {
     221, 214, 203, 218, 0,   239, 231, 240,                // SLAP (2)
 };
 
-const u8 pick_type_name_start[] = {0, 0, 0, 8, 16, 24, 35, 44, 53, 61, 69, 79};
+const u8 pick_type_name_start[] = {0,  0,  0,  8,  16, 24, 35,
+                                   44, 53, 61, 69, 79, 87};
 
 const u8 float_diff_y[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -720,6 +731,15 @@ const u8 inventory_down_y[] = {
     106, 104, 101, 98,  94,  91,  86,  82,  77,  71,  64,  57,  49,
 };
 
+const u8 msg_tiles[] = {
+  // "wurstlord awakens"
+  0x5b, 0x5c, 0x5d, 0x5e, 0x5f, 0x60, 0x61, 0x62, 0x63,
+  0x64, 0x64, 0x64, 0x64, 0x64, 0x64, 0x64, 0x64, 0x64,
+  // "one monster holds the key"
+  0x65, 0x66, 0x67, 0x68, 0x5d, 0x69, 0x6a, 0x6b, 0x63,
+  0x6c, 0x6d, 0x6e, 0x6f, 0x70, 0x71, 0x6d, 0x6d, 0x72,
+};
+
 void init(void);
 void do_turn(void);
 void pass_turn(void);
@@ -751,7 +771,8 @@ void vbl_interrupt(void);
 void trigger_step(u8 index);
 
 void addfloat(u8 pos, u8 tile);
-void update_floats(void);
+void update_floats_and_msg(void);
+void showmsg(u8 index, u8 y);
 
 void inv_animate(void);
 
@@ -896,6 +917,8 @@ u8 mob_last_tile_val;   // last tile value in A for mob_tile_code
 u8 float_time[MAX_FLOATS];
 u8 num_floats;
 
+u8 msg_timer;
+
 Turn turn;
 u8 noturn;
 
@@ -912,6 +935,8 @@ u8 equip_charge[MAX_EQUIPS];
 u8 num_keys;
 
 u8 obj_pal1_timer, obj_pal1_index;
+
+u16 steps;
 
 u16 myclock;
 void tim_interrupt(void) { ++myclock; }
@@ -955,7 +980,7 @@ void main(void) {
     do_turn();
     do_animate();
     end_animate();
-    update_floats();
+    update_floats_and_msg();
     update_obj1_pal();
     wait_vbl_done();
   }
@@ -1005,7 +1030,7 @@ void init(void) {
   turn = TURN_PLAYER;
   noturn = 0;
 
-  num_floats = 0;
+  num_floats = BASE_FLOAT;
   num_sprites = 0;
 
   inv_anim_up = 0;
@@ -1027,7 +1052,7 @@ void begin_animate(void) {
   // Initialize to ret so if a VBL occurs while we're setting the animation it
   // won't run off the end
   *mob_tile_code_ptr++ = 0xc9;  // ret
-  num_sprites = MAX_FLOATS;  // Start mob sprites after floats
+  num_sprites = BASE_FLOAT + MAX_FLOATS; // Start mob sprites after floats
 }
 
 void end_animate(void) {
@@ -1045,10 +1070,10 @@ void end_animate(void) {
 
 void hide_float_sprites(void) {
   u8 i;
-  for (i = 0; i < num_floats; ++i) {
+  for (i = BASE_FLOAT; i < num_floats; ++i) {
     hide_sprite(i);
   }
-  num_floats = 0;
+  num_floats = BASE_FLOAT;
 }
 
 void do_turn(void) {
@@ -1086,6 +1111,12 @@ void pass_turn(void) {
 
   case TURN_WEEDS_WAIT:
     turn = TURN_PLAYER;
+    if (floor && steps == REAPER_AWAKENS_STEPS) {
+      ++steps; // Make sure to only spawn reaper once per floor
+      addmob(MOB_TYPE_REAPER, dropspot(startpos));
+      mob_active[num_mobs - 1] = 1;
+      showmsg(MSG_REAPER, MSG_REAPER_Y);
+    }
     break;
   }
 }
@@ -1116,20 +1147,23 @@ void move_player(void) {
         if (IS_WALL_TILE(tile)) {
           if (IS_SPECIAL_TILE(tile)) {
             if (tile == TILE_GATE) {
-              // TODO: Display message if no key
-              if (num_keys > 0) {
+              if (num_keys) {
                 --num_keys;
                 set_tile_during_vbl(newpos,
                                     tmap[newpos] = dtmap[newpos] = TILE_EMPTY);
+                set_digit_tile_during_vbl(INV_KEYS_ADDR, num_keys);
                 mobbump(PLAYER_MOB, dir);
                 sight();
                 goto done;
+              } else {
+                showmsg(MSG_KEY, MSG_KEY_Y);
               }
             }
           }
           // fallthrough to bump below...
         } else {
           mobwalk(PLAYER_MOB, dir);
+          ++steps;
           goto done;
         }
       }
@@ -1333,6 +1367,16 @@ u8 do_mob_ai(u8 index) {
       return 1;
 
     case MOB_AI_REAPER:
+      if (ai_dobump(index)) {
+        return 1;
+      } else {
+        mob_target_pos[index] = mob_pos[PLAYER_MOB];
+        dir = ai_getnextstep(index);
+        if (dir != 255) {
+          mobwalk(index, dir);
+          return 1;
+        }
+      }
       break;
 
     case MOB_AI_ATTACK:
@@ -1885,7 +1929,7 @@ void trigger_step(u8 mob) {
         shadow_OAM[num_floats].x = x;
         shadow_OAM[num_floats].y = y;
         shadow_OAM[num_floats].tile = float_pick_type_tiles[i];
-        float_time[num_floats] = FLOAT_TIME;
+        float_time[num_floats - BASE_FLOAT] = FLOAT_TIME;
         ++num_floats;
         x += 8;
       }
@@ -1914,28 +1958,50 @@ void addfloat(u8 pos, u8 tile) {
   shadow_OAM[num_floats].x = POS_TO_X(pos);
   shadow_OAM[num_floats].y = POS_TO_Y(pos);
   shadow_OAM[num_floats].tile = tile;
-  float_time[num_floats] = FLOAT_TIME;
+  float_time[num_floats - BASE_FLOAT] = FLOAT_TIME;
   ++num_floats;
 }
 
-void update_floats(void) {
-  u8 i;
-  for (i = 0; i < num_floats;) {
-    --float_time[i];
-    if (float_time[i] == 0) {
+void showmsg(u8 index, u8 y) {
+  u8 i, j;
+  u8* p = (u8*)shadow_OAM;
+  for (j = 0; j < 2; ++j) {
+    for (i = 0; i < 9; ++i) {
+      *p++ = y;
+      *p++ = 52 + (i << 3);
+      *p++ = msg_tiles[index++];
+      *p++ = 0;
+    }
+    y += 8;
+  }
+  msg_timer = MSG_TIME;
+}
+
+void update_floats_and_msg(void) {
+  u8 i, j;
+  if (--msg_timer == 0) {
+    for (i = 0; i < MSG_LEN; ++i) {
+      hide_sprite(i);
+    }
+  }
+
+  for (i = BASE_FLOAT; i < num_floats;) {
+    j = i - BASE_FLOAT;
+    --float_time[j];
+    if (float_time[j] == 0) {
       --num_floats;
       if (num_floats) {
         shadow_OAM[i].x = shadow_OAM[num_floats].x;
         shadow_OAM[i].y = shadow_OAM[num_floats].y;
         shadow_OAM[i].tile = shadow_OAM[num_floats].tile;
-        float_time[i] = float_time[num_floats];
+        float_time[j] = float_time[num_floats - BASE_FLOAT];
         hide_sprite(num_floats);
       } else {
         hide_sprite(i);
       }
       continue;
     } else {
-      shadow_OAM[i].y -= float_diff_y[float_time[i]];
+      shadow_OAM[i].y -= float_diff_y[float_time[j]];
     }
     ++i;
   }
@@ -2004,10 +2070,12 @@ void addmob(MobType type, u8 pos) {
 void delmob(u8 index) {
   mobmap[mob_pos[index]] = 0;
 
-  if (num_mobs == key_mob) {
-    key_mob = index + 1;
-  } else if (index + 1 == key_mob) {
+  // If this mob was the key mob, then there is no more key mob.
+  if (index + 1 == key_mob) {
     key_mob = 0;
+  } else if (num_mobs == key_mob) {
+    // If the last mob was the key mob, update it to index
+    key_mob = index + 1;
   }
 
   --num_mobs;
@@ -2135,6 +2203,8 @@ void mapgen(void) {
   u8 fog;
   num_picks = 0;
   num_mobs = 1;
+  num_dead_mobs = 0;
+  steps = 0;
   mapgeninit();
   begin_tile_anim();
   if (floor == 0) {
