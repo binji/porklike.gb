@@ -884,12 +884,12 @@ u8 num_picks;
 
 u8 tile_code[TILE_CODE_SIZE];         // code for animating tiles
 u8 mob_tile_code[MOB_TILE_CODE_SIZE]; // code for animating mobs
-u8 tile_code_end;                     // next available index in tile_code
+u8 *tile_code_ptr;                    // next available index in tile_code
 u16 last_tile_addr;                   // last tile address in HL for tile_code
 u8 last_tile_val;                     // last tile value in A for tile_code
 u8 tile_timer; // timer for animating tiles (every TILE_ANIM_SPEED frames)
 u8 tile_inc;   // either 0 or TILE_ANIM_FRAME_DIFF, for two frames of animation
-u8 mob_tile_code_end;   // next available index in mob_tile_code
+u8 *mob_tile_code_ptr;  // next available index in mob_tile_code
 u16 mob_last_tile_addr; // last tile address in HL for mob_tile_code
 u8 mob_last_tile_val;   // last tile value in A for mob_tile_code
 
@@ -993,6 +993,7 @@ void init(void) {
 
   num_picks = 0;
   num_mobs = 0;
+  num_dead_mobs = 0;
   addmob(MOB_TYPE_PLAYER, 0);
 
   doupdatemap = 0;
@@ -1022,10 +1023,10 @@ void init(void) {
 void begin_animate(void) {
   mob_last_tile_addr = 0;
   mob_last_tile_val = 0xff;
-  mob_tile_code_end = 1;
+  mob_tile_code_ptr = mob_tile_code;
   // Initialize to ret so if a VBL occurs while we're setting the animation it
   // won't run off the end
-  mob_tile_code[0] = 0xc9;  // ret
+  *mob_tile_code_ptr++ = 0xc9;  // ret
   num_sprites = MAX_FLOATS;  // Start mob sprites after floats
 }
 
@@ -1037,9 +1038,9 @@ void end_animate(void) {
   }
   last_num_sprites = num_sprites;
 
-  mob_tile_code[mob_tile_code_end++] = 0xf1; // pop af
-  mob_tile_code[mob_tile_code_end++] = 0xc9; // ret
-  mob_tile_code[0] = 0xf5; // push af
+  *mob_tile_code_ptr++ = 0xf1; // pop af
+  *mob_tile_code_ptr++ = 0xc9; // ret
+  mob_tile_code[0] = 0xf5;     // push af
 }
 
 void hide_float_sprites(void) {
@@ -1773,8 +1774,8 @@ void do_animate(void) {
 
 void set_tile_during_vbl(u8 pos, u8 tile) {
   u16 addr = POS_TO_ADDR(pos);
-  u8 *ptr = mob_tile_code + mob_tile_code_end;
-  if (mob_tile_code_end == 1 || (addr >> 8) != (mob_last_tile_addr >> 8)) {
+  u8 *ptr = mob_tile_code_ptr;
+  if ((addr >> 8) != (mob_last_tile_addr >> 8)) {
     *ptr++ = 0x21; // ld hl, addr
     *ptr++ = (u8)addr;
     *ptr++ = addr >> 8;
@@ -1789,11 +1790,11 @@ void set_tile_during_vbl(u8 pos, u8 tile) {
     mob_last_tile_val = tile;
   }
   *ptr++ = 0x77; // ld (hl), a
-  mob_tile_code_end = ptr - mob_tile_code;
+  mob_tile_code_ptr = ptr;
 }
 
 void set_digit_tile_during_vbl(u16 addr, u8 value) {
-  u8 *ptr = mob_tile_code + mob_tile_code_end;
+  u8 *ptr = mob_tile_code_ptr;
   *ptr++ = 0x21; // ld hl, addr
   *ptr++ = addr & 0xff;
   *ptr++ = addr >> 8;
@@ -1801,11 +1802,11 @@ void set_digit_tile_during_vbl(u16 addr, u8 value) {
   *ptr++ = mob_last_tile_val = TILE_0 + value;
   *ptr++ = 0x77; // ld (hl), a
   mob_last_tile_addr = INV_HP_ADDR;
-  mob_tile_code_end = ptr - mob_tile_code;
+  mob_tile_code_ptr = ptr;
 }
 
 void set_tile_range_during_vbl(u16 addr, u8* src, u8 len) {
-  u8 *dst = mob_tile_code + mob_tile_code_end;
+  u8 *dst = mob_tile_code_ptr;
   *dst++ = 0x21; // ld hl, addr
   *dst++ = addr & 0xff;
   *dst++ = addr >> 8;
@@ -1815,7 +1816,7 @@ void set_tile_range_during_vbl(u16 addr, u8* src, u8 len) {
     *dst++ = 0x22; // ld (hl+), a
   } while(--len);
   mob_last_tile_addr = *--src;
-  mob_tile_code_end = dst - mob_tile_code;
+  mob_tile_code_ptr = dst;
 }
 
 void trigger_step(u8 mob) {
@@ -3023,22 +3024,22 @@ void begin_tile_anim(void) {
   tile_code[3] = (u8)addr;
   tile_code[4] = addr >> 8;
   tile_code[5] = 0x47; // ld b, a
-  tile_code_end = 6;
+  tile_code_ptr = tile_code + 6;
   last_tile_addr = 0;
   last_tile_val = 0;
 }
 
 void end_tile_anim(void) {
-  u8 *ptr = tile_code + tile_code_end;
+  u8 *ptr = tile_code_ptr;
   *ptr++ = 0xc1; // pop bc
   *ptr++ = 0xf1; // pop af
   *ptr = 0xc9;   // ret
 }
 
 void add_tile_anim(u8 pos, u8 tile) {
-  u8* ptr = tile_code + tile_code_end;
+  u8* ptr = tile_code_ptr;
   u16 addr = POS_TO_ADDR(pos);
-  if (tile_code_end == 6 || (addr >> 8) != (last_tile_addr >> 8)) {
+  if ((addr >> 8) != (last_tile_addr >> 8)) {
     *ptr++ = 0x21; // ld hl, NNNN
     *ptr++ = (u8)addr;
     *ptr++ = addr >> 8;
@@ -3054,7 +3055,7 @@ void add_tile_anim(u8 pos, u8 tile) {
     last_tile_val = tile;
   }
   *ptr++ = 0x77; // ld (hl), a
-  tile_code_end = ptr - tile_code;
+  tile_code_ptr = ptr;
 }
 
 void spawnmobs(void) {
