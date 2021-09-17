@@ -18,6 +18,7 @@ typedef void (*vfp)(void);
 #define MAX_ROOMS 4
 #define MAX_VOIDS 10 /* XXX Figure out what this should be */
 #define MAX_CANDS 256
+#define MAX_DEAD_MOBS 4
 #define MAX_MOBS 32    /* XXX Figure out what this should be */
 #define MAX_PICKUPS 16 /* XXX Figure out what this should be */
 #define MAX_FLOATS 8   /* For now; we'll probably want more */
@@ -43,6 +44,7 @@ typedef void (*vfp)(void);
 #define TILE_ANIM_SPEED 8
 #define TILE_ANIM_FRAME_DIFF 16
 #define TILE_FLIP_DIFF 0x21
+#define TILE_MOB_FLASH_DIFF 0x46
 
 #define FADE_TIME 8
 #define INV_ANIM_TIME 43
@@ -54,6 +56,8 @@ typedef void (*vfp)(void);
 #define FLOAT_TIME 70
 #define QUEEN_CHARGE_TIME 2
 #define OBJ1_PAL_TIME 8
+#define MOB_FLASH_TIME 20
+#define DEAD_MOB_TIME 10
 
 #define AI_COOL_TIME 8
 
@@ -248,14 +252,14 @@ const u8 fadepal[] = {
 };
 
 const u8 obj_pal1[] = {
-    0b00111001, // 0:LightGray 1:DarkGray 2:Black 3:White
-    0b00111001, // 0:LightGray 1:DarkGray 2:Black 3:White
-    0b00111001, // 0:LightGray 1:DarkGray 2:Black 3:White
-    0b00111001, // 0:LightGray 1:DarkGray 2:Black 3:White
-    0b00111001, // 0:LightGray 1:DarkGray 2:Black 3:White
-    0b01111001, // 0:LightGray 1:DarkGray 2:Black 3:White
-    0b10111001, // 0:LightGray 1:DarkGray 2:Black 3:White
-    0b01111001, // 0:LightGray 1:DarkGray 2:Black 3:White
+    0b00110101, // 0:LightGray 1:LightGray 2:Black 3:White
+    0b00110101, // 0:LightGray 1:LightGray 2:Black 3:White
+    0b00110101, // 0:LightGray 1:LightGray 2:Black 3:White
+    0b00110101, // 0:LightGray 1:LightGray 2:Black 3:White
+    0b00110101, // 0:LightGray 1:LightGray 2:Black 3:White
+    0b01110101, // 0:LightGray 1:LightGray 2:Black 3:LightGray
+    0b10110101, // 0:LightGray 1:LightGray 2:Black 3:DarkGray
+    0b01110101, // 0:LightGray 1:LightGray 2:Black 3:LightGray
 };
 
 const u8 dirx[] = {0xff, 1, 0, 0};       // L R U D
@@ -580,29 +584,29 @@ const u8 pick_type_anim_start[] = {
 const u8 pick_type_sprite_tile[] = {
     0,    // PICKUP_TYPE_HEART,
     0,    // PICKUP_TYPE_KEY,
-    0x14, // PICKUP_TYPE_JUMP,
-    0x15, // PICKUP_TYPE_BOLT,
-    0x16, // PICKUP_TYPE_PUSH,
-    0x17, // PICKUP_TYPE_GRAPPLE,
-    0x18, // PICKUP_TYPE_SPEAR,
-    0x19, // PICKUP_TYPE_SMASH,
-    0x1a, // PICKUP_TYPE_HOOK,
-    0x1b, // PICKUP_TYPE_SPIN,
-    0x1c, // PICKUP_TYPE_SUPLEX,
-    0x1d, // PICKUP_TYPE_SLAP,
+    0xf1, // PICKUP_TYPE_JUMP,
+    0xf2, // PICKUP_TYPE_BOLT,
+    0xf3, // PICKUP_TYPE_PUSH,
+    0xf4, // PICKUP_TYPE_GRAPPLE,
+    0xf5, // PICKUP_TYPE_SPEAR,
+    0xf6, // PICKUP_TYPE_SMASH,
+    0xf7, // PICKUP_TYPE_HOOK,
+    0xf8, // PICKUP_TYPE_SPIN,
+    0xf9, // PICKUP_TYPE_SUPLEX,
+    0xfa, // PICKUP_TYPE_SLAP,
 };
 
 const u8 pick_type_name_tile[] = {
-    212, 223, 215, 218, 255, 239, 231, 240,                // JUMP (2)
-    204, 217, 214, 222, 255, 239, 231, 240,                // BOLT (2)
-    218, 223, 221, 210, 255, 239, 231, 240,                // PUSH (2)
-    209, 220, 203, 218, 218, 214, 207, 255, 239, 231, 240, // GRAPPLE (2)
-    221, 218, 207, 203, 220, 255, 239, 231, 240,           // SPEAR (2)
-    221, 215, 203, 221, 210, 255, 239, 231, 240,           // SMASH (2)
-    210, 217, 217, 213, 255, 239, 231, 240,                // HOOK (2)
-    221, 218, 211, 216, 255, 239, 231, 240,                // SPIN (2)
-    221, 223, 218, 214, 207, 226, 255, 239, 231, 240,      // SUPLEX (2)
-    221, 214, 203, 218, 255, 239, 231, 240,                // SLAP (2)
+    212, 223, 215, 218, 0,   239, 231, 240,                // JUMP (2)
+    204, 217, 214, 222, 0,   239, 231, 240,                // BOLT (2)
+    218, 223, 221, 210, 0,   239, 231, 240,                // PUSH (2)
+    209, 220, 203, 218, 218, 214, 207, 0,   239, 231, 240, // GRAPPLE (2)
+    221, 218, 207, 203, 220, 0,   239, 231, 240,           // SPEAR (2)
+    221, 215, 203, 221, 210, 0,   239, 231, 240,           // SMASH (2)
+    210, 217, 217, 213, 0,   239, 231, 240,                // HOOK (2)
+    221, 218, 211, 216, 0,   239, 231, 240,                // SPIN (2)
+    221, 223, 218, 214, 207, 226, 0,   239, 231, 240,      // SUPLEX (2)
+    221, 214, 203, 218, 0,   239, 231, 240,                // SLAP (2)
 };
 
 const u8 pick_type_name_start[] = {0, 0, 0, 8, 16, 24, 35, 44, 53, 61, 69, 79};
@@ -612,22 +616,22 @@ const u8 float_diff_y[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0,
                            1, 0, 0, 0, 1, 0, 0, 1, 0, 1, 0, 1, 1, 1, 1, 1};
 
-const u8 float_dmg[] = {0, 0x1e, 0x2e, 0x3d};
+const u8 float_dmg[] = {0, 0x14, 0x15, 0x16};
 
 const u8 float_pick_type_tiles[] = {
-    0x1f,                   // PICKUP_TYPE_HEART,
-    0x3d, 0x3e,             // PICKUP_TYPE_KEY,
-    0x20, 0x21, 0x22,       // PICKUP_TYPE_JUMP,
-    0x23, 0x24, 0x25,       // PICKUP_TYPE_BOLT,
-    0x26, 0x27, 0x28,       // PICKUP_TYPE_PUSH,
-    0x29, 0x2a, 0x2b, 0x2c, // PICKUP_TYPE_GRAPPLE,
-    0x2f, 0x30, 0x31,       // PICKUP_TYPE_SPEAR,
-    0x32, 0x33, 0x34,       // PICKUP_TYPE_SMASH,
-    0x35, 0x36, 0x28,       // PICKUP_TYPE_HOOK,
-    0x2f, 0x37, 0x38,       // PICKUP_TYPE_SPIN,
-    0x3a, 0x2b, 0x3b, 0x28, // PICKUP_TYPE_SUPLEX,
-    0x3c, 0x2a, 0x22,       // PICKUP_TYPE_SLAP,
-    0x3f, 0x40, 0x41,       // PICKUP_TYPE_FULL
+    0x17,                   // PICKUP_TYPE_HEART,
+    0x32, 0x33,             // PICKUP_TYPE_KEY,
+    0x18, 0x19, 0x1a,       // PICKUP_TYPE_JUMP,
+    0x1b, 0x1c, 0x1d,       // PICKUP_TYPE_BOLT,
+    0x1e, 0x1f, 0x20,       // PICKUP_TYPE_PUSH,
+    0x21, 0x22, 0x23, 0x24, // PICKUP_TYPE_GRAPPLE,
+    0x25, 0x26, 0x27,       // PICKUP_TYPE_SPEAR,
+    0x28, 0x29, 0x2a,       // PICKUP_TYPE_SMASH,
+    0x2b, 0x2c, 0x20,       // PICKUP_TYPE_HOOK,
+    0x25, 0x2d, 0x2e,       // PICKUP_TYPE_SPIN,
+    0x2f, 0x23, 0x30, 0x20, // PICKUP_TYPE_SUPLEX,
+    0x31, 0x22, 0x1a,       // PICKUP_TYPE_SLAP,
+    0x34, 0x35, 0x36,       // PICKUP_TYPE_FULL
 };
 
 const u8 float_pick_type_start[] = {
@@ -690,21 +694,19 @@ const u8 drop_diff[] = {
 };
 
 const u8 inventory_map[] = {
-    241, 242, 242, 243, 242, 242, 243, 242, 242, 242, 242, 242, 242, 242, 242,
-    244, 245, 228, 234, 246, 197, 229, 246, 208, 214, 217, 217, 220, 255, 229,
-    255, 247, 248, 249, 249, 250, 249, 249, 250, 249, 249, 249, 249, 249, 249,
-    249, 249, 251, 245, 255, 255, 219, 219, 219, 255, 255, 255, 255, 255, 255,
-    255, 255, 255, 247, 245, 255, 255, 219, 219, 219, 255, 255, 255, 255, 255,
-    255, 255, 255, 255, 247, 245, 255, 255, 219, 219, 219, 255, 255, 255, 255,
-    255, 255, 255, 255, 255, 247, 245, 255, 255, 219, 219, 219, 255, 255, 255,
-    255, 255, 255, 255, 255, 255, 247, 248, 249, 249, 249, 249, 249, 249, 249,
-    249, 249, 249, 249, 249, 249, 249, 251, 245, 255, 255, 255, 255, 255, 255,
-    255, 255, 255, 255, 255, 255, 255, 255, 247, 245, 255, 255, 255, 255, 255,
-    255, 255, 255, 255, 255, 255, 255, 255, 255, 247, 245, 255, 255, 255, 255,
-    255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 247, 245, 255, 255, 255,
-    255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 247, 252, 253, 253,
-    253, 253, 253, 253, 253, 253, 253, 253, 253, 253, 253, 253, 254,
-};
+    112, 113, 113, 114, 113, 113, 114, 113, 113, 113, 113, 113, 113, 113, 113, 115,
+    116, 228, 234, 117, 197, 229, 117, 208, 214, 217, 217, 220, 0,   229, 0,   118,
+    119, 120, 120, 121, 120, 120, 121, 120, 120, 120, 120, 120, 120, 120, 120, 122,
+    116, 0,   0,   219, 219, 219, 0,   0,   0,   0,   0,   0,   0,   0,   0,   118,
+    116, 0,   0,   219, 219, 219, 0,   0,   0,   0,   0,   0,   0,   0,   0,   118,
+    116, 0,   0,   219, 219, 219, 0,   0,   0,   0,   0,   0,   0,   0,   0,   118,
+    116, 0,   0,   219, 219, 219, 0,   0,   0,   0,   0,   0,   0,   0,   0,   118,
+    119, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 122,
+    116, 0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   118,
+    116, 0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   118,
+    116, 0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   118,
+    116, 0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   118,
+    123, 124, 124, 124, 124, 124, 124, 124, 124, 124, 124, 124, 124, 124, 124, 125};
 
 const u8 inventory_up_y[] = {
     40, 41, 41, 41, 41, 41, 41, 41, 42, 42, 42,  43,  43,  43, 44,
@@ -764,6 +766,8 @@ void delpick(u8 index);
 void droppick(PickupType type, u8 pos);
 void droppick_rnd(u8 pos);
 u8 dropspot(u8 pos);
+
+void adddeadmob(u8 index);
 
 void initdtmap(void);
 
@@ -858,8 +862,16 @@ u8 mob_ai_cool[MAX_MOBS]; // cooldown time while mob is searching for player
 u8 mob_active[MAX_MOBS];  // 0=inactive 1=active
 u8 mob_charge[MAX_MOBS];  // only used by queen
 u8 mob_hp[MAX_MOBS];
+u8 mob_flash[MAX_MOBS];
 u8 num_mobs;
 u8 key_mob;
+
+u8 dmob_x[MAX_DEAD_MOBS];
+u8 dmob_y[MAX_DEAD_MOBS];
+u8 dmob_tile[MAX_DEAD_MOBS];
+u8 dmob_prop[MAX_DEAD_MOBS];
+u8 dmob_timer[MAX_DEAD_MOBS];
+u8 num_dead_mobs;
 
 PickupType pick_type[MAX_PICKUPS];
 u8 pick_pos[MAX_PICKUPS];
@@ -1249,6 +1261,7 @@ void hitmob(u8 index, u8 dmg) {
     addfloat(pos, float_dmg[dmg]);
 
     if (mob_hp[index] <= dmg) {
+      adddeadmob(index);
       // drop key, if any.
       // NOTE: This code is subtle; delmob() will update the
       // key_mob, and droppick() must be called after delmob() so the pickup
@@ -1262,6 +1275,7 @@ void hitmob(u8 index, u8 dmg) {
       // TODO: restore to 5hp if reaper killed, and drop key
       set_tile_during_vbl(pos, dtmap[pos]);
     } else {
+      mob_flash[index] = MOB_FLASH_TIME;
       mob_hp[index] -= dmg;
       if (index == PLAYER_MOB) {
         set_digit_tile_during_vbl(INV_HP_ADDR, mob_hp[PLAYER_MOB]);
@@ -1588,7 +1602,7 @@ void calcdist_ai(u8 from, u8 to) {
 }
 
 void do_animate(void) {
-  u8 i, dosprite, dotile, sprite, frame, animdone;
+  u8 i, dosprite, dotile, sprite, prop, frame, animdone;
 
   animdone = 1;
 
@@ -1669,21 +1683,30 @@ void do_animate(void) {
       dotile = 1;
     }
 
-    if (i + 1 == key_mob || mob_move_timer[i]) {
+    if (i + 1 == key_mob || mob_move_timer[i] || mob_flash[i]) {
       dosprite = 1;
     }
 
     if (dotile || dosprite) {
       frame = mob_type_anim_frames[mob_anim_frame[i]];
-      if (mob_flip[i]) {
-        frame += TILE_FLIP_DIFF;
-      }
 
       if (dosprite) {
+        prop = mob_flip[i] ? S_FLIPX : 0;
         move_sprite(num_sprites, mob_x[i], mob_y[i]);
-        set_sprite_tile(num_sprites, frame);
-        set_sprite_prop(num_sprites, i + 1 == key_mob ? S_PALETTE : 0);
+        if (mob_flash[i]) {
+          set_sprite_tile(num_sprites, frame - TILE_MOB_FLASH_DIFF);
+          set_sprite_prop(num_sprites, S_PALETTE | prop);
+          --mob_flash[i];
+        } else {
+          set_sprite_tile(num_sprites, frame);
+          set_sprite_prop(num_sprites,
+                          prop | (i + 1 == key_mob ? S_PALETTE : 0));
+        }
         ++num_sprites;
+      }
+
+      if (mob_flip[i]) {
+        frame += TILE_FLIP_DIFF;
       }
 
       if (mob_move_timer[i]) {
@@ -1722,6 +1745,24 @@ void do_animate(void) {
       } else if (dotile) {
         set_tile_during_vbl(mob_pos[i], frame);
       }
+    }
+  }
+
+  for (i = 0; i < num_dead_mobs;) {
+    if (--dmob_timer[i] == 0) {
+      --num_dead_mobs;
+      if (i != num_dead_mobs) {
+        dmob_x[i] = dmob_x[num_dead_mobs];
+        dmob_y[i] = dmob_y[num_dead_mobs];
+        dmob_tile[i] = dmob_tile[num_dead_mobs];
+        dmob_prop[i] = dmob_prop[num_dead_mobs];
+      }
+    } else {
+      move_sprite(num_sprites, dmob_x[i], dmob_y[i]);
+      set_sprite_tile(num_sprites, dmob_tile[i]);
+      set_sprite_prop(num_sprites, dmob_prop[i]);
+      ++num_sprites;
+      ++i;
     }
   }
 
@@ -2070,6 +2111,16 @@ void droppick(PickupType type, u8 pos) {
 
 void droppick_rnd(u8 pos) {
   droppick(randint(10) + 2, pos);
+}
+
+void adddeadmob(u8 index) {
+  dmob_x[num_dead_mobs] = mob_x[index];
+  dmob_y[num_dead_mobs] = mob_y[index];
+  dmob_tile[num_dead_mobs] =
+      mob_type_anim_frames[mob_anim_frame[index]] - TILE_MOB_FLASH_DIFF;
+  dmob_prop[num_dead_mobs] = S_PALETTE | (mob_flip[index] ? S_FLIPX : 0);
+  dmob_timer[num_dead_mobs] = DEAD_MOB_TIME;
+  ++num_dead_mobs;
 }
 
 void initdtmap(void) {
