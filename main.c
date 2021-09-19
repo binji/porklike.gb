@@ -49,29 +49,36 @@ typedef void (*vfp)(void);
 #define INV_FLOOR_ADDR 0x9c2d
 #define INV_EQUIP_ADDR 0x9c63
 
-#define TILE_ANIM_SPEED 8
+#define TILE_ANIM_FRAMES 8
 #define TILE_ANIM_FRAME_DIFF 16
 #define TILE_FLIP_DIFF 0x21
 #define TILE_MOB_FLASH_DIFF 0x46
 
-#define FADE_TIME 8
-#define INV_ANIM_TIME 43
+#define FADE_FRAMES 8
+#define INV_ANIM_FRAMES 43
 
-#define WALK_TIME 8
-#define BUMP_TIME 4
-#define MOB_HOP_TIME 8
-#define PICK_HOP_TIME 8
-#define FLOAT_TIME 70
-#define QUEEN_CHARGE_TIME 2
-#define OBJ1_PAL_TIME 8
-#define MOB_FLASH_TIME 20
-#define DEAD_MOB_TIME 10
-#define MSG_TIME 120
+#define WALK_FRAMES 8
+#define BUMP_FRAMES 4
+#define MOB_HOP_FRAMES 8
+#define PICK_HOP_FRAMES 8
+#define FLOAT_FRAMES 70
+#define OBJ1_PAL_FRAMES 8
+#define MOB_FLASH_FRAMES 20
+#define DEAD_MOB_FRAMES 10
+#define MSG_FRAMES 120
 
-#define AI_COOL_TIME 8
+#define QUEEN_CHARGE_MOVES 2
+#define AI_COOL_MOVES 8
+#define RECOVER_MOVES 30
+
 #define REAPER_AWAKENS_STEPS 100
 
-#define PICKUP_SPEED 6
+#define SIGHT_DIST_BLIND 1
+#define SIGHT_DIST_DEFAULT 4
+
+#define FLOAT_BLIND_X_OFFSET 0xfb
+
+#define PICKUP_FRAMES 6
 #define PICKUP_CHARGES 2
 
 #define IS_WALL_TILE(tile) (flags_bin[tile] & 1)
@@ -167,6 +174,8 @@ typedef void (*vfp)(void);
 
 #define TILE_WALLSIG_BASE 0xf
 #define TILE_CRACKED_DIFF 0x34
+
+#define TILE_BLIND 0x37
 
 #define TILE_0 0xe5
 #define TILE_1 0xe6
@@ -759,6 +768,7 @@ u8 ai_tcheck(u8 index);
 u8 ai_getnextstep(u8 index);
 u8 ai_getnextstep_rev(u8 index);
 void sight(void);
+void blind(void);
 void calcdist_ai(u8 from, u8 to);
 void do_animate(void);
 void end_animate(void);
@@ -829,16 +839,16 @@ u8 ds_find(u8 id);
 u8 getpos(u8 cand);
 u8 randint(u8 mx);
 
-Map tmap;     // Tile map (everything unfogged)
-Map dtmap;    // Display tile map (w/ fogged tiles)
-Map roommap;  // Room/void map
-Map distmap;  // Distance map
-Map mobmap;   // Mob map
-Map pickmap;  // Pickup map
-Map sigmap;   // Signature map (tracks neighbors) **only used during mapgen
-Map tempmap;  // Temp map (used for carving)      **only used during mapgen
-Map sightmap; // Sight from player
-Map fogmap;   // Tiles player hasn't seen
+Map tmap;        // Tile map (everything unfogged)
+Map dtmap;       // Display tile map (w/ fogged tiles)
+Map roommap;     // Room/void map
+Map distmap;     // Distance map
+Map mobmap;      // Mob map
+Map pickmap;     // Pickup map
+Map sigmap;      // Signature map (tracks neighbors) **only used during mapgen
+Map tempmap;     // Temp map (used for carving)      **only used during mapgen
+Map mobsightmap; // Always checks 4 steps from player
+Map fogmap;      // Tiles player hasn't seen
 
 // The following data structures is used for rooms as well as union-find
 // algorithm; see https://en.wikipedia.org/wiki/Disjoint-set_data_structure
@@ -908,14 +918,14 @@ u8 mob_tile_code[MOB_TILE_CODE_SIZE]; // code for animating mobs
 u8 *tile_code_ptr;                    // next available index in tile_code
 u16 last_tile_addr;                   // last tile address in HL for tile_code
 u8 last_tile_val;                     // last tile value in A for tile_code
-u8 tile_timer; // timer for animating tiles (every TILE_ANIM_SPEED frames)
+u8 tile_timer; // timer for animating tiles (every TILE_ANIM_FRAMES frames)
 u8 tile_inc;   // either 0 or TILE_ANIM_FRAME_DIFF, for two frames of animation
 u8 *mob_tile_code_ptr;  // next available index in mob_tile_code
 u16 mob_last_tile_addr; // last tile address in HL for mob_tile_code
 u8 mob_last_tile_val;   // last tile value in A for mob_tile_code
 
 u8 float_time[MAX_FLOATS];
-u8 num_floats;
+u8 next_float;
 
 u8 msg_timer;
 
@@ -924,7 +934,7 @@ u8 noturn;
 
 u8 joy;
 
-u8 doupdatemap, donextlevel;
+u8 doupdatemap, donextlevel, doblind;
 u8 num_sprites, last_num_sprites;
 
 u8 inv_anim_up;
@@ -933,10 +943,10 @@ u8 inv_anim_timer;
 u8 equip_type[MAX_EQUIPS];
 u8 equip_charge[MAX_EQUIPS];
 u8 num_keys;
+u8 recover; // how long until recovering from blind
+u16 steps;
 
 u8 obj_pal1_timer, obj_pal1_index;
-
-u16 steps;
 
 u16 myclock;
 void tim_interrupt(void) { ++myclock; }
@@ -994,7 +1004,7 @@ void init(void) {
 
   // 0:LightGray 1:DarkGray 2:Black 3:White
   BGP_REG = OBP0_REG = OBP1_REG = fadepal[0];
-  obj_pal1_timer = OBJ1_PAL_TIME;
+  obj_pal1_timer = OBJ1_PAL_FRAMES;
   obj_pal1_index = 0;
 
   add_TIM(tim_interrupt);
@@ -1004,7 +1014,7 @@ void init(void) {
 
   enable_interrupts();
 
-  floor = 0;
+  floor = 4;
   initrand(0x4321);  // TODO: seed with DIV on button press
 
   set_sprite_data(0, SPRITES_TILES, sprites_bin);
@@ -1023,6 +1033,7 @@ void init(void) {
 
   doupdatemap = 0;
   donextlevel = 0;
+  doblind = 0;
 
   floor_tile[0] = TILE_0;
   floor_tile[1] = 0;
@@ -1030,7 +1041,7 @@ void init(void) {
   turn = TURN_PLAYER;
   noturn = 0;
 
-  num_floats = BASE_FLOAT;
+  next_float = BASE_FLOAT;
   num_sprites = 0;
 
   inv_anim_up = 0;
@@ -1040,7 +1051,7 @@ void init(void) {
   equip_charge[0] = equip_charge[1] = equip_charge[2] = equip_charge[3] = 0;
 
   tile_inc = 0;
-  tile_timer = TILE_ANIM_SPEED;
+  tile_timer = TILE_ANIM_FRAMES;
   tile_code[0] = mob_tile_code[0] = 0xc9; // ret
   add_VBL(vbl_interrupt);
 }
@@ -1063,17 +1074,22 @@ void end_animate(void) {
   }
   last_num_sprites = num_sprites;
 
-  *mob_tile_code_ptr++ = 0xf1; // pop af
-  *mob_tile_code_ptr++ = 0xc9; // ret
-  mob_tile_code[0] = 0xf5;     // push af
+  // When blinded, don't update any mob animations
+  if (doblind) {
+    doblind = 0;
+  } else {
+    *mob_tile_code_ptr++ = 0xf1; // pop af
+    *mob_tile_code_ptr++ = 0xc9; // ret
+    mob_tile_code[0] = 0xf5;     // push af
+  }
 }
 
 void hide_float_sprites(void) {
   u8 i;
-  for (i = BASE_FLOAT; i < num_floats; ++i) {
+  for (i = BASE_FLOAT; i < next_float; ++i) {
     hide_sprite(i);
   }
-  num_floats = BASE_FLOAT;
+  next_float = BASE_FLOAT;
 }
 
 void do_turn(void) {
@@ -1117,6 +1133,9 @@ void pass_turn(void) {
       mob_active[num_mobs - 1] = 1;
       showmsg(MSG_REAPER, MSG_REAPER_Y);
     }
+    if (recover && --recover == 0) {
+      sight();
+    }
     break;
   }
 }
@@ -1141,6 +1160,9 @@ void move_player(void) {
       if (IS_MOB(newpos)) {
         mobbump(PLAYER_MOB, dir);
         hitmob(mobmap[newpos] - 1, 1);
+        if (mobmap[newpos] == MOB_TYPE_SCORPION + 1 && URAND_50_PERCENT()) {
+          blind();
+        }
         goto done;
       } else if (validmap[pos] & dirvalid[dir]) {
         tile = tmap[newpos];
@@ -1176,7 +1198,7 @@ void move_player(void) {
     }
 
     if ((joy & J_B) && !inv_anim_timer) {
-      inv_anim_timer = INV_ANIM_TIME;
+      inv_anim_timer = INV_ANIM_FRAMES;
       inv_anim_up ^= 1;
     }
   }
@@ -1200,7 +1222,7 @@ void mobwalk(u8 index, u8 dir) {
   mob_dy[index] = diry[dir];
   set_tile_during_vbl(pos, dtmap[pos]);
 
-  mob_move_timer[index] = WALK_TIME;
+  mob_move_timer[index] = WALK_FRAMES;
   mob_anim_state[index] = MOB_ANIM_STATE_WALK;
   mob_pos[index] = newpos = POS_DIR(pos, dir);
   mob_anim_speed[index] = mob_anim_timer[index] = 3;
@@ -1216,7 +1238,7 @@ void mobbump(u8 index, u8 dir) {
   mob_dy[index] = diry[dir];
   set_tile_during_vbl(pos, dtmap[pos]);
 
-  mob_move_timer[index] = BUMP_TIME;
+  mob_move_timer[index] = BUMP_FRAMES;
   mob_anim_state[index] = MOB_ANIM_STATE_BUMP1;
 }
 
@@ -1231,7 +1253,7 @@ void mobhop(u8 index, u8 newpos) {
   mob_dx[index] = (s8)(newx - oldx) >> 3;
   mob_dy[index] = (s8)(newy - oldy) >> 3;
 
-  mob_move_timer[index] = MOB_HOP_TIME;
+  mob_move_timer[index] = MOB_HOP_FRAMES;
   mob_anim_state[index] = MOB_ANIM_STATE_HOP4;
   mob_pos[index] = newpos;
   mobmap[pos] = 0;
@@ -1249,7 +1271,7 @@ void pickhop(u8 index, u8 newpos) {
   pick_dx[index] = (s8)(newx - oldx) >> 3;
   pick_dy[index] = (s8)(newy - oldy) >> 3;
 
-  pick_move_timer[index] = PICK_HOP_TIME;
+  pick_move_timer[index] = PICK_HOP_FRAMES;
   pick_pos[index] = newpos;
   pickmap[pos] = 0;
   pickmap[newpos] = index + 1;
@@ -1310,7 +1332,7 @@ void hitmob(u8 index, u8 dmg) {
       // TODO: restore to 5hp if reaper killed, and drop key
       set_tile_during_vbl(pos, dtmap[pos]);
     } else {
-      mob_flash[index] = MOB_FLASH_TIME;
+      mob_flash[index] = MOB_FLASH_FRAMES;
       mob_hp[index] -= dmg;
       if (index == PLAYER_MOB) {
         set_digit_tile_during_vbl(INV_HP_ADDR, mob_hp[PLAYER_MOB]);
@@ -1340,7 +1362,7 @@ u8 do_mob_ai(u8 index) {
       break;
 
     case MOB_AI_WAIT:
-      if (sightmap[pos]) {
+      if (mobsightmap[pos]) {
         addfloat(pos, FLOAT_FOUND);
         mob_task[index] = mob_type_ai_active[mob_type[index]];
         mob_target_pos[index] = mob_pos[PLAYER_MOB];
@@ -1392,7 +1414,7 @@ u8 do_mob_ai(u8 index) {
       break;
 
     case MOB_AI_QUEEN:
-      if (!sightmap[pos]) {
+      if (!mobsightmap[pos]) {
         mob_task[index] = MOB_AI_WAIT;
         mob_active[index] = 0;
         addfloat(pos, FLOAT_LOST);
@@ -1405,7 +1427,7 @@ u8 do_mob_ai(u8 index) {
             addmob(MOB_TYPE_SLIME, pos);
             mobhop(mob, POS_DIR(pos, dir));
             mobmap[pos] = index + 1; // Fix mobmap back to queen
-            mob_charge[index] = QUEEN_CHARGE_TIME;
+            mob_charge[index] = QUEEN_CHARGE_MOVES;
             return 1;
           }
         } else {
@@ -1430,9 +1452,9 @@ u8 ai_dobump(u8 index) {
   pos = mob_pos[index];
   diff = mob_pos[PLAYER_MOB] - pos;
 
-  // Use sightmap as a quick check to determine whether this mob is close to
+  // Use mobsightmap as a quick check to determine whether this mob is close to
   // the player.
-  if (sightmap[pos]) {
+  if (mobsightmap[pos]) {
     if (diff == 0xff) { // left
       dir = 0;
     } else if (diff == 1) { // right
@@ -1447,6 +1469,9 @@ u8 ai_dobump(u8 index) {
 
     mobbump(index, dir);
     hitmob(PLAYER_MOB, 1);
+    if (mob_type[index] == MOB_TYPE_SCORPION) {
+      blind();
+    }
     return 1;
   }
   return 0;
@@ -1454,12 +1479,12 @@ u8 ai_dobump(u8 index) {
 
 u8 ai_tcheck(u8 index) {
   ++mob_ai_cool[index];
-  if (sightmap[mob_pos[index]]) {
+  if (mobsightmap[mob_pos[index]]) {
     mob_target_pos[index] = mob_pos[PLAYER_MOB];
     mob_ai_cool[index] = 0;
   }
   if (mob_target_pos[index] == mob_pos[index] ||
-      mob_ai_cool[index] > AI_COOL_TIME) {
+      mob_ai_cool[index] > AI_COOL_MOVES) {
     addfloat(mob_pos[index], FLOAT_LOST);
     mob_task[index] = MOB_AI_WAIT;
     mob_active[index] = 0;
@@ -1539,8 +1564,9 @@ u8 ai_getnextstep_rev(u8 index) {
 }
 
 void sight(void) {
-  u8 ppos, pos, adjpos, diff, head, oldtail, newtail, sig, valid, first;
-  memset(sightmap, 0, sizeof(sightmap));
+  u8 ppos, pos, adjpos, diff, head, oldtail, newtail, sig, valid, first,
+      dist, maxdist;
+  memset(mobsightmap, 0, sizeof(mobsightmap));
 
   // Put a "ret" at the beginning of the tile animation code in case it is
   // executed while we are modifying it.
@@ -1551,14 +1577,27 @@ void sight(void) {
   cands[head = 0] = 0;
   newtail = 1;
   first = 1;
+  dist = 0;
+
+  if (recover) {
+    valid = validmap[ppos];
+    if (valid & VALID_U) { cands[newtail++] = POS_U(0); }
+    if (valid & VALID_L) { cands[newtail++] = POS_L(0); }
+    if (valid & VALID_R) { cands[newtail++] = POS_R(0); }
+    if (valid & VALID_D) { cands[newtail++] = POS_D(0); }
+    maxdist = 1;
+  } else {
+    maxdist = 255;
+  }
+
   do {
     oldtail = newtail;
     do {
       diff = cands[head++];
-      sightmap[pos = (u8)(ppos + diff)] = 1;
+      mobsightmap[pos = (u8)(ppos + diff)] = 1;
 
-      // Unfog this tile
-      if (fogmap[pos]) {
+      // Unfog this tile, within player sight range
+      if (dist < maxdist && fogmap[pos]) {
         set_tile_during_vbl(pos, dtmap[pos] = tmap[pos]);
         fogmap[pos] = 0;
 
@@ -1570,27 +1609,30 @@ void sight(void) {
 
       if (first || !IS_OPAQUE_TILE(tmap[pos])) {
         first = 0;
-        // Unfog neighbors
         valid = validmap[pos];
-        if ((valid & VALID_U) && fogmap[adjpos = POS_U(pos)] &&
-            IS_WALL_TILE(tmap[adjpos])) {
-          set_tile_during_vbl(adjpos, dtmap[adjpos] = tmap[adjpos]);
-          fogmap[adjpos] = 0;
-        }
-        if ((valid & VALID_L) && fogmap[adjpos = POS_L(pos)] &&
-            IS_WALL_TILE(tmap[adjpos])) {
-          set_tile_during_vbl(adjpos, dtmap[adjpos] = tmap[adjpos]);
-          fogmap[adjpos] = 0;
-        }
-        if ((valid & VALID_R) && fogmap[adjpos = POS_R(pos)] &&
-            IS_WALL_TILE(tmap[adjpos])) {
-          set_tile_during_vbl(adjpos, dtmap[adjpos] = tmap[adjpos]);
-          fogmap[adjpos] = 0;
-        }
-        if ((valid & VALID_D) && fogmap[adjpos = POS_D(pos)] &&
-            IS_WALL_TILE(tmap[adjpos])) {
-          set_tile_during_vbl(adjpos, dtmap[adjpos] = tmap[adjpos]);
-          fogmap[adjpos] = 0;
+
+        // Unfog neighboring walls, within player sight range
+        if (dist < maxdist) {
+          if ((valid & VALID_U) && fogmap[adjpos = POS_U(pos)] &&
+              IS_WALL_TILE(tmap[adjpos])) {
+            set_tile_during_vbl(adjpos, dtmap[adjpos] = tmap[adjpos]);
+            fogmap[adjpos] = 0;
+          }
+          if ((valid & VALID_L) && fogmap[adjpos = POS_L(pos)] &&
+              IS_WALL_TILE(tmap[adjpos])) {
+            set_tile_during_vbl(adjpos, dtmap[adjpos] = tmap[adjpos]);
+            fogmap[adjpos] = 0;
+          }
+          if ((valid & VALID_R) && fogmap[adjpos = POS_R(pos)] &&
+              IS_WALL_TILE(tmap[adjpos])) {
+            set_tile_during_vbl(adjpos, dtmap[adjpos] = tmap[adjpos]);
+            fogmap[adjpos] = 0;
+          }
+          if ((valid & VALID_D) && fogmap[adjpos = POS_D(pos)] &&
+              IS_WALL_TILE(tmap[adjpos])) {
+            set_tile_during_vbl(adjpos, dtmap[adjpos] = tmap[adjpos]);
+            fogmap[adjpos] = 0;
+          }
         }
 
         sig = sightsig[(u8)(68 + diff)] & valid;
@@ -1604,11 +1646,40 @@ void sight(void) {
         if (sig & VALID_DR) { cands[newtail++] = POS_DR(diff); }
       }
     } while(head != oldtail);
+    ++dist;
   } while (oldtail != newtail);
 
   // Put the epilog back on, and replace the "ret" with "push af"
   end_tile_anim();
   tile_code[0] = 0xf5;
+}
+
+void blind(void) {
+  u8 i, x, y;
+  if (!recover) {
+    recover = RECOVER_MOVES;
+
+    // Display float
+    x = POS_TO_X(mob_pos[PLAYER_MOB]) + FLOAT_BLIND_X_OFFSET;
+    y = POS_TO_Y(mob_pos[PLAYER_MOB]);
+    for (i = 0; i < 3; ++i) {
+      shadow_OAM[next_float].x = x;
+      shadow_OAM[next_float].y = y;
+      shadow_OAM[next_float].tile = TILE_BLIND + i;
+      float_time[next_float - BASE_FLOAT] = FLOAT_FRAMES;
+      ++next_float;
+      x += 8;
+    }
+
+    // Reset fogmap and dtmap
+    memset(fogmap, 1, sizeof(fogmap));
+    memset(dtmap, 0, sizeof(fogmap));
+    sight();
+    doupdatemap = 1;
+    // Clear all the mob updates later (since we may be updating all the mobs
+    // right now)
+    doblind = 1;
+  }
 }
 
 void calcdist_ai(u8 from, u8 to) {
@@ -1663,7 +1734,7 @@ void do_animate(void) {
 
     sprite = pick_type_sprite_tile[pick_type[i]];
     if (--pick_anim_timer[i] == 0) {
-      pick_anim_timer[i] = PICKUP_SPEED;
+      pick_anim_timer[i] = PICKUP_FRAMES;
 
       // bounce the sprite (if not a heart or key)
       if (sprite) {
@@ -1768,7 +1839,7 @@ void do_animate(void) {
           switch (mob_anim_state[i]) {
             case MOB_ANIM_STATE_BUMP1:
               mob_anim_state[i] = MOB_ANIM_STATE_BUMP2;
-              mob_move_timer[i] = BUMP_TIME;
+              mob_move_timer[i] = BUMP_FRAMES;
               mob_dx[i] = -mob_dx[i];
               mob_dy[i] = -mob_dy[i];
               break;
@@ -1872,6 +1943,7 @@ void trigger_step(u8 mob) {
 
     if (tmap[mob_pos[PLAYER_MOB]] == TILE_END) {
       donextlevel = 1;
+      recover = 1; // Recover blindness on the next floor
     }
 
     // Handle pickups
@@ -1926,11 +1998,11 @@ void trigger_step(u8 mob) {
       y = POS_TO_Y(mob_pos[PLAYER_MOB]);
 
       for (i = flt_start; i < flt_end; ++i) {
-        shadow_OAM[num_floats].x = x;
-        shadow_OAM[num_floats].y = y;
-        shadow_OAM[num_floats].tile = float_pick_type_tiles[i];
-        float_time[num_floats - BASE_FLOAT] = FLOAT_TIME;
-        ++num_floats;
+        shadow_OAM[next_float].x = x;
+        shadow_OAM[next_float].y = y;
+        shadow_OAM[next_float].tile = float_pick_type_tiles[i];
+        float_time[next_float - BASE_FLOAT] = FLOAT_FRAMES;
+        ++next_float;
         x += 8;
       }
     }
@@ -1946,7 +2018,7 @@ void vbl_interrupt(void) {
     doupdatemap = 0;
   }
   if (--tile_timer == 0) {
-    tile_timer = TILE_ANIM_SPEED;
+    tile_timer = TILE_ANIM_FRAMES;
     tile_inc ^= TILE_ANIM_FRAME_DIFF;
     ((vfp)tile_code)();
   }
@@ -1955,11 +2027,11 @@ void vbl_interrupt(void) {
 }
 
 void addfloat(u8 pos, u8 tile) {
-  shadow_OAM[num_floats].x = POS_TO_X(pos);
-  shadow_OAM[num_floats].y = POS_TO_Y(pos);
-  shadow_OAM[num_floats].tile = tile;
-  float_time[num_floats - BASE_FLOAT] = FLOAT_TIME;
-  ++num_floats;
+  shadow_OAM[next_float].x = POS_TO_X(pos);
+  shadow_OAM[next_float].y = POS_TO_Y(pos);
+  shadow_OAM[next_float].tile = tile;
+  float_time[next_float - BASE_FLOAT] = FLOAT_FRAMES;
+  ++next_float;
 }
 
 void showmsg(u8 index, u8 y) {
@@ -1974,28 +2046,28 @@ void showmsg(u8 index, u8 y) {
     }
     y += 8;
   }
-  msg_timer = MSG_TIME;
+  msg_timer = MSG_FRAMES;
 }
 
 void update_floats_and_msg(void) {
   u8 i, j;
-  if (--msg_timer == 0) {
+  if (msg_timer && --msg_timer == 0) {
     for (i = 0; i < MSG_LEN; ++i) {
       hide_sprite(i);
     }
   }
 
-  for (i = BASE_FLOAT; i < num_floats;) {
+  for (i = BASE_FLOAT; i < next_float;) {
     j = i - BASE_FLOAT;
     --float_time[j];
     if (float_time[j] == 0) {
-      --num_floats;
-      if (num_floats) {
-        shadow_OAM[i].x = shadow_OAM[num_floats].x;
-        shadow_OAM[i].y = shadow_OAM[num_floats].y;
-        shadow_OAM[i].tile = shadow_OAM[num_floats].tile;
-        float_time[j] = float_time[num_floats - BASE_FLOAT];
-        hide_sprite(num_floats);
+      --next_float;
+      if (next_float != BASE_FLOAT) {
+        shadow_OAM[i].x = shadow_OAM[next_float].x;
+        shadow_OAM[i].y = shadow_OAM[next_float].y;
+        shadow_OAM[i].tile = shadow_OAM[next_float].tile;
+        float_time[j] = float_time[next_float - BASE_FLOAT];
+        hide_sprite(next_float);
       } else {
         hide_sprite(i);
       }
@@ -2017,7 +2089,7 @@ void inv_animate(void) {
 
 void update_obj1_pal(void) {
   if (--obj_pal1_timer == 0) {
-    obj_pal1_timer = OBJ1_PAL_TIME;
+    obj_pal1_timer = OBJ1_PAL_FRAMES;
     OBP1_REG = obj_pal1[obj_pal1_index = (obj_pal1_index + 1) & 7];
   }
 }
@@ -2026,7 +2098,7 @@ void fadeout(void) {
   u8 i, j;
   i = 3;
   do {
-    for (j = 0; j < FADE_TIME; ++j) { wait_vbl_done(); }
+    for (j = 0; j < FADE_FRAMES; ++j) { wait_vbl_done(); }
     BGP_REG = OBP0_REG = OBP1_REG = fadepal[i];
   } while(i--);
 }
@@ -2035,7 +2107,7 @@ void fadein(void) {
   u8 i, j;
   i = 0;
   do {
-    for (j = 0; j < FADE_TIME; ++j) { wait_vbl_done(); }
+    for (j = 0; j < FADE_FRAMES; ++j) { wait_vbl_done(); }
     BGP_REG = OBP0_REG = OBP1_REG = fadepal[i];
   } while(++i != 4);
 }
@@ -2188,7 +2260,7 @@ void adddeadmob(u8 index) {
   dmob_tile[num_dead_mobs] =
       mob_type_anim_frames[mob_anim_frame[index]] - TILE_MOB_FLASH_DIFF;
   dmob_prop[num_dead_mobs] = S_PALETTE | (mob_flip[index] ? S_FLIPX : 0);
-  dmob_timer[num_dead_mobs] = DEAD_MOB_TIME;
+  dmob_timer[num_dead_mobs] = DEAD_MOB_FRAMES;
   ++num_dead_mobs;
 }
 
