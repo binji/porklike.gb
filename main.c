@@ -1,4 +1,5 @@
 #include <gb/gb.h>
+#include <gb/gbdecompress.h>
 #include <rand.h>
 #include <string.h>
 
@@ -1063,9 +1064,9 @@ void init(void) {
   floor = 1;
   initrand(0x4321);  // TODO: seed with DIV on button press
 
-  set_sprite_data(0, SPRITES_TILES, sprites_bin);
-  set_bkg_data(0, BG_TILES, bg_bin);
-  set_bkg_data(0x80, SHARED_TILES, shared_bin);
+  gb_decompress_bkg_data(0, bg_bin);
+  gb_decompress_bkg_data(0x80, shared_bin);
+  gb_decompress_sprite_data(0, sprites_bin);
   set_win_tiles(0, 0, INV_WIDTH, INV_HEIGHT, inventory_map);
   init_bkg(0);
 

@@ -3,6 +3,7 @@
 /*.map
 /*.ihx
 /*.sym
+/*.binz
 /main.gb
 /main.asm
 /bg.bin
