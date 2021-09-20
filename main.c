@@ -982,7 +982,7 @@ u8 noturn;
 u8 joy;
 
 u8 doupdatemap, donextlevel, doblind, dosight;
-u8 num_sprites, last_num_sprites;
+OAM_item_t *next_sprite, *last_next_sprite;
 
 u8 inv_anim_up;
 u8 inv_anim_timer;
@@ -1090,7 +1090,6 @@ void init(void) {
   noturn = 0;
 
   next_float = BASE_FLOAT;
-  num_sprites = 0;
 
   inv_anim_up = 0;
   inv_anim_timer = 0;
@@ -1110,17 +1109,19 @@ void begin_animate(void) {
   mob_tile_code_ptr = mob_tile_code;
   // Initialize to ret so if a VBL occurs while we're setting the animation it
   // won't run off the end
-  *mob_tile_code_ptr++ = 0xc9;  // ret
-  num_sprites = BASE_FLOAT + MAX_FLOATS; // Start mob sprites after floats
+  *mob_tile_code_ptr++ = 0xc9; // ret
+
+  // Start mob sprites after floats
+  next_sprite = shadow_OAM + BASE_FLOAT + MAX_FLOATS;
 }
 
 void end_animate(void) {
   // Hide the rest of the sprites
-  u8 i;
-  for (i = num_sprites; i < last_num_sprites; ++i) {
-    hide_sprite(i);
+  while (next_sprite < last_next_sprite) {
+    next_sprite->y = 0;  // hide sprite
+    ++next_sprite;
   }
-  last_num_sprites = num_sprites;
+  last_next_sprite = next_sprite;
 
   // When blinded, don't update any mob animations
   if (doblind) {
@@ -1838,8 +1839,10 @@ void calcdist_ai(u8 from, u8 to) {
 
 void do_animate(void) {
   u8 i, dosprite, dotile, sprite, prop, frame, animdone;
-
   animdone = num_sprs == 0;
+
+  // use u8* pointer instead of OAM_item_t* pointer for better code generation
+  u8* psprite = (u8*)next_sprite;
 
   // Loop through all pickups
   for (i = 0; i < num_picks; ++i) {
@@ -1874,20 +1877,20 @@ void do_animate(void) {
     // Since the pickups bounce by 1 pixel up and down, we also display them at
     // WY_REG + 7 so they don't disappear while bouncing.
     if (sprite && pick_y[i] <= WY_REG + 9) {
-      move_sprite(num_sprites, pick_x[i], pick_y[i]);
-      set_sprite_tile(num_sprites, sprite);
-      set_sprite_prop(num_sprites, 0);
-      ++num_sprites;
+      *psprite++ = pick_y[i];
+      *psprite++ = pick_x[i];
+      *psprite++ = sprite;
+      *psprite++ = 0;
     }
 
     if (dotile || pick_move_timer[i]) {
       frame = pick_type_anim_frames[pick_anim_frame[i]];
       if (pick_move_timer[i]) {
         animdone = 0;
-        move_sprite(num_sprites, pick_x[i], pick_y[i]);
-        set_sprite_tile(num_sprites, frame);
-        set_sprite_prop(num_sprites, 0);
-        ++num_sprites;
+        *psprite++ = pick_y[i];
+        *psprite++ = pick_x[i];
+        *psprite++ = frame;
+        *psprite++ = 0;
 
         pick_x[i] += pick_dx[i];
         pick_y[i] += pick_dy[i] + hopy12[--pick_move_timer[i]];
@@ -1927,17 +1930,17 @@ void do_animate(void) {
 
       if (dosprite) {
         prop = mob_flip[i] ? S_FLIPX : 0;
-        move_sprite(num_sprites, mob_x[i], mob_y[i]);
+
+        *psprite++ = mob_y[i];
+        *psprite++ = mob_x[i];
         if (mob_flash[i]) {
-          set_sprite_tile(num_sprites, frame - TILE_MOB_FLASH_DIFF);
-          set_sprite_prop(num_sprites, S_PALETTE | prop);
+          *psprite++ = frame - TILE_MOB_FLASH_DIFF;
+          *psprite++ = S_PALETTE | prop;
           --mob_flash[i];
         } else {
-          set_sprite_tile(num_sprites, frame);
-          set_sprite_prop(num_sprites,
-                          prop | (i + 1 == key_mob ? S_PALETTE : 0));
+          *psprite++ = frame;
+          *psprite++ = prop | (i + 1 == key_mob ? S_PALETTE : 0);
         }
-        ++num_sprites;
       }
 
       if (mob_flip[i]) {
@@ -1984,6 +1987,7 @@ void do_animate(void) {
     }
   }
 
+  // Draw all dead mobs as sprites
   for (i = 0; i < num_dead_mobs;) {
     if (--dmob_timer[i] == 0) {
       --num_dead_mobs;
@@ -1994,13 +1998,15 @@ void do_animate(void) {
         dmob_prop[i] = dmob_prop[num_dead_mobs];
       }
     } else {
-      move_sprite(num_sprites, dmob_x[i], dmob_y[i]);
-      set_sprite_tile(num_sprites, dmob_tile[i]);
-      set_sprite_prop(num_sprites, dmob_prop[i]);
-      ++num_sprites;
+      *psprite++ = dmob_y[i];
+      *psprite++ = dmob_x[i];
+      *psprite++ = dmob_tile[i];
+      *psprite++ = dmob_prop[i];
       ++i;
     }
   }
+
+  next_sprite = (OAM_item_t*)psprite;
 
   if (animdone) {
     pass_turn();
@@ -2277,12 +2283,6 @@ void fadein(void) {
   } while(++i != 4);
 }
 
-u8 dummy[13];
-#define TIMESTART dummy[0] = (u8)(myclock)
-#define TIMEDIFF(x)                                                            \
-  dummy[x] = (u8)(myclock)-dummy[0];                                           \
-  TIMESTART
-
 void addmob(MobType type, u8 pos) {
   mob_type[num_mobs] = type;
   mob_anim_frame[num_mobs] = mob_type_anim_start[type];
@@ -2421,32 +2421,17 @@ void mapgen(void) {
     copymap(1);
   } else {
     fog = 1;
-    TIMESTART;
     roomgen();
-    TIMEDIFF(1);
     mazeworms();
-    TIMEDIFF(2);
     carvedoors();
-    TIMEDIFF(3);
     carvecuts();
-    TIMEDIFF(4);
     startend();
-    TIMEDIFF(5);
     fillends();
-    TIMEDIFF(6);
     prettywalls();
-    TIMEDIFF(7);
     voids();
-    TIMEDIFF(8);
     chests();
-    TIMEDIFF(9);
     decoration();
-    TIMEDIFF(10);
     spawnmobs();
-    TIMEDIFF(11);
-
-    dummy[12] = dummy[1] + dummy[2] + dummy[3] + dummy[4] + dummy[5] +
-                dummy[6] + dummy[7] + dummy[8] + dummy[9] + dummy[10] + dummy[11];
   }
   end_tile_anim();
   memset(fogmap, fog, sizeof(fogmap));
