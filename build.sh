@@ -6,4 +6,5 @@ python ref/bin2c.py bg.bin -t -o tilebg.c
 python ref/bin2c.py shared.bin -t -o tileshared.c
 python ref/bin2c.py sprites.bin -t -o tilesprites.c
 ../gbdk/bin/lcc -Wa-l main.c -c -o main.o
-../gbdk/bin/lcc -Wl-m main.o -o main.gb
+../gbdk/bin/lcc -Wa-l util.s -c -o util.o
+../gbdk/bin/lcc -Wl-m main.o util.o -o main.gb

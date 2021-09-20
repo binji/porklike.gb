@@ -23,6 +23,7 @@ typedef void (*vfp)(void);
 #define MAX_PICKUPS 16 /* XXX Figure out what this should be */
 #define MAX_FLOATS 8   /* For now; we'll probably want more */
 #define MAX_EQUIPS 4
+#define MAX_SPRS 16 /* Animation sprites for explosions, etc. */
 
 #define BASE_FLOAT 18
 
@@ -81,13 +82,14 @@ typedef void (*vfp)(void);
 #define PICKUP_FRAMES 6
 #define PICKUP_CHARGES 2
 
-#define IS_WALL_TILE(tile) (flags_bin[tile] & 1)
-#define IS_SPECIAL_TILE(tile) (flags_bin[tile] & 2)
-#define IS_WALL_OR_SPECIAL_TILE(tile) (flags_bin[tile] & 3)
-#define IS_OPAQUE_TILE(tile) (flags_bin[tile] & 4)
+#define IS_WALL_TILE(tile)             (flags_bin[tile] & 0b00000001)
+#define IS_SPECIAL_TILE(tile)          (flags_bin[tile] & 0b00000010)
+#define IS_WALL_OR_SPECIAL_TILE(tile)  (flags_bin[tile] & 0b00000011)
+#define IS_OPAQUE_TILE(tile)           (flags_bin[tile] & 0b00000100)
+#define IS_CRACKED_WALL_TILE(tile)     (flags_bin[tile] & 0b00001000)
+#define IS_ANIMATED_TILE(tile)         (flags_bin[tile] & 0b00010000)
+#define IS_WALL_FACE_TILE(tile)        (flags_bin[tile] & 0b00100000)
 #define TILE_HAS_CRACKED_VARIANT(tile) (flags_bin[tile] & 0b01000000)
-#define IS_CRACKED_WALL_TILE(tile) (flags_bin[tile] & 0b00001000)
-#define IS_ANIMATED_TILE(tile) (flags_bin[tile] & 0b00010000)
 
 #define IS_DOOR(pos) sigmatch((pos), doorsig, doormask)
 #define CAN_CARVE(pos) sigmatch((pos), carvesig, carvemask)
@@ -97,6 +99,8 @@ typedef void (*vfp)(void);
 #define IS_SMARTMOB(tile, pos) ((flags_bin[tile] & 3) || mobmap[pos])
 #define IS_MOB_AI(tile, pos)                                                   \
   ((flags_bin[tile] & 3) || (mobmap[pos] && !mob_active[mobmap[pos] - 1]))
+#define IS_UNSPECIAL_WALL_TILE(tile)                                           \
+  ((flags_bin[tile] & 0b00000011) == 0b00000001)
 
 #define URAND() ((u8)rand())
 #define URAND_10_PERCENT() (URAND() < 26)
@@ -142,12 +146,14 @@ typedef void (*vfp)(void);
 #define POS_DR(pos)       ((u8)(pos + 17))
 #define POS_DIR(pos, dir) ((u8)(pos + dirpos[dir]))
 
+// BG tiles
 #define TILE_NONE 0
 #define TILE_EMPTY 1
 #define TILE_WALL 2
 #define TILE_WALL_FACE_CRACKED 3
 #define TILE_WALL_FACE 4
-#define TILE_WALL_FACE_PLANT 5
+#define TILE_WALL_FACE_RUBBLE 5
+#define TILE_WALL_FACE_PLANT 6
 #define TILE_TELEPORTER 7
 #define TILE_CARPET 8
 #define TILE_CHEST_OPEN 9
@@ -168,15 +174,18 @@ typedef void (*vfp)(void);
 #define TILE_PLANT2 0xd
 #define TILE_PLANT3 0x5c
 #define TILE_FIXED_WALL 0x47
-#define TILE_SAW1 0x42
+#define TILE_SAW 0x42
 #define TILE_STEPS 0x60
 #define TILE_ENTRANCE 0x61
 
 #define TILE_WALLSIG_BASE 0xf
 #define TILE_CRACKED_DIFF 0x34
 
+// Sprite tiles
 #define TILE_BLIND 0x37
+#define TILE_BOOM 0x05
 
+// Shared tiles
 #define TILE_0 0xe5
 #define TILE_1 0xe6
 
@@ -245,6 +254,11 @@ typedef enum PickupType {
   PICKUP_TYPE_NONE = 0,
 } PickupType;
 
+typedef enum SprType {
+  SPR_TYPE_BOOM,
+  SPR_TYPE_SPIN,
+} SprType;
+
 typedef enum MobAnimState {
   MOB_ANIM_STATE_NONE,
   MOB_ANIM_STATE_WALK,
@@ -283,8 +297,10 @@ const u8 obj_pal1[] = {
 
 const u8 dirx[] = {0xff, 1, 0, 0};       // L R U D
 const u8 diry[] = {0, 0, 0xff, 1};       // L R U D
-const u8 dirpos[] = {0xff, 1, 0xf0, 16}; // L R U D
-const u8 dirvalid[] = {VALID_L,VALID_R,VALID_U,VALID_D};
+const u8 dirpos[] = {0xff, 1,    0xf0, 16,
+                     0xef, 0xf1, 15,   17}; // L R U D UL UR DL DR
+const u8 dirvalid[] = {VALID_L,  VALID_R,  VALID_U,  VALID_D,
+                       VALID_UL, VALID_UR, VALID_DL, VALID_DR};
 
 // Movement is reversed since it is accessed backward. Stored as differences
 // from the last position instead of absolute offset.
@@ -555,7 +571,7 @@ const u8 mob_type_object[] = {
     0, // kong
     0, // reaper
     0, // weed
-    0, // bomb
+    1, // bomb
     1, // vase1
     1, // vase2
     1, // chest
@@ -749,6 +765,21 @@ const u8 msg_tiles[] = {
   0x6c, 0x6d, 0x6e, 0x6f, 0x70, 0x71, 0x6d, 0x6d, 0x72,
 };
 
+// Explosion sprites
+const u8 boom_spr_speed[] = {40, 19, 20, 38, 41, 39, 38, 22,
+                             39, 31, 15, 34, 22, 26, 36, 45};
+const u8 boom_spr_anim_speed[] = {10, 5, 5, 10, 11, 10, 10, 6,
+                                  10, 8, 4, 9,  6,  7,  9,  12};
+const u16 boom_spr_x[] = {64665, 757, 65447, 65176, 841, 64448, 65167, 398,
+                          49,    570, 1221,  65345, 807, 65415, 303,   351};
+const u16 boom_spr_y[] = {125,   65459, 65415, 541,   64906, 65047, 270, 277,
+                          65264, 65337, 65419, 65041, 65281, 785,   479, 65493};
+const u16 boom_spr_dx[] = {65301, 177, 65459, 65409, 196, 65394, 65378, 202,
+                           39,    166, 245,   65483, 243, 65498, 114,   135};
+const u16 boom_spr_dy[] = {33,    65518, 65432, 190,   65389, 65472,
+                           115,   140,   65318, 65477, 65512, 65400,
+                           65459, 243,   180,   65519};
+
 void init(void);
 void do_turn(void);
 void pass_turn(void);
@@ -760,6 +791,7 @@ void mobbump(u8 index, u8 dir);
 void mobhop(u8 index, u8 pos);
 void pickhop(u8 index, u8 pos);
 void hitmob(u8 index, u8 dmg);
+void hitpos(u8 pos, u8 dmg);
 void do_ai(void);
 void do_ai_weeds(void);
 u8 do_mob_ai(u8 index);
@@ -776,12 +808,15 @@ void hide_float_sprites(void);
 void set_tile_during_vbl(u8 pos, u8 tile);
 void set_digit_tile_during_vbl(u16 addr, u8 value);
 void set_tile_range_during_vbl(u16 addr, u8* source, u8 len);
+void update_tile(u8 pos, u8 tile);
+void unfog_tile(u8 pos);
 void vbl_interrupt(void);
 
 void trigger_step(u8 index);
 
 void addfloat(u8 pos, u8 tile);
-void update_floats_and_msg(void);
+void update_floats_and_msg_and_sprs(void);
+u16 drag(u16 x);
 void showmsg(u8 index, u8 y);
 
 void inv_animate(void);
@@ -794,6 +829,7 @@ void addmob(MobType type, u8 pos);
 void delmob(u8 index);
 void addpick(PickupType type, u8 pos);
 void delpick(u8 index);
+u8 is_valid(u8 pos, u8 diff) __preserves_regs(b, c);
 void droppick(PickupType type, u8 pos);
 void droppick_rnd(u8 pos);
 u8 dropspot(u8 pos);
@@ -913,6 +949,16 @@ u8 pick_dx[MAX_PICKUPS], pick_dy[MAX_PICKUPS]; // dx,dy moving sprite
 u8 pick_move_timer[MAX_PICKUPS];               // timer for sprite animation
 u8 num_picks;
 
+SprType spr_type[MAX_SPRS];
+u8 spr_anim_frame[MAX_SPRS];            // Actual sprite tile (not index)
+u8 spr_anim_timer[MAX_SPRS];            // 0..spr_anim_speed
+u8 spr_anim_speed[MAX_SPRS];            //
+u16 spr_x[MAX_SPRS], spr_y[MAX_SPRS];   // 8.8 fixed point
+u16 spr_dx[MAX_SPRS], spr_dy[MAX_SPRS]; // 8.8 fixed point
+u8 spr_timer[MAX_SPRS];
+u8 spr_drag[MAX_SPRS];
+u8 num_sprs;
+
 u8 tile_code[TILE_CODE_SIZE];         // code for animating tiles
 u8 mob_tile_code[MOB_TILE_CODE_SIZE]; // code for animating mobs
 u8 *tile_code_ptr;                    // next available index in tile_code
@@ -934,7 +980,7 @@ u8 noturn;
 
 u8 joy;
 
-u8 doupdatemap, donextlevel, doblind;
+u8 doupdatemap, donextlevel, doblind, dosight;
 u8 num_sprites, last_num_sprites;
 
 u8 inv_anim_up;
@@ -989,8 +1035,8 @@ void main(void) {
     begin_animate();
     do_turn();
     do_animate();
+    update_floats_and_msg_and_sprs();
     end_animate();
-    update_floats_and_msg();
     update_obj1_pal();
     wait_vbl_done();
   }
@@ -1014,7 +1060,7 @@ void init(void) {
 
   enable_interrupts();
 
-  floor = 4;
+  floor = 1;
   initrand(0x4321);  // TODO: seed with DIV on button press
 
   set_sprite_data(0, SPRITES_TILES, sprites_bin);
@@ -1034,6 +1080,7 @@ void init(void) {
   doupdatemap = 0;
   donextlevel = 0;
   doblind = 0;
+  dosight = 0;
 
   floor_tile[0] = TILE_0;
   floor_tile[1] = 0;
@@ -1134,9 +1181,14 @@ void pass_turn(void) {
       showmsg(MSG_REAPER, MSG_REAPER_Y);
     }
     if (recover && --recover == 0) {
-      sight();
+      dosight = 1;
     }
     break;
+  }
+
+  if (dosight) {
+    dosight = 0;
+    sight();
   }
 }
 
@@ -1171,11 +1223,11 @@ void move_player(void) {
             if (tile == TILE_GATE) {
               if (num_keys) {
                 --num_keys;
-                set_tile_during_vbl(newpos,
-                                    tmap[newpos] = dtmap[newpos] = TILE_EMPTY);
+
+                update_tile(newpos, TILE_EMPTY);
                 set_digit_tile_during_vbl(INV_KEYS_ADDR, num_keys);
                 mobbump(PLAYER_MOB, dir);
-                sight();
+                dosight = 1;
                 goto done;
               } else {
                 showmsg(MSG_KEY, MSG_KEY_Y);
@@ -1278,29 +1330,29 @@ void pickhop(u8 index, u8 newpos) {
 }
 
 void hitmob(u8 index, u8 dmg) {
-  u8 mob, percent, tile, slime, pos, is_heart_chest;
+  u8 mob, mtype, percent, tile, slime, pos, valid, i;
+  u16 x, y;
   pos = mob_pos[index];
+  mtype = mob_type[index];
 
-  if (mob_type_object[mob_type[index]]) {
-    if (mob_type[index] == MOB_TYPE_CHEST) {
+  if (mob_type_object[mtype]) {
+    if (mtype == MOB_TYPE_CHEST) {
       percent = 100;
       tile = TILE_CHEST_OPEN;
       slime = 0;
-    } else if (mob_type[index] == MOB_TYPE_BOMB) {
+    } else if (mtype == MOB_TYPE_BOMB) {
       percent = 100;
       tile = TILE_BOMB_EXPLODED;
       slime = 0;
-      // TODO: explode
     } else {
       percent = 20;
       tile = dirt_tiles[URAND() & 3];
       slime = 1;
     }
 
-    is_heart_chest = mob_type[index] == MOB_TYPE_HEART_CHEST;
     delmob(index);
     if (!IS_SPECIAL_TILE(tmap[pos])) {
-      set_tile_during_vbl(pos, dtmap[pos] = tmap[pos] = tile);
+      update_tile(pos, tile);
     }
 
     if (randint(100) < percent) {
@@ -1308,10 +1360,51 @@ void hitmob(u8 index, u8 dmg) {
         mob = num_mobs;
         addmob(MOB_TYPE_SLIME, pos);
         mobhop(mob, dropspot(pos));
-      } else if (is_heart_chest && URAND_20_PERCENT()) {
+      } else if (mtype == MOB_TYPE_HEART_CHEST && URAND_20_PERCENT()) {
         droppick(PICKUP_TYPE_HEART, pos);
       } else {
         droppick_rnd(pos);
+      }
+    }
+
+    // Explode bomb after the mob is deleted (to prevent infinite recursion)
+    if (mtype == MOB_TYPE_BOMB) {
+      // Destroy the surrounding tiles
+      valid = validmap[pos];
+      u8 dir = 7;
+      do {
+        if (valid & dirvalid[dir]) {
+          u8 newpos = POS_DIR(pos, dir);
+          u8 tile = tmap[newpos];
+          if (IS_WALL_FACE_TILE(tile)) {
+            tile = TILE_WALL_FACE_RUBBLE;
+          } else if (IS_UNSPECIAL_WALL_TILE(tile)) {
+            tile = dirt_tiles[URAND() & 3];
+          } else {
+            goto noupdate;
+          }
+          update_tile(newpos, tile);
+        noupdate:
+          hitpos(newpos, dmg);
+        }
+      } while (dir--);
+      update_tile(pos, TILE_BOMB_EXPLODED);
+
+      x = POS_TO_X(pos) << 8;
+      y = POS_TO_Y(pos) << 8;
+
+      for (i = 0; i < sizeof(boom_spr_speed); ++i) {
+        spr_type[num_sprs] = SPR_TYPE_BOOM;
+        spr_anim_frame[num_sprs] = TILE_BOOM;
+        spr_anim_timer[num_sprs] = spr_anim_speed[num_sprs] =
+            boom_spr_anim_speed[i];
+        spr_x[num_sprs] = x + boom_spr_x[i];
+        spr_y[num_sprs] = y + boom_spr_y[i];
+        spr_dx[num_sprs] = boom_spr_dx[i];
+        spr_dy[num_sprs] = boom_spr_dy[i];
+        spr_drag[num_sprs] = 1;
+        spr_timer[num_sprs] = boom_spr_speed[i];
+        ++num_sprs;
       }
     }
   } else {
@@ -1339,6 +1432,25 @@ void hitmob(u8 index, u8 dmg) {
       }
     }
   }
+}
+
+void hitpos(u8 pos, u8 dmg) {
+  u8 tile, mob;
+  tile = tmap[pos];
+  if ((mob = mobmap[pos])) {
+    hitmob(mob - 1, dmg); // XXX maybe recursive...
+  }
+  if (tmap[pos] == TILE_SAW) {
+    // TODO: remove the animation on this saw
+  } else if (IS_CRACKED_WALL_TILE(tile)) {
+    tile = dirt_tiles[URAND() & 3];
+    // TODO: update tile above this one, if needed
+  } else {
+    goto noupdate;
+  }
+  update_tile(pos, tile);
+noupdate:
+  dosight = 1;
 }
 
 void do_ai(void) {
@@ -1598,7 +1710,7 @@ void sight(void) {
 
       // Unfog this tile, within player sight range
       if (dist < maxdist && fogmap[pos]) {
-        set_tile_during_vbl(pos, dtmap[pos] = tmap[pos]);
+        unfog_tile(pos);
         fogmap[pos] = 0;
 
         // Potentially start animating this tile
@@ -1615,22 +1727,22 @@ void sight(void) {
         if (dist < maxdist) {
           if ((valid & VALID_U) && fogmap[adjpos = POS_U(pos)] &&
               IS_WALL_TILE(tmap[adjpos])) {
-            set_tile_during_vbl(adjpos, dtmap[adjpos] = tmap[adjpos]);
+            unfog_tile(adjpos);
             fogmap[adjpos] = 0;
           }
           if ((valid & VALID_L) && fogmap[adjpos = POS_L(pos)] &&
               IS_WALL_TILE(tmap[adjpos])) {
-            set_tile_during_vbl(adjpos, dtmap[adjpos] = tmap[adjpos]);
+            unfog_tile(adjpos);
             fogmap[adjpos] = 0;
           }
           if ((valid & VALID_R) && fogmap[adjpos = POS_R(pos)] &&
               IS_WALL_TILE(tmap[adjpos])) {
-            set_tile_during_vbl(adjpos, dtmap[adjpos] = tmap[adjpos]);
+            unfog_tile(adjpos);
             fogmap[adjpos] = 0;
           }
           if ((valid & VALID_D) && fogmap[adjpos = POS_D(pos)] &&
               IS_WALL_TILE(tmap[adjpos])) {
-            set_tile_during_vbl(adjpos, dtmap[adjpos] = tmap[adjpos]);
+            unfog_tile(adjpos);
             fogmap[adjpos] = 0;
           }
         }
@@ -1674,6 +1786,12 @@ void blind(void) {
     // Reset fogmap and dtmap
     memset(fogmap, 1, sizeof(fogmap));
     memset(dtmap, 0, sizeof(fogmap));
+
+    // Reset all tile animations (e.g. saws, torches)
+    begin_tile_anim();
+    end_tile_anim();
+
+    // Use sight() instead of dosight=1, since the tile updates will be removed
     sight();
     doupdatemap = 1;
     // Clear all the mob updates later (since we may be updating all the mobs
@@ -1720,7 +1838,7 @@ void calcdist_ai(u8 from, u8 to) {
 void do_animate(void) {
   u8 i, dosprite, dotile, sprite, prop, frame, animdone;
 
-  animdone = 1;
+  animdone = num_sprs == 0;
 
   // Loop through all pickups
   for (i = 0; i < num_picks; ++i) {
@@ -1846,7 +1964,6 @@ void do_animate(void) {
 
             case MOB_ANIM_STATE_WALK:
               trigger_step(i);
-              mob_anim_speed[i] = mob_type_anim_speed[mob_type[i]];
               goto done;
 
             done:
@@ -1858,6 +1975,8 @@ void do_animate(void) {
               break;
           }
         }
+        // Reset animation speed
+        mob_anim_speed[i] = mob_type_anim_speed[mob_type[i]];
       } else if (dotile) {
         set_tile_during_vbl(mob_pos[i], frame);
       }
@@ -1934,12 +2053,20 @@ void set_tile_range_during_vbl(u16 addr, u8* src, u8 len) {
   mob_tile_code_ptr = dst;
 }
 
+void update_tile(u8 pos, u8 tile) {
+  set_tile_during_vbl(pos, dtmap[pos] = tmap[pos] = tile);
+}
+
+void unfog_tile(u8 pos) {
+  set_tile_during_vbl(pos, dtmap[pos] = tmap[pos]);
+}
+
 void trigger_step(u8 mob) {
   u8 ptype, pindex, i, flt_start, flt_end, x, y, len;
   u16 equip_addr;
 
   if (mob == PLAYER_MOB) {
-    sight();
+    dosight = 1;
 
     if (tmap[mob_pos[PLAYER_MOB]] == TILE_END) {
       donextlevel = 1;
@@ -2049,14 +2176,16 @@ void showmsg(u8 index, u8 y) {
   msg_timer = MSG_FRAMES;
 }
 
-void update_floats_and_msg(void) {
+void update_floats_and_msg_and_sprs(void) {
   u8 i, j;
+  // Hide message if timer runs out
   if (msg_timer && --msg_timer == 0) {
     for (i = 0; i < MSG_LEN; ++i) {
       hide_sprite(i);
     }
   }
 
+  // Draw float sprites and remove them if timed out
   for (i = BASE_FLOAT; i < next_float;) {
     j = i - BASE_FLOAT;
     --float_time[j];
@@ -2076,6 +2205,41 @@ void update_floats_and_msg(void) {
       shadow_OAM[i].y -= float_diff_y[float_time[j]];
     }
     ++i;
+  }
+
+  // Draw sprs using the same ones allocated for messages
+  for (i = 0; i < num_sprs;) {
+    if (--spr_timer[i] == 0) {
+      if (--num_sprs != i) {
+        spr_type[i] = spr_type[num_sprs];
+        spr_anim_frame[i] = spr_anim_frame[num_sprs];
+        spr_anim_timer[i] = spr_anim_timer[num_sprs];
+        spr_anim_speed[i] = spr_anim_speed[num_sprs];
+        spr_x[i] = spr_x[num_sprs];
+        spr_y[i] = spr_y[num_sprs];
+        spr_dx[i] = spr_dx[num_sprs];
+        spr_dy[i] = spr_dy[num_sprs];
+        spr_drag[i] = spr_drag[num_sprs];
+        spr_timer[i] = spr_timer[num_sprs];
+      }
+      hide_sprite(num_sprs);
+    } else {
+      if (--spr_anim_timer[i] == 0) {
+        ++spr_anim_frame[i];
+        spr_anim_timer[i] = spr_anim_speed[i];
+      }
+      spr_x[i] += spr_dx[i];
+      spr_y[i] += spr_dy[i];
+      if (spr_drag[i]) {
+        spr_dx[i] = drag(spr_dx[i]);
+        spr_dy[i] = drag(spr_dy[i]);
+      }
+      shadow_OAM[i].x = spr_x[i] >> 8;
+      shadow_OAM[i].y = spr_y[i] >> 8;
+      shadow_OAM[i].tile = spr_anim_frame[i];
+      shadow_OAM[i].prop = 0;
+      ++i;
+    }
   }
 }
 
@@ -2199,38 +2363,6 @@ void delpick(u8 index) {
     pick_move_timer[index] = pick_move_timer[num_picks];
     pickmap[pick_pos[index]] = index + 1;
   }
-}
-
-// TODO: optimize
-u8 is_valid(u8 pos, u8 diff) __preserves_regs(b, c) {
-  (void)pos;
-  (void)diff;
-  __asm__(
-    "  ldhl sp, #3\n"
-    "  ld a, (hl)\n"
-    "  ld e, a\n"
-    "  rlc a\n"
-    "  jr C, 1$\n"
-    "  dec hl\n"
-    "  ld a, (hl)\n"
-    "  add a, e\n"
-    "  ld e, a\n"
-    "  jr 2$\n"
-    "1$:\n"
-    "  ld a, e\n"
-    "  cpl\n"
-    "  inc a\n"
-    "  ld e, a\n"
-    "  dec hl\n"
-    "  ld a, (hl)\n"
-    "  sub a, e\n"
-    "  ld e, a\n"
-    "2$:\n"
-    "  ld a, #0\n"
-    "  daa\n"
-    "  ret Z\n"
-    "  ld e, #0\n"
-  );
 }
 
 u8 dropspot(u8 pos) {
@@ -3142,7 +3274,7 @@ void decoration(void) {
         if (kind != ROOM_KIND_PLANT && room + 1 != start_room &&
             tmap[pos] == TILE_EMPTY && !mobmap[pos] && IS_FREESTANDING(pos) &&
             URAND_10_PERCENT()) {
-          tmap[pos] = TILE_SAW1;
+          tmap[pos] = TILE_SAW;
           sigwall(pos);
           // TODO: what to do about removing animations on broken saws?
         }

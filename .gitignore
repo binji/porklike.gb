@@ -1,9 +1,10 @@
-/flags.bin
-/flags.c
+/*.o
+/*.lst
+/*.map
+/*.ihx
+/*.sym
 /main.gb
-/main.map
-/map.bin
-/map.c
+/main.asm
 /bg.bin
 /bg.tilemap
 /shared.bin
