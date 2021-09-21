@@ -51,6 +51,11 @@ typedef void (*vfp)(void);
 #define INV_KEYS_ADDR 0x9c25
 #define INV_FLOOR_ADDR 0x9c2d
 #define INV_EQUIP_ADDR 0x9c63
+#define INV_DESC_ADDR 0x9d01
+#define INV_SELECT_X_OFFSET 32
+#define INV_SELECT_Y_OFFSET 40
+#define INV_ROW_LEN 14
+#define NUM_INV_ROWS 4
 
 #define TILE_ANIM_FRAMES 8
 #define TILE_ANIM_FRAME_DIFF 16
@@ -71,6 +76,7 @@ typedef void (*vfp)(void);
 #define MOB_FLASH_FRAMES 20
 #define DEAD_MOB_FRAMES 10
 #define MSG_FRAMES 120
+#define INV_SELECT_FRAMES 8
 
 #define QUEEN_CHARGE_MOVES 2
 #define AI_COOL_MOVES 8
@@ -656,6 +662,105 @@ const u8 pick_type_name_tile[] = {
 const u8 pick_type_name_start[] = {0,  0,  0,  8,  16, 24, 35,
                                    44, 53, 61, 69, 79, 87};
 
+const u8 pick_type_desc_tile[] = {
+    // JUMP 2 SPACES
+    212, 223, 215, 218,   0, 231,   0, 221, 218, 203, 205, 207, 221,
+    // STOP ENEMIES
+    221, 222, 217, 218,   0, 207, 216, 207, 215, 211, 207, 221,
+    // YOU SKIP OVER
+    227, 217, 223,   0, 221, 213, 211, 218,   0, 217, 224, 207, 220,
+    // RANGED ATTACK
+    220, 203, 216, 209, 207, 206,   0, 203, 222, 222, 203, 205, 213,
+    // DO 1 DAMAGE
+    206, 217,   0, 230,   0, 206, 203, 215, 203, 209, 207,
+    // STOP ENEMY
+    221, 222, 217, 218,   0, 207, 216, 207, 215, 227,
+    // RANGED ATTACK
+    220, 203, 216, 209, 207, 206,   0, 203, 222, 222, 203, 205, 213,
+    // PUSH ENEMY
+    218, 223, 221, 210,   0, 207, 216, 207, 215, 227,
+    // 1 SPACE AND
+    230,   0, 221, 218, 203, 205, 207,   0, 203, 216, 206,
+    // STOP THEM
+    221, 222, 217, 218,   0, 222, 210, 207, 215,
+    // PULL YOURSELF
+    218, 223, 214, 214,   0, 227, 217, 223, 220, 221, 207, 214, 208,
+    // UP TO THE NEXT
+    223, 218,   0, 222, 217,   0, 222, 210, 207,   0, 216, 207, 226, 222,
+    // OCCUPIED SPACE
+    217, 205, 205, 223, 218, 211, 207, 206,   0, 221, 218, 203, 205, 207,
+    // HIT 2 SPACES
+    210, 211, 222,   0, 231,   0, 221, 218, 203, 205, 207, 221,
+    // IN ANY
+    211, 216,   0, 203, 216, 227,
+    // DIRECTION
+    206, 211, 220, 207, 205, 222, 211, 217, 216,
+    // SMASH A WALL
+    221, 215, 203, 221, 210,   0, 203,   0, 225, 203, 214, 214,
+    // OR DO 2
+    217, 220,   0, 206, 217,   0, 231,
+    // DAMAGE
+    206, 203, 215, 203, 209, 207,
+    // PULL AN ENEMY
+    218, 223, 214, 214,   0, 203, 216,   0, 207, 216, 207, 215, 227,
+    // 1 SPACE TOWARD
+    230,   0, 221, 218, 203, 205, 207,   0, 222, 217, 225, 203, 220, 206,
+    // YOU AND STOP
+    227, 217, 223,   0, 203, 216, 206,   0, 221, 222, 217, 218,
+    // THEM
+    222, 210, 207, 215,
+    // HIT 4 SPACES
+    210, 211, 222,   0, 233,   0, 221, 218, 203, 205, 207, 221,
+    // AROUND YOU
+    203, 220, 217, 223, 216, 206,   0, 227, 217, 223,
+    // LIFT AND THROW
+    214, 211, 208, 222,   0, 203, 216, 206,   0, 222, 210, 220, 217, 225,
+    // AN ENEMY
+    203, 216,   0, 207, 216, 207, 215, 227,
+    // BEHIND YOU AND
+    204, 207, 210, 211, 216, 206,   0, 227, 217, 223,   0, 203, 216, 206,
+    // STOP THEM
+    221, 222, 217, 218,   0, 222, 210, 207, 215,
+    // HIT AN ENEMY
+    210, 211, 222,   0, 203, 216,   0, 207, 216, 207, 215, 227,
+    // AND HOP
+    203, 216, 206,   0, 210, 217, 218,
+    // BACKWARD
+    204, 203, 205, 213, 225, 203, 220, 206,
+    // STOP ENEMY
+    221, 222, 217, 218,   0, 207, 216, 207, 215, 227
+};
+
+const u16 pick_type_desc_start[][NUM_INV_ROWS] = {
+    {  0,   0,   0,   0}, // PICKUP_TYPE_HEART,
+    {  0,   0,   0,   0}, // PICKUP_TYPE_KEY,
+    {  0,  13,  25,   0}, // PICKUP_TYPE_JUMP,
+    { 38,  51,  62,   0}, // PICKUP_TYPE_BOLT,
+    { 72,  85,  95, 106}, // PICKUP_TYPE_PUSH,
+    {115, 128, 142,   0}, // PICKUP_TYPE_GRAPPLE,
+    {156, 168, 174,   0}, // PICKUP_TYPE_SPEAR,
+    {183, 195, 202,   0}, // PICKUP_TYPE_SMASH,
+    {208, 221, 235, 247}, // PICKUP_TYPE_HOOK,
+    {251, 263,   0,   0}, // PICKUP_TYPE_SPIN,
+    {273, 287, 295, 309}, // PICKUP_TYPE_SUPLEX,
+    {318, 330, 337, 345}, // PICKUP_TYPE_SLAP,
+};
+
+const u8 pick_type_desc_len[][NUM_INV_ROWS] = {
+    { 0,  0,  0,  0}, // PICKUP_TYPE_HEART,
+    { 0,  0,  0,  0}, // PICKUP_TYPE_KEY,
+    {13, 12, 13,  0}, // PICKUP_TYPE_JUMP,
+    {13, 11, 10,  0}, // PICKUP_TYPE_BOLT,
+    {13, 10, 11,  9}, // PICKUP_TYPE_PUSH,
+    {13, 14, 14,  0}, // PICKUP_TYPE_GRAPPLE,
+    {12,  6,  9,  0}, // PICKUP_TYPE_SPEAR,
+    {12,  7,  6,  0}, // PICKUP_TYPE_SMASH,
+    {13, 14, 12,  4}, // PICKUP_TYPE_HOOK,
+    {12, 10,  0,  0}, // PICKUP_TYPE_SPIN,
+    {14,  8, 14,  9}, // PICKUP_TYPE_SUPLEX,
+    {12,  7,  8, 10}, // PICKUP_TYPE_SLAP,
+};
+
 const u8 float_diff_y[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0,
@@ -991,13 +1096,17 @@ u8 msg_timer;
 Turn turn;
 u8 noturn;
 
-u8 joy;
+u8 joy, lastjoy, newjoy;
 
 u8 doupdatemap, donextlevel, doblind, dosight;
 OAM_item_t *next_sprite, *last_next_sprite;
 
 u8 inv_anim_up;
 u8 inv_anim_timer;
+u8 inv_select;
+u8 inv_select_timer;
+u8 inv_select_frame;
+u8 inv_msg_update;
 
 u8 equip_type[MAX_EQUIPS];
 u8 equip_charge[MAX_EQUIPS];
@@ -1019,7 +1128,9 @@ void main(void) {
   fadein();
 
   while(1) {
+    lastjoy = joy;
     joy = joypad();
+    newjoy = (joy ^ lastjoy) & joy;
 
     if (donextlevel || (joy & J_START)) {
       donextlevel = 0;
@@ -1044,11 +1155,11 @@ void main(void) {
       fadein();
     }
 
-    inv_animate();
     begin_animate();
     do_turn();
     do_animate();
     update_floats_and_msg_and_sprs();
+    inv_animate();
     end_animate();
     update_obj1_pal();
     wait_vbl_done();
@@ -1105,6 +1216,10 @@ void init(void) {
 
   inv_anim_up = 0;
   inv_anim_timer = 0;
+  inv_select = 0;
+  inv_select_timer = INV_SELECT_FRAMES;
+  inv_select_frame = 0;
+  inv_msg_update = 1;
 
   equip_type[0] = equip_type[1] = equip_type[2] = equip_type[3] = 0;
   equip_charge[0] = equip_charge[1] = equip_charge[2] = equip_charge[3] = 0;
@@ -1154,20 +1269,35 @@ void hide_float_sprites(void) {
 }
 
 void do_turn(void) {
-  switch (turn) {
-  case TURN_PLAYER:
-    move_player();
-    break;
+  if (inv_anim_up) {
+    if (newjoy & J_UP) {
+      inv_select = (inv_select + 3) & 3;
+      inv_msg_update = 1;
+    } else if (newjoy & J_DOWN) {
+      inv_select = (inv_select + 1) & 3;
+      inv_msg_update = 1;
+    }
 
-  case TURN_AI:
-    turn = TURN_AI_WAIT;
-    do_ai();
-    break;
+    if ((newjoy & J_B) && !inv_anim_timer) {
+      inv_anim_timer = INV_ANIM_FRAMES;
+      inv_anim_up ^= 1;
+    }
+  } else {
+    switch (turn) {
+    case TURN_PLAYER:
+      move_player();
+      break;
 
-  case TURN_WEEDS:
-    turn = TURN_WEEDS_WAIT;
-    do_ai();
-    break;
+    case TURN_AI:
+      turn = TURN_AI_WAIT;
+      do_ai();
+      break;
+
+    case TURN_WEEDS:
+      turn = TURN_WEEDS_WAIT;
+      do_ai();
+      break;
+    }
   }
 }
 
@@ -1279,7 +1409,8 @@ void move_player(void) {
       turn = TURN_PLAYER_WAIT;
     }
 
-    if ((joy & J_B) && !inv_anim_timer) {
+    // Open inventory
+    if ((newjoy & J_B) && !inv_anim_timer) {
       inv_anim_timer = INV_ANIM_FRAMES;
       inv_anim_up ^= 1;
     }
@@ -2105,7 +2236,8 @@ void set_tile_range_during_vbl(u16 addr, u8* src, u8 len) {
     *dst++ = *src++;
     *dst++ = 0x22; // ld (hl+), a
   } while(--len);
-  mob_last_tile_addr = *--src;
+  mob_last_tile_addr = addr + len;
+  mob_last_tile_val = *--src;
   mob_tile_code_ptr = dst;
 }
 
@@ -2170,6 +2302,10 @@ redo:
             set_tile_range_during_vbl(
                 equip_addr, pick_type_name_tile + pick_type_name_start[ptype],
                 len);
+
+            // Update the inventory message if the selection was set to this
+            // equip slot
+            inv_msg_update |= inv_select == i;
             goto pickup;
           } else if (equip_type[i] == ptype) {
             // Increase charges
@@ -2363,6 +2499,49 @@ void inv_animate(void) {
     --inv_anim_timer;
     WY_REG = inv_anim_up ? inventory_up_y[inv_anim_timer]
                          : inventory_down_y[inv_anim_timer];
+  }
+
+  if (inv_anim_timer || inv_anim_up) {
+    if (--inv_select_timer == 0) {
+      inv_select_timer = INV_SELECT_FRAMES;
+      ++inv_select_frame;
+    }
+    next_sprite->y = WY_REG + INV_SELECT_Y_OFFSET + (inv_select << 3);
+    next_sprite->x = INV_SELECT_X_OFFSET + pickbounce[inv_select_frame & 7];
+    next_sprite->tile = 0;
+    next_sprite->prop = 0;
+    ++next_sprite;
+
+    if (inv_msg_update) {
+      inv_msg_update = 0;
+
+      u16 addr = INV_DESC_ADDR;
+      u8 pick = equip_type[inv_select];
+      u8 i;
+      for (i = 0; i < NUM_INV_ROWS; ++i) {
+        u8 len = pick_type_desc_len[pick][i];
+        if (len) {
+          set_tile_range_during_vbl(
+              addr, pick_type_desc_tile + pick_type_desc_start[pick][i], len);
+        } else {
+          *mob_tile_code_ptr++ = 0x21; // ld hl, addr
+          *mob_tile_code_ptr++ = addr & 0xff;
+          *mob_tile_code_ptr++ = addr >> 8;
+        }
+
+        // Fill the rest of the row with 0
+        u8* dst = mob_tile_code_ptr;
+        *dst++ = 0xaf; // xor a
+        while (len < INV_ROW_LEN) {
+          *dst++ = 0x22; // ld (hl+), a
+          ++len;
+        }
+        mob_last_tile_addr = addr + INV_ROW_LEN;
+        mob_last_tile_val = 0;
+        mob_tile_code_ptr = dst;
+        addr += 32;
+      }
+    }
   }
 }
 
