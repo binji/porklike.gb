@@ -25,6 +25,7 @@ typedef void (*vfp)(void);
 #define MAX_FLOATS 8   /* For now; we'll probably want more */
 #define MAX_EQUIPS 4
 #define MAX_SPRS 16 /* Animation sprites for explosions, etc. */
+#define MAX_SAWS 32 /* XXX */
 
 #define BASE_FLOAT 18
 
@@ -55,6 +56,8 @@ typedef void (*vfp)(void);
 #define TILE_ANIM_FRAME_DIFF 16
 #define TILE_FLIP_DIFF 0x21
 #define TILE_MOB_FLASH_DIFF 0x46
+#define TILE_VOID_EXIT_DIFF 0x35
+#define TILE_VOID_OPEN_DIFF 3
 
 #define FADE_FRAMES 8
 #define INV_ANIM_FRAMES 43
@@ -165,6 +168,10 @@ typedef void (*vfp)(void);
 #define TILE_GATE 0x3f
 #define TILE_TORCH_LEFT 0x40
 #define TILE_TORCH_RIGHT 0x41
+#define TILE_VOID_BUTTON_U 0x46
+#define TILE_VOID_BUTTON_L 0x55
+#define TILE_VOID_BUTTON_R 0x57
+#define TILE_VOID_BUTTON_D 0x66
 #define TILE_HEART 0x48
 #define TILE_RUG 0x59
 #define TILE_BOMB_EXPLODED 0x5b
@@ -176,6 +183,7 @@ typedef void (*vfp)(void);
 #define TILE_PLANT3 0x5c
 #define TILE_FIXED_WALL 0x47
 #define TILE_SAW 0x42
+#define TILE_SAW_BROKEN 0x53
 #define TILE_STEPS 0x60
 #define TILE_ENTRANCE 0x61
 
@@ -793,6 +801,7 @@ void mobhop(u8 index, u8 pos);
 void pickhop(u8 index, u8 pos);
 void hitmob(u8 index, u8 dmg);
 void hitpos(u8 pos, u8 dmg);
+void update_wall_face(u8 pos);
 void do_ai(void);
 void do_ai_weeds(void);
 u8 do_mob_ai(u8 index);
@@ -810,6 +819,7 @@ void set_tile_during_vbl(u8 pos, u8 tile);
 void set_digit_tile_during_vbl(u16 addr, u8 value);
 void set_tile_range_during_vbl(u16 addr, u8* source, u8 len);
 void update_tile(u8 pos, u8 tile);
+void update_tile_if_unfogged(u8 pos, u8 tile);
 void unfog_tile(u8 pos);
 void vbl_interrupt(void);
 
@@ -864,6 +874,7 @@ void decoration(void);
 void begin_tile_anim(void);
 void end_tile_anim(void);
 void add_tile_anim(u8 pos, u8 tile);
+void nop_saw_anim(u8 pos);
 void spawnmobs(void);
 u8 no_mob_neighbors(u8 pos);
 void mapset(u8* pos, u8 w, u8 h, u8 val);
@@ -886,6 +897,7 @@ Map sigmap;      // Signature map (tracks neighbors) **only used during mapgen
 Map tempmap;     // Temp map (used for carving)      **only used during mapgen
 Map mobsightmap; // Always checks 4 steps from player
 Map fogmap;      // Tiles player hasn't seen
+Map sawmap;      // Map from saw to its animation code addr in tile_code
 
 // The following data structures is used for rooms as well as union-find
 // algorithm; see https://en.wikipedia.org/wiki/Disjoint-set_data_structure
@@ -904,7 +916,7 @@ u8 room_avoid[MAX_ROOMS]; // ** only used during mapgen
 u8 num_rooms;
 
 u8 void_num_tiles[MAX_VOIDS]; // Number of tiles in a void region
-u8 void_num_walls[MAX_VOIDS]; // Number of walls in a void region
+u8 void_exit[MAX_VOIDS];      // Exit tile for a given void region
 u8 num_voids;
 
 u8 start_room;
@@ -1062,7 +1074,7 @@ void init(void) {
   enable_interrupts();
 
   floor = 1;
-  initrand(0x4321);  // TODO: seed with DIV on button press
+  initrand(0x1234);  // TODO: seed with DIV on button press
 
   gb_decompress_bkg_data(0, bg_bin);
   gb_decompress_bkg_data(0x80, shared_bin);
@@ -1213,10 +1225,11 @@ void move_player(void) {
       mobdir(PLAYER_MOB, dir);
       if (IS_MOB(newpos)) {
         mobbump(PLAYER_MOB, dir);
-        hitmob(mobmap[newpos] - 1, 1);
-        if (mobmap[newpos] == MOB_TYPE_SCORPION + 1 && URAND_50_PERCENT()) {
+        if (mob_type[mobmap[newpos] - 1] == MOB_TYPE_SCORPION &&
+            URAND_50_PERCENT()) {
           blind();
         }
+        hitmob(mobmap[newpos] - 1, 1);
         goto done;
       } else if (validmap[pos] & dirvalid[dir]) {
         tile = tmap[newpos];
@@ -1228,14 +1241,28 @@ void move_player(void) {
 
                 update_tile(newpos, TILE_EMPTY);
                 set_digit_tile_during_vbl(INV_KEYS_ADDR, num_keys);
-                mobbump(PLAYER_MOB, dir);
                 dosight = 1;
-                goto done;
+                goto dobump;
               } else {
                 showmsg(MSG_KEY, MSG_KEY_Y);
               }
+            } else if (tile == TILE_VOID_BUTTON_U ||
+                       tile == TILE_VOID_BUTTON_L ||
+                       tile == TILE_VOID_BUTTON_R ||
+                       tile == TILE_VOID_BUTTON_D) {
+              update_tile(newpos, tile + TILE_VOID_OPEN_DIFF);
+              update_wall_face(newpos);
+              dosight = 1;
+              goto dobump;
             }
           }
+#if 0
+          // XXX: bump to destroy walls for testing
+          else {
+            update_tile(newpos, TILE_EMPTY);
+            goto dobump;
+          }
+#endif
           // fallthrough to bump below...
         } else {
           mobwalk(PLAYER_MOB, dir);
@@ -1245,8 +1272,9 @@ void move_player(void) {
       }
 
       // Bump w/o taking a turn
-      mobbump(PLAYER_MOB, dir);
       noturn = 1;
+    dobump:
+      mobbump(PLAYER_MOB, dir);
     done:
       turn = TURN_PLAYER_WAIT;
     }
@@ -1443,16 +1471,31 @@ void hitpos(u8 pos, u8 dmg) {
     hitmob(mob - 1, dmg); // XXX maybe recursive...
   }
   if (tmap[pos] == TILE_SAW) {
-    // TODO: remove the animation on this saw
+    nop_saw_anim(pos);
   } else if (IS_CRACKED_WALL_TILE(tile)) {
     tile = dirt_tiles[URAND() & 3];
-    // TODO: update tile above this one, if needed
+    update_wall_face(pos);
   } else {
     goto noupdate;
   }
   update_tile(pos, tile);
 noupdate:
   dosight = 1;
+}
+
+void update_wall_face(u8 pos) {
+  if (validmap[pos] & VALID_D) {
+    pos = POS_D(pos);
+    u8 tile = tmap[pos];
+    if (tile == TILE_WALL_FACE || tile == TILE_WALL_FACE_CRACKED) {
+      tile = TILE_EMPTY;
+    } else if (tile == TILE_WALL_FACE_RUBBLE) {
+      tile = dirt_tiles[URAND() & 3];
+    } else if (tile == TILE_WALL_FACE_PLANT) {
+      tile = TILE_PLANT1;
+    }
+    update_tile_if_unfogged(pos, tile);
+  }
 }
 
 void do_ai(void) {
@@ -1718,6 +1761,11 @@ void sight(void) {
         // Potentially start animating this tile
         if (IS_ANIMATED_TILE(tmap[pos])) {
           add_tile_anim(pos, tmap[pos]);
+
+          // Store the offset into tile_code for this animated saw
+          if (tmap[pos] == TILE_SAW) {
+            sawmap[pos] = tile_code_ptr - tile_code - 1;
+          }
         }
       }
 
@@ -1785,9 +1833,10 @@ void blind(void) {
       x += 8;
     }
 
-    // Reset fogmap and dtmap
+    // Reset fogmap, dtmap and sawmap
     memset(fogmap, 1, sizeof(fogmap));
     memset(dtmap, 0, sizeof(fogmap));
+    memset(sawmap, 0, sizeof(sawmap));
 
     // Reset all tile animations (e.g. saws, torches)
     begin_tile_anim();
@@ -1978,9 +2027,9 @@ void do_animate(void) {
               set_tile_during_vbl(mob_pos[i], frame);
               break;
           }
+          // Reset animation speed
+          mob_anim_speed[i] = mob_type_anim_speed[mob_type[i]];
         }
-        // Reset animation speed
-        mob_anim_speed[i] = mob_type_anim_speed[mob_type[i]];
       } else if (dotile) {
         set_tile_during_vbl(mob_pos[i], frame);
       }
@@ -2064,24 +2113,40 @@ void update_tile(u8 pos, u8 tile) {
   set_tile_during_vbl(pos, dtmap[pos] = tmap[pos] = tile);
 }
 
+void update_tile_if_unfogged(u8 pos, u8 tile) {
+  // If the tile is already unfogged then updated it, otherwise just
+  // change tmap.
+  if (fogmap[pos]) {
+    tmap[pos] = tile;
+  } else {
+    update_tile(pos, tile);
+  }
+}
+
 void unfog_tile(u8 pos) {
   set_tile_during_vbl(pos, dtmap[pos] = tmap[pos]);
 }
 
 void trigger_step(u8 mob) {
-  u8 ptype, pindex, i, flt_start, flt_end, x, y, len;
+  u8 pos, tile, ptype, pindex, i, flt_start, flt_end, x, y, len, teleported;
   u16 equip_addr;
+
+  teleported = 0;
+redo:
+
+  pos = mob_pos[mob];
+  tile = tmap[pos];
 
   if (mob == PLAYER_MOB) {
     dosight = 1;
 
-    if (tmap[mob_pos[PLAYER_MOB]] == TILE_END) {
+    if (tile == TILE_END) {
       donextlevel = 1;
       recover = 1; // Recover blindness on the next floor
     }
 
     // Handle pickups
-    if ((pindex = pickmap[mob_pos[PLAYER_MOB]])) {
+    if ((pindex = pickmap[pos])) {
       ptype = pick_type[--pindex];
       if (ptype == PICKUP_TYPE_HEART) {
         if (mob_hp[PLAYER_MOB] < 9) {
@@ -2128,8 +2193,8 @@ void trigger_step(u8 mob) {
     done:
       flt_start = float_pick_type_start[ptype];
       flt_end = float_pick_type_start[ptype + 1];
-      x = POS_TO_X(mob_pos[PLAYER_MOB]) + float_pick_type_x_offset[ptype];
-      y = POS_TO_Y(mob_pos[PLAYER_MOB]);
+      x = POS_TO_X(pos) + float_pick_type_x_offset[ptype];
+      y = POS_TO_Y(pos);
 
       for (i = flt_start; i < flt_end; ++i) {
         shadow_OAM[next_float].x = x;
@@ -2139,6 +2204,49 @@ void trigger_step(u8 mob) {
         ++next_float;
         x += 8;
       }
+    }
+
+    // Expose the exit button for this void region.
+    u8 room;
+    if ((room = roommap[pos]) >= num_rooms) {
+      room -= num_rooms + 1;
+      u8 exitpos = void_exit[room];
+      u8 exittile = tmap[exitpos];
+      if (TILE_HAS_CRACKED_VARIANT(exittile)) {
+        exittile += TILE_VOID_EXIT_DIFF;
+        update_tile_if_unfogged(exitpos, exittile);
+      }
+    }
+  }
+
+  // Step on saw
+  if (tile == TILE_SAW) {
+    u8 hp = mob_hp[mob];
+    hitmob(mob, 3);
+    if (mob != PLAYER_MOB && hp < 3) {
+      droppick_rnd(pos);
+    }
+    update_tile(pos, TILE_SAW_BROKEN);
+    nop_saw_anim(pos);
+  } else if (tile == TILE_TELEPORTER && !teleported) {
+    u8 newpos = 0;
+    do {
+      if (tmap[newpos] == TILE_TELEPORTER && !IS_MOB(newpos)) {
+        break;
+      }
+    } while(++newpos);
+
+    if (pos != newpos) {
+      // Move mob position in mobmap
+      mobmap[pos] = 0;
+      mobmap[newpos] = mob + 1;
+      mob_pos[mob] = newpos;
+
+      // Reset mob anim timer so the tile is updated next frame
+      mob_anim_frame[mob] = 1;
+
+      teleported = 1;
+      goto redo;
     }
   }
 }
@@ -2445,6 +2553,7 @@ void mapgeninit(void) {
   memset(pickmap, 0, sizeof(pickmap));
   memset(sigmap, 255, sizeof(sigmap));
   memset(ds_sets, 0, sizeof(ds_sets));
+  memset(sawmap, 0, sizeof(sawmap));
 
   dogate = 0;
 
@@ -3085,43 +3194,60 @@ void prettywalls(void) {
 }
 
 void voids(void) {
-  u8 pos, head, oldtail, newtail, valid, newpos;
+  u8 pos, head, oldtail, newtail, valid, newpos, dir, num_walls, id, exit;
+
   pos = 0;
   num_voids = 0;
 
   memset(void_num_tiles, 0, sizeof(void_num_tiles));
+  // Use the tempmap to keep track of void walls
+  memset(tempmap, 0, sizeof(tempmap));
 
   do {
     if (!tmap[pos]) {
       // flood fill this region
+      num_walls = 0;
       cands[head = 0] = pos;
       newtail = 1;
+      id = num_rooms + num_voids + 1;
+
       do {
         oldtail = newtail;
         do {
           pos = cands[head++];
           if (!tmap[pos]) {
-            roommap[pos] = num_rooms + num_voids + 1;
+            roommap[pos] = id;
             ++void_num_tiles[num_voids];
             tmap[pos] = void_tiles[randint(sizeof(void_tiles))];
             valid = validmap[pos];
 
-            // TODO: handle void exits
-            if ((valid & VALID_U) && !tmap[newpos = POS_U(pos)]) {
-              cands[newtail++] = newpos;
-            }
-            if ((valid & VALID_L) && !tmap[newpos = POS_L(pos)]) {
-              cands[newtail++] = newpos;
-            }
-            if ((valid & VALID_R) && !tmap[newpos = POS_R(pos)]) {
-              cands[newtail++] = newpos;
-            }
-            if ((valid & VALID_D) && !tmap[newpos = POS_D(pos)]) {
-              cands[newtail++] = newpos;
+            for (dir = 0; dir < 4; ++dir) {
+              if (valid & dirvalid[dir]) {
+                if (!tmap[newpos = POS_DIR(pos, dir)]) {
+                  cands[newtail++] = newpos;
+                } else if (TILE_HAS_CRACKED_VARIANT(tmap[newpos])) {
+                  ++num_walls;
+                  tempmap[newpos] = id;
+                }
+              }
             }
           }
         } while(head != oldtail);
       } while (oldtail != newtail);
+
+      // Pick a random wall to make into a void exit
+      exit = randint(num_walls);
+      newpos = 0;
+      do {
+        if (tempmap[newpos] == id && exit-- == 0) { break; }
+      } while(++newpos);
+
+      void_exit[num_voids] = newpos;
+
+      // Make sure the void exit is not a cracked wall.
+      if (IS_CRACKED_WALL_TILE(tmap[newpos])) {
+        tmap[newpos] -= TILE_CRACKED_DIFF;
+      }
       ++num_voids;
     }
   } while(++pos);
@@ -3262,7 +3388,6 @@ void decoration(void) {
             URAND_10_PERCENT()) {
           tmap[pos] = TILE_SAW;
           sigwall(pos);
-          // TODO: what to do about removing animations on broken saws?
         }
 
         ++pos;
@@ -3316,6 +3441,11 @@ void add_tile_anim(u8 pos, u8 tile) {
   }
   *ptr++ = 0x77; // ld (hl), a
   tile_code_ptr = ptr;
+}
+
+void nop_saw_anim(u8 pos) {
+  // Only nop out the memory write
+  tile_code[sawmap[pos]] = 0;
 }
 
 void spawnmobs(void) {
