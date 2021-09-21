@@ -71,3 +71,50 @@ _is_valid::
   ret Z
   ld e, #0
   ret
+
+; 16-bit xorshift implementation, from John Metcalf. See
+; http://www.retroprogramming.com/2017/07/xorshift-pseudorandom-numbers-in-z80.html
+; Modified to use sdcc calling convention
+
+.area _DATA
+
+xrnd_seed: .ds 2
+
+.area _CODE
+
+_xrnd::
+  ;; read seed
+  ld hl, #xrnd_seed
+  ld a, (hl+)
+  ld e, a
+  ld a, (hl)
+  ld d, a
+
+  ;; xorshift
+  rra
+  ld a,e
+  rra
+  xor d
+  ld d,a
+  ld a,e
+  rra
+  ld a,d
+  rra
+  xor e
+  ld e,a
+  xor d
+  ld d,a
+
+  ; write back seed
+  ld (hl-), a
+  ld a, e
+  ld (hl), a
+  ret
+
+_xrnd_init::
+  ldhl sp, #2
+  ld a, (hl+)
+  ld (#xrnd_seed), a
+  ld a, (hl)
+  ld (#xrnd_seed + 1), a
+  ret

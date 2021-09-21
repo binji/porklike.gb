@@ -1,6 +1,5 @@
 #include <gb/gb.h>
 #include <gb/gbdecompress.h>
-#include <rand.h>
 #include <string.h>
 
 #include "tilebg.c"
@@ -114,13 +113,12 @@ typedef void (*vfp)(void);
 #define IS_UNSPECIAL_WALL_TILE(tile)                                           \
   ((flags_bin[tile] & 0b00000011) == 0b00000001)
 
-#define URAND() ((u8)rand())
-#define URAND_10_PERCENT() (URAND() < 26)
-#define URAND_12_5_PERCENT() ((URAND() & 7) == 0)
-#define URAND_20_PERCENT() (URAND() < 51)
-#define URAND_25_PERCENT() ((URAND() & 3) == 0)
-#define URAND_33_PERCENT() (URAND() < 85)
-#define URAND_50_PERCENT() (URAND() & 1)
+#define XRND_10_PERCENT() (xrnd() < 26)
+#define XRND_12_5_PERCENT() ((xrnd() & 7) == 0)
+#define XRND_20_PERCENT() (xrnd() < 51)
+#define XRND_25_PERCENT() ((xrnd() & 3) == 0)
+#define XRND_33_PERCENT() (xrnd() < 85)
+#define XRND_50_PERCENT() (xrnd() & 1)
 
 #define MAP_X_OFFSET 2
 #define MAP_Y_OFFSET 0
@@ -900,6 +898,9 @@ const u16 boom_spr_dy[] = {33,    65518, 65432, 190,   65389, 65472,
                            115,   140,   65318, 65477, 65512, 65400,
                            65459, 243,   180,   65519};
 
+u8 xrnd(void) __preserves_regs(b, c);
+void xrnd_init(u16) __preserves_regs(b, c);
+
 void init(void);
 void do_turn(void);
 void pass_turn(void);
@@ -1197,7 +1198,7 @@ void init(void) {
   enable_interrupts();
 
   floor = 1;
-  initrand(0x1234);  // TODO: seed with DIV on button press
+  xrnd_init(0x1234);  // TODO: seed with DIV on button press
 
   gb_decompress_bkg_data(0, bg_bin);
   gb_decompress_bkg_data(0x80, shared_bin);
@@ -1384,7 +1385,7 @@ void move_player(void) {
         if (IS_MOB(newpos)) {
           mobbump(PLAYER_MOB, dir);
           if (mob_type[mobmap[newpos] - 1] == MOB_TYPE_SCORPION &&
-              URAND_50_PERCENT()) {
+              XRND_50_PERCENT()) {
             blind();
           }
           hitmob(mobmap[newpos] - 1, 1);
@@ -1537,7 +1538,7 @@ void hitmob(u8 index, u8 dmg) {
       slime = 0;
     } else {
       percent = 20;
-      tile = dirt_tiles[URAND() & 3];
+      tile = dirt_tiles[xrnd() & 3];
       slime = 1;
     }
 
@@ -1547,11 +1548,11 @@ void hitmob(u8 index, u8 dmg) {
     }
 
     if (randint(100) < percent) {
-      if (slime && URAND_20_PERCENT()) {
+      if (slime && XRND_20_PERCENT()) {
         mob = num_mobs;
         addmob(MOB_TYPE_SLIME, pos);
         mobhop(mob, dropspot(pos));
-      } else if (mtype == MOB_TYPE_HEART_CHEST && URAND_20_PERCENT()) {
+      } else if (mtype == MOB_TYPE_HEART_CHEST && XRND_20_PERCENT()) {
         droppick(PICKUP_TYPE_HEART, pos);
       } else {
         droppick_rnd(pos);
@@ -1570,7 +1571,7 @@ void hitmob(u8 index, u8 dmg) {
           if (IS_WALL_FACE_TILE(tile)) {
             tile = TILE_WALL_FACE_RUBBLE;
           } else if (IS_UNSPECIAL_WALL_TILE(tile)) {
-            tile = dirt_tiles[URAND() & 3];
+            tile = dirt_tiles[xrnd() & 3];
           } else {
             goto noupdate;
           }
@@ -1634,7 +1635,7 @@ void hitpos(u8 pos, u8 dmg) {
   if (tmap[pos] == TILE_SAW) {
     nop_saw_anim(pos);
   } else if (IS_CRACKED_WALL_TILE(tile)) {
-    tile = dirt_tiles[URAND() & 3];
+    tile = dirt_tiles[xrnd() & 3];
     update_wall_face(pos);
   } else {
     goto noupdate;
@@ -1651,7 +1652,7 @@ void update_wall_face(u8 pos) {
     if (tile == TILE_WALL_FACE || tile == TILE_WALL_FACE_CRACKED) {
       tile = TILE_EMPTY;
     } else if (tile == TILE_WALL_FACE_RUBBLE) {
-      tile = dirt_tiles[URAND() & 3];
+      tile = dirt_tiles[xrnd() & 3];
     } else if (tile == TILE_WALL_FACE_PLANT) {
       tile = TILE_PLANT1;
     }
@@ -3096,7 +3097,7 @@ void digworm(u8 pos) {
   u8 dir, step, num_dirs, valid;
 
   // Pick a random direction
-  dir = URAND() & 3;
+  dir = xrnd() & 3;
   step = 0;
   do {
     tmap[pos] = 1; // Set tile to empty.
@@ -3124,7 +3125,7 @@ void digworm(u8 pos) {
     // Continue in the current direction, unless we can't carve. Also randomly
     // change direction after 3 or more steps.
     if (!((valid & dirvalid[dir]) && tempmap[POS_DIR(pos, dir)]) ||
-        (URAND_50_PERCENT() && step > 2)) {
+        (XRND_50_PERCENT() && step > 2)) {
       step = 0;
       num_dirs = 0;
       if ((valid & VALID_L) && tempmap[POS_L(pos)]) { cands[num_dirs++] = 0; }
@@ -3280,7 +3281,7 @@ void startend(void) {
   if (!dogate) {
     // Pick a random walkable location
     do {
-      endpos = URAND();
+      endpos = xrnd();
     } while (IS_WALL_TILE(tmap[endpos]));
   }
 
@@ -3428,7 +3429,7 @@ void prettywalls(void) {
       if (tile) {
         tile += TILE_WALLSIG_BASE;
       }
-      if (TILE_HAS_CRACKED_VARIANT(tile) && URAND_12_5_PERCENT()) {
+      if (TILE_HAS_CRACKED_VARIANT(tile) && XRND_12_5_PERCENT()) {
         tile += TILE_CRACKED_DIFF;
       }
       tmap[pos] = tile;
@@ -3505,7 +3506,7 @@ void chests(void) {
   u8 has_teleporter, room, chest_pos, i, pos, cand0, cand1;
 
   // Teleporter in level if level >= 5 and rnd(5)<1 (20%)
-  has_teleporter = floor >= 5 && URAND_20_PERCENT();
+  has_teleporter = floor >= 5 && XRND_20_PERCENT();
 
   // Pick a random room
   room = randint(num_rooms);
@@ -3558,7 +3559,7 @@ void chests(void) {
   }
 
   for (i = 0; i < num_cands; ++i) {
-    addmob(floor >= 5 && URAND_20_PERCENT() ? MOB_TYPE_HEART_CHEST
+    addmob(floor >= 5 && XRND_20_PERCENT() ? MOB_TYPE_HEART_CHEST
                                             : MOB_TYPE_CHEST,
            cands[i]);
   }
@@ -3590,7 +3591,7 @@ void decoration(void) {
 
           case ROOM_KIND_DIRT:
             if (tile == TILE_EMPTY) {
-              tmap[pos] = dirt_tiles[URAND() & 3];
+              tmap[pos] = dirt_tiles[xrnd() & 3];
             }
             break;
 
@@ -3602,7 +3603,7 @@ void decoration(void) {
             // fallthrough
 
           case ROOM_KIND_TORCH:
-            if (tile == TILE_EMPTY && URAND_33_PERCENT() && (h & 1) &&
+            if (tile == TILE_EMPTY && XRND_33_PERCENT() && (h & 1) &&
                 IS_FREESTANDING(pos)) {
               if (w == 1) {
                 tmap[pos] = TILE_TORCH_RIGHT;
@@ -3620,7 +3621,7 @@ void decoration(void) {
             }
 
             if (!IS_SMARTMOB(tile, pos) && room + 1 != start_room &&
-                URAND_25_PERCENT() && no_mob_neighbors(pos) &&
+                XRND_25_PERCENT() && no_mob_neighbors(pos) &&
                 IS_FREESTANDING(pos)) {
               mob = plant_mobs[randint(sizeof(plant_mobs))];
               addmob(mob, pos);
@@ -3633,7 +3634,7 @@ void decoration(void) {
 
         if (kind != ROOM_KIND_PLANT && room + 1 != start_room &&
             tmap[pos] == TILE_EMPTY && !mobmap[pos] && IS_FREESTANDING(pos) &&
-            URAND_10_PERCENT()) {
+            XRND_10_PERCENT()) {
           tmap[pos] = TILE_SAW;
           sigwall(pos);
         }
@@ -3879,7 +3880,7 @@ u8 randint(u8 mx) {
   if (mx == 0) { return 0; }
   u8 result;
   do {
-    result = URAND() & randmask[mx];
+    result = xrnd() & randmask[mx];
   } while (result >= mx);
   return result;
 }
