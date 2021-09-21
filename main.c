@@ -77,6 +77,7 @@ typedef void (*vfp)(void);
 #define DEAD_MOB_FRAMES 10
 #define MSG_FRAMES 120
 #define INV_SELECT_FRAMES 8
+#define INV_TARGET_FRAMES 2
 
 #define QUEEN_CHARGE_MOVES 2
 #define AI_COOL_MOVES 8
@@ -87,6 +88,7 @@ typedef void (*vfp)(void);
 #define SIGHT_DIST_BLIND 1
 #define SIGHT_DIST_DEFAULT 4
 
+#define INV_TARGET_OFFSET 3
 #define FLOAT_BLIND_X_OFFSET 0xfb
 
 #define PICKUP_FRAMES 6
@@ -197,6 +199,10 @@ typedef void (*vfp)(void);
 #define TILE_CRACKED_DIFF 0x34
 
 // Sprite tiles
+#define TILE_ARROW_L 0x9
+#define TILE_ARROW_R 0xa
+#define TILE_ARROW_U 0xb
+#define TILE_ARROW_D 0xc
 #define TILE_BLIND 0x37
 #define TILE_BOOM 0x05
 
@@ -1096,6 +1102,9 @@ u8 msg_timer;
 Turn turn;
 u8 noturn;
 
+u8 is_targeting;
+Dir target_dir;
+
 u8 joy, lastjoy, newjoy;
 
 u8 doupdatemap, donextlevel, doblind, dosight;
@@ -1106,7 +1115,10 @@ u8 inv_anim_timer;
 u8 inv_select;
 u8 inv_select_timer;
 u8 inv_select_frame;
+u8 inv_target_timer;
+u8 inv_target_frame;
 u8 inv_msg_update;
+PickupType inv_selected_pick;
 
 u8 equip_type[MAX_EQUIPS];
 u8 equip_charge[MAX_EQUIPS];
@@ -1211,6 +1223,7 @@ void init(void) {
 
   turn = TURN_PLAYER;
   noturn = 0;
+  is_targeting = 0;
 
   next_float = BASE_FLOAT;
 
@@ -1219,6 +1232,8 @@ void init(void) {
   inv_select = 0;
   inv_select_timer = INV_SELECT_FRAMES;
   inv_select_frame = 0;
+  inv_target_timer = INV_TARGET_FRAMES;
+  inv_target_frame = 0;
   inv_msg_update = 1;
 
   equip_type[0] = equip_type[1] = equip_type[2] = equip_type[3] = 0;
@@ -1270,17 +1285,22 @@ void hide_float_sprites(void) {
 
 void do_turn(void) {
   if (inv_anim_up) {
-    if (newjoy & J_UP) {
-      inv_select = (inv_select + 3) & 3;
-      inv_msg_update = 1;
-    } else if (newjoy & J_DOWN) {
-      inv_select = (inv_select + 1) & 3;
-      inv_msg_update = 1;
-    }
-
-    if ((newjoy & J_B) && !inv_anim_timer) {
-      inv_anim_timer = INV_ANIM_FRAMES;
-      inv_anim_up ^= 1;
+    if (!inv_anim_timer) {
+      if (newjoy & (J_UP | J_DOWN)) {
+        if (newjoy & J_UP) {
+          inv_select += 3;
+        } else if (newjoy & J_DOWN) {
+          ++inv_select;
+        }
+        inv_select &= 3;
+        inv_msg_update = 1;
+        inv_selected_pick = equip_type[inv_select];
+      }
+      if (newjoy & (J_B | J_A)) {
+        inv_anim_timer = INV_ANIM_FRAMES;
+        inv_anim_up ^= 1;
+        is_targeting = (newjoy & J_A) != 0;
+      }
     }
   } else {
     switch (turn) {
@@ -1338,6 +1358,7 @@ void pass_turn(void) {
 
 void move_player(void) {
   u8 dir, pos, newpos, tile;
+
   if (mob_move_timer[PLAYER_MOB] == 0) {
     if (joy & (J_LEFT | J_RIGHT | J_UP | J_DOWN)) {
       if (joy & J_LEFT) {
@@ -1350,69 +1371,78 @@ void move_player(void) {
         dir = DIR_DOWN;
       }
 
-      pos = mob_pos[PLAYER_MOB];
-      newpos = POS_DIR(pos, dir);
-      mobdir(PLAYER_MOB, dir);
-      if (IS_MOB(newpos)) {
-        mobbump(PLAYER_MOB, dir);
-        if (mob_type[mobmap[newpos] - 1] == MOB_TYPE_SCORPION &&
-            URAND_50_PERCENT()) {
-          blind();
+      if (is_targeting) {
+        if (dir != target_dir) {
+          target_dir = dir;
+          mobdir(PLAYER_MOB, dir);
+          mob_anim_timer[PLAYER_MOB] = 1;  // Update the player's direction
         }
-        hitmob(mobmap[newpos] - 1, 1);
-        goto done;
-      } else if (validmap[pos] & dirvalid[dir]) {
-        tile = tmap[newpos];
-        if (IS_WALL_TILE(tile)) {
-          if (IS_SPECIAL_TILE(tile)) {
-            if (tile == TILE_GATE) {
-              if (num_keys) {
-                --num_keys;
+      } else {
+        pos = mob_pos[PLAYER_MOB];
+        newpos = POS_DIR(pos, dir);
+        mobdir(PLAYER_MOB, dir);
+        if (IS_MOB(newpos)) {
+          mobbump(PLAYER_MOB, dir);
+          if (mob_type[mobmap[newpos] - 1] == MOB_TYPE_SCORPION &&
+              URAND_50_PERCENT()) {
+            blind();
+          }
+          hitmob(mobmap[newpos] - 1, 1);
+          goto done;
+        } else if (validmap[pos] & dirvalid[dir]) {
+          tile = tmap[newpos];
+          if (IS_WALL_TILE(tile)) {
+            if (IS_SPECIAL_TILE(tile)) {
+              if (tile == TILE_GATE) {
+                if (num_keys) {
+                  --num_keys;
 
-                update_tile(newpos, TILE_EMPTY);
-                set_digit_tile_during_vbl(INV_KEYS_ADDR, num_keys);
+                  update_tile(newpos, TILE_EMPTY);
+                  set_digit_tile_during_vbl(INV_KEYS_ADDR, num_keys);
+                  dosight = 1;
+                  goto dobump;
+                } else {
+                  showmsg(MSG_KEY, MSG_KEY_Y);
+                }
+              } else if (tile == TILE_VOID_BUTTON_U ||
+                         tile == TILE_VOID_BUTTON_L ||
+                         tile == TILE_VOID_BUTTON_R ||
+                         tile == TILE_VOID_BUTTON_D) {
+                update_tile(newpos, tile + TILE_VOID_OPEN_DIFF);
+                update_wall_face(newpos);
                 dosight = 1;
                 goto dobump;
-              } else {
-                showmsg(MSG_KEY, MSG_KEY_Y);
               }
-            } else if (tile == TILE_VOID_BUTTON_U ||
-                       tile == TILE_VOID_BUTTON_L ||
-                       tile == TILE_VOID_BUTTON_R ||
-                       tile == TILE_VOID_BUTTON_D) {
-              update_tile(newpos, tile + TILE_VOID_OPEN_DIFF);
-              update_wall_face(newpos);
-              dosight = 1;
+            }
+#if 0
+            // XXX: bump to destroy walls for testing
+            else {
+              update_tile(newpos, TILE_EMPTY);
               goto dobump;
             }
-          }
-#if 0
-          // XXX: bump to destroy walls for testing
-          else {
-            update_tile(newpos, TILE_EMPTY);
-            goto dobump;
-          }
 #endif
-          // fallthrough to bump below...
-        } else {
-          mobwalk(PLAYER_MOB, dir);
-          ++steps;
-          goto done;
+            // fallthrough to bump below...
+          } else {
+            mobwalk(PLAYER_MOB, dir);
+            ++steps;
+            goto done;
+          }
         }
-      }
 
-      // Bump w/o taking a turn
-      noturn = 1;
-    dobump:
-      mobbump(PLAYER_MOB, dir);
-    done:
-      turn = TURN_PLAYER_WAIT;
+        // Bump w/o taking a turn
+        noturn = 1;
+      dobump:
+        mobbump(PLAYER_MOB, dir);
+      done:
+        turn = TURN_PLAYER_WAIT;
+      }
     }
 
-    // Open inventory
+    // Open inventory (or back out of targeting)
     if ((newjoy & J_B) && !inv_anim_timer) {
       inv_anim_timer = INV_ANIM_FRAMES;
       inv_anim_up ^= 1;
+      is_targeting = 0;
     }
   }
 }
@@ -2305,7 +2335,10 @@ redo:
 
             // Update the inventory message if the selection was set to this
             // equip slot
-            inv_msg_update |= inv_select == i;
+            if (inv_select == i) {
+              inv_selected_pick = equip_type[inv_select];
+              inv_msg_update = 1;
+            }
             goto pickup;
           } else if (equip_type[i] == ptype) {
             // Increase charges
@@ -2490,6 +2523,42 @@ void update_floats_and_msg_and_sprs(void) {
       shadow_OAM[i].tile = spr_anim_frame[i];
       shadow_OAM[i].prop = 0;
       ++i;
+    }
+  }
+
+  // Draw the targeting arrow (also using sprites 0 through 3)
+  if (is_targeting) {
+    if (--inv_target_timer == 0) {
+      inv_target_timer = INV_TARGET_FRAMES;
+      ++inv_target_frame;
+    }
+
+    u8 dir;
+    u8 ppos = mob_pos[PLAYER_MOB];
+
+    for (dir = 0; dir < 4; ++dir) {
+      if (dir == target_dir || inv_selected_pick == PICKUP_TYPE_SPIN) {
+        u8 pos = POS_DIR(ppos, dir);
+        u8 x = POS_TO_X(pos);
+        u8 y = POS_TO_Y(pos);
+        u8 delta = INV_TARGET_OFFSET + pickbounce[inv_target_frame & 7];
+
+        if (dir == DIR_LEFT) {
+          x -= delta;
+        } else if (dir == DIR_RIGHT) {
+          x += delta;
+        } else if (dir == DIR_UP) {
+          y -= delta;
+        } else if (dir == DIR_DOWN) {
+          y += delta;
+        }
+
+        next_sprite->y = y;
+        next_sprite->x = x;
+        next_sprite->tile = TILE_ARROW_L + dir;
+        next_sprite->prop = 0;
+        ++next_sprite;
+      }
     }
   }
 }
