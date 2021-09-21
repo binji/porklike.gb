@@ -54,6 +54,7 @@ typedef void (*vfp)(void);
 #define INV_SELECT_X_OFFSET 32
 #define INV_SELECT_Y_OFFSET 40
 #define INV_ROW_LEN 14
+#define INV_BLANK_ROW_OFFSET 49 /* offset into inventory_map */
 #define NUM_INV_ROWS 4
 
 #define TILE_ANIM_FRAMES 8
@@ -101,12 +102,14 @@ typedef void (*vfp)(void);
 #define IS_ANIMATED_TILE(tile)         (flags_bin[tile] & 0b00010000)
 #define IS_WALL_FACE_TILE(tile)        (flags_bin[tile] & 0b00100000)
 #define TILE_HAS_CRACKED_VARIANT(tile) (flags_bin[tile] & 0b01000000)
+#define IS_BREAKABLE_WALL(tile)        (flags_bin[tile] & 0b10000000)
 
 #define IS_DOOR(pos) sigmatch((pos), doorsig, doormask)
 #define CAN_CARVE(pos) sigmatch((pos), carvesig, carvemask)
 #define IS_FREESTANDING(pos) sigmatch((pos), freesig, freemask)
 
 #define IS_MOB(pos) (mobmap[pos])
+#define IS_WALL_OR_MOB(tile, pos) (IS_WALL_TILE(tile) || mobmap[pos])
 #define IS_SMARTMOB(tile, pos) ((flags_bin[tile] & 3) || mobmap[pos])
 #define IS_MOB_AI(tile, pos)                                                   \
   ((flags_bin[tile] & 3) || (mobmap[pos] && !mob_active[mobmap[pos] - 1]))
@@ -314,8 +317,9 @@ const u8 obj_pal1[] = {
     0b01110101, // 0:LightGray 1:LightGray 2:Black 3:LightGray
 };
 
-const u8 dirx[] = {0xff, 1, 0, 0};       // L R U D
-const u8 diry[] = {0, 0, 0xff, 1};       // L R U D
+const Dir invdir[] = {DIR_RIGHT, DIR_LEFT, DIR_DOWN, DIR_UP}; // L R U D
+const u8 dirx[] = {0xff, 1, 0, 0};                            // L R U D
+const u8 diry[] = {0, 0, 0xff, 1};                            // L R U D
 const u8 dirpos[] = {0xff, 1,    0xf0, 16,
                      0xef, 0xf1, 15,   17}; // L R U D UL UR DL DR
 const u8 dirvalid[] = {VALID_L,  VALID_R,  VALID_U,  VALID_D,
@@ -666,6 +670,8 @@ const u8 pick_type_name_tile[] = {
 const u8 pick_type_name_start[] = {0,  0,  0,  8,  16, 24, 35,
                                    44, 53, 61, 69, 79, 87};
 
+const u8 pick_type_name_len[] = {0, 0, 8, 8, 8, 11, 9, 9, 8, 8, 10, 8};
+
 const u8 pick_type_desc_tile[] = {
     // JUMP 2 SPACES
     212, 223, 215, 218,   0, 231,   0, 221, 218, 203, 205, 207, 221,
@@ -906,10 +912,12 @@ void do_turn(void);
 void pass_turn(void);
 void begin_animate(void);
 void move_player(void);
+void use_pickup(void);
 void mobdir(u8 index, u8 dir);
 void mobwalk(u8 index, u8 dir);
 void mobbump(u8 index, u8 dir);
 void mobhop(u8 index, u8 pos);
+void mobhopnew(u8 index, u8 pos);
 void pickhop(u8 index, u8 pos);
 void hitmob(u8 index, u8 dmg);
 void hitpos(u8 pos, u8 dmg);
@@ -1055,6 +1063,8 @@ u8 mob_active[MAX_MOBS];  // 0=inactive 1=active
 u8 mob_charge[MAX_MOBS];  // only used by queen
 u8 mob_hp[MAX_MOBS];
 u8 mob_flash[MAX_MOBS];
+u8 mob_stun[MAX_MOBS];
+u8 mob_trigger[MAX_MOBS]; // Trigger a step action after this anim finishes?
 u8 num_mobs;
 u8 key_mob;
 
@@ -1197,7 +1207,7 @@ void init(void) {
 
   enable_interrupts();
 
-  floor = 1;
+  floor = 0;
   xrnd_init(0x1234);  // TODO: seed with DIV on button press
 
   gb_decompress_bkg_data(0, bg_bin);
@@ -1300,7 +1310,8 @@ void do_turn(void) {
       if (newjoy & (J_B | J_A)) {
         inv_anim_timer = INV_ANIM_FRAMES;
         inv_anim_up ^= 1;
-        is_targeting = (newjoy & J_A) != 0;
+        is_targeting =
+            ((newjoy & J_A) != 0) && inv_selected_pick != PICKUP_TYPE_NONE;
       }
     }
   } else {
@@ -1360,7 +1371,7 @@ void pass_turn(void) {
 void move_player(void) {
   u8 dir, pos, newpos, tile;
 
-  if (mob_move_timer[PLAYER_MOB] == 0) {
+  if (mob_move_timer[PLAYER_MOB] == 0 && !inv_anim_timer) {
     if (joy & (J_LEFT | J_RIGHT | J_UP | J_DOWN)) {
       if (joy & J_LEFT) {
         dir = DIR_LEFT;
@@ -1433,19 +1444,84 @@ void move_player(void) {
         // Bump w/o taking a turn
         noturn = 1;
       dobump:
+        mob_trigger[PLAYER_MOB] = !noturn;
         mobbump(PLAYER_MOB, dir);
       done:
         turn = TURN_PLAYER_WAIT;
       }
-    }
-
-    // Open inventory (or back out of targeting)
-    if ((newjoy & J_B) && !inv_anim_timer) {
+    } else if (is_targeting && (newjoy & J_A)) {
+      use_pickup();
+      turn = TURN_PLAYER_WAIT;
+    } else if (newjoy & J_B) {
+      // Open inventory (or back out of targeting)
       inv_anim_timer = INV_ANIM_FRAMES;
       inv_anim_up ^= 1;
       is_targeting = 0;
     }
   }
+}
+
+void use_pickup(void) {
+  u8 pos = mob_pos[PLAYER_MOB];
+  u8 valid1 = validmap[pos] & dirvalid[target_dir];
+  u8 pos1 = POS_DIR(pos, target_dir);
+  u8 valid2 = valid1 && (validmap[pos1] & dirvalid[target_dir]);
+  u8 pos2 = POS_DIR(pos1, target_dir);
+  u8 validb = validmap[pos] & dirvalid[invdir[target_dir]];
+  u8 posb = POS_DIR(pos, invdir[target_dir]);
+
+  u8 mob1 = mobmap[pos1];
+  u8 mob2 = mobmap[pos2];
+
+  switch (inv_selected_pick) {
+    case PICKUP_TYPE_JUMP:
+      if (valid2 && !IS_WALL_OR_MOB(tmap[pos2], pos2)) {
+        if (mob1) {
+          mob_stun[mob1 - 1] = 1;
+        }
+        mobhop(PLAYER_MOB, pos2);
+      }
+      break;
+
+    case PICKUP_TYPE_SMASH:
+      mobbump(PLAYER_MOB, target_dir);
+      if (valid1) {
+        hitpos(pos1, 2);
+        if (IS_BREAKABLE_WALL(tmap[pos1])) {
+          update_tile(pos1, dirt_tiles[xrnd() & 3]);
+          update_wall_face(pos1);
+        }
+      }
+      break;
+
+    case PICKUP_TYPE_SUPLEX:
+      if (valid1 && validb && mob1 && !IS_WALL_OR_MOB(tmap[posb], posb)) {
+        mobhop(mob1 - 1, posb);
+        mob_stun[mob1 - 1] = 1;
+        mob_trigger[mob1 - 1] = 1;
+        mobbump(PLAYER_MOB, target_dir);
+      }
+      break;
+  }
+
+  u16 equip_addr = INV_EQUIP_ADDR - 2 + (inv_select << 5);
+  if (--equip_charge[inv_select] == 0) {
+    equip_type[inv_select] = PICKUP_TYPE_NONE;
+    inv_msg_update = 1;
+
+    // Clear equip display
+    set_tile_range_during_vbl(equip_addr, inventory_map + INV_BLANK_ROW_OFFSET,
+                              INV_ROW_LEN);
+  } else {
+    // Update charge count display
+    set_digit_tile_during_vbl(equip_addr +
+                                  pick_type_name_len[inv_selected_pick],
+                              equip_charge[inv_select]);
+  }
+
+  mob_trigger[PLAYER_MOB] = 1;
+  dosight = 1;
+  is_targeting = 0;
 }
 
 void mobdir(u8 index, u8 dir) {
@@ -1470,6 +1546,7 @@ void mobwalk(u8 index, u8 dir) {
   mob_anim_state[index] = MOB_ANIM_STATE_WALK;
   mob_pos[index] = newpos = POS_DIR(pos, dir);
   mob_anim_speed[index] = mob_anim_timer[index] = 3;
+  mob_trigger[index] = 1;
   mobmap[pos] = 0;
   mobmap[newpos] = index + 1;
 }
@@ -1487,6 +1564,12 @@ void mobbump(u8 index, u8 dir) {
 }
 
 void mobhop(u8 index, u8 newpos) {
+  u8 pos = mob_pos[index];
+  mobhopnew(index, newpos);
+  set_tile_during_vbl(pos, dtmap[pos]);
+}
+
+void mobhopnew(u8 index, u8 newpos) {
   u8 pos, oldx, oldy, newx, newy;
   pos = mob_pos[index];
   mob_x[index] = oldx = POS_TO_X(pos);
@@ -1551,7 +1634,7 @@ void hitmob(u8 index, u8 dmg) {
       if (slime && XRND_20_PERCENT()) {
         mob = num_mobs;
         addmob(MOB_TYPE_SLIME, pos);
-        mobhop(mob, dropspot(pos));
+        mobhopnew(mob, dropspot(pos));
       } else if (mtype == MOB_TYPE_HEART_CHEST && XRND_20_PERCENT()) {
         droppick(PICKUP_TYPE_HEART, pos);
       } else {
@@ -1675,93 +1758,94 @@ void do_ai(void) {
 
 u8 do_mob_ai(u8 index) {
   u8 pos, mob, dir, valid;
-  pos = mob_pos[index];
-  switch (mob_task[index]) {
-    case MOB_AI_NONE:
-      break;
-
-    case MOB_AI_WAIT:
-      if (mobsightmap[pos]) {
-        addfloat(pos, FLOAT_FOUND);
-        mob_task[index] = mob_type_ai_active[mob_type[index]];
-        mob_target_pos[index] = mob_pos[PLAYER_MOB];
-        mob_ai_cool[index] = 0;
-        mob_active[index] = 1;
-      }
-      break;
-
-    case MOB_AI_WEED:
-      valid = validmap[pos];
-      if ((valid & VALID_L) && (mob = mobmap[POS_L(pos)])) {
-        dir = 0;
-      } else if ((valid & VALID_R) && (mob = mobmap[POS_R(pos)])) {
-        dir = 1;
-      } else if ((valid & VALID_U) && (mob = mobmap[POS_U(pos)])) {
-        dir = 2;
-      } else if ((valid & VALID_D) && (mob = mobmap[POS_D(pos)])) {
-        dir = 3;
-      } else {
-        return 0;
-      }
-      mobbump(index, dir);
-      hitmob(mob - 1, 1);
-      return 1;
-
-    case MOB_AI_REAPER:
-      if (ai_dobump(index)) {
-        return 1;
-      } else {
-        mob_target_pos[index] = mob_pos[PLAYER_MOB];
-        dir = ai_getnextstep(index);
-        if (dir != 255) {
-          mobwalk(index, dir);
-          return 1;
+  if (mob_stun[index]) {
+    mob_stun[index] = 0;
+  } else {
+    pos = mob_pos[index];
+    switch (mob_task[index]) {
+      case MOB_AI_WAIT:
+        if (mobsightmap[pos]) {
+          addfloat(pos, FLOAT_FOUND);
+          mob_task[index] = mob_type_ai_active[mob_type[index]];
+          mob_target_pos[index] = mob_pos[PLAYER_MOB];
+          mob_ai_cool[index] = 0;
+          mob_active[index] = 1;
         }
-      }
-      break;
+        break;
 
-    case MOB_AI_ATTACK:
-      if (ai_dobump(index)) {
-        return 1;
-      } else if (ai_tcheck(index)) {
-        dir = ai_getnextstep(index);
-        if (dir != 255) {
-          mobwalk(index, dir);
-          return 1;
-        }
-      }
-      break;
-
-    case MOB_AI_QUEEN:
-      if (!mobsightmap[pos]) {
-        mob_task[index] = MOB_AI_WAIT;
-        mob_active[index] = 0;
-        addfloat(pos, FLOAT_LOST);
-      } else {
-        mob_target_pos[index] = mob_pos[PLAYER_MOB];
-        if (mob_charge[index] == 0) {
-          dir = ai_getnextstep(index);
-          if (dir != 255) {
-            mob = num_mobs;
-            addmob(MOB_TYPE_SLIME, pos);
-            mobhop(mob, POS_DIR(pos, dir));
-            mobmap[pos] = index + 1; // Fix mobmap back to queen
-            mob_charge[index] = QUEEN_CHARGE_MOVES;
-            return 1;
-          }
+      case MOB_AI_WEED:
+        valid = validmap[pos];
+        if ((valid & VALID_L) && (mob = mobmap[POS_L(pos)])) {
+          dir = 0;
+        } else if ((valid & VALID_R) && (mob = mobmap[POS_R(pos)])) {
+          dir = 1;
+        } else if ((valid & VALID_U) && (mob = mobmap[POS_U(pos)])) {
+          dir = 2;
+        } else if ((valid & VALID_D) && (mob = mobmap[POS_D(pos)])) {
+          dir = 3;
         } else {
-          --mob_charge[index];
-          dir = ai_getnextstep_rev(index);
+          return 0;
+        }
+        mobbump(index, dir);
+        hitmob(mob - 1, 1);
+        return 1;
+
+      case MOB_AI_REAPER:
+        if (ai_dobump(index)) {
+          return 1;
+        } else {
+          mob_target_pos[index] = mob_pos[PLAYER_MOB];
+          dir = ai_getnextstep(index);
           if (dir != 255) {
             mobwalk(index, dir);
             return 1;
           }
         }
-      }
-      break;
+        break;
 
-    case MOB_AI_KONG:
-      break;
+      case MOB_AI_ATTACK:
+        if (ai_dobump(index)) {
+          return 1;
+        } else if (ai_tcheck(index)) {
+          dir = ai_getnextstep(index);
+          if (dir != 255) {
+            mobwalk(index, dir);
+            return 1;
+          }
+        }
+        break;
+
+      case MOB_AI_QUEEN:
+        if (!mobsightmap[pos]) {
+          mob_task[index] = MOB_AI_WAIT;
+          mob_active[index] = 0;
+          addfloat(pos, FLOAT_LOST);
+        } else {
+          mob_target_pos[index] = mob_pos[PLAYER_MOB];
+          if (mob_charge[index] == 0) {
+            dir = ai_getnextstep(index);
+            if (dir != 255) {
+              mob = num_mobs;
+              addmob(MOB_TYPE_SLIME, pos);
+              mobhopnew(mob, POS_DIR(pos, dir));
+              mobmap[pos] = index + 1; // Fix mobmap back to queen
+              mob_charge[index] = QUEEN_CHARGE_MOVES;
+              return 1;
+            }
+          } else {
+            --mob_charge[index];
+            dir = ai_getnextstep_rev(index);
+            if (dir != 255) {
+              mobwalk(index, dir);
+              return 1;
+            }
+          }
+        }
+        break;
+
+      case MOB_AI_KONG:
+        break;
+    }
   }
   return 0;
 }
@@ -2117,6 +2201,10 @@ void do_animate(void) {
 
   // Loop through all mobs, update animations
   for (i = 0; i < num_mobs; ++i) {
+    // TODO: need to properly handle active fogged mobs; they should still do
+    // their triggers but not draw anything. We also probably want to display
+    // mobs that are partially fogged; if the start or end position is
+    // unfogged.
     if (fogmap[mob_pos[i]]) { continue; }
 
     dosprite = dotile = 0;
@@ -2178,7 +2266,6 @@ void do_animate(void) {
               break;
 
             case MOB_ANIM_STATE_WALK:
-              trigger_step(i);
               goto done;
 
             done:
@@ -2191,6 +2278,11 @@ void do_animate(void) {
           }
           // Reset animation speed
           mob_anim_speed[i] = mob_type_anim_speed[mob_type[i]];
+
+          if (mob_trigger[i]) {
+            mob_trigger[i] = 0;
+            trigger_step(i);
+          }
         }
       } else if (dotile) {
         set_tile_during_vbl(mob_pos[i], frame);
@@ -2324,7 +2416,7 @@ redo:
       } else {
         // Is there a free spot in the equip?
         equip_addr = INV_EQUIP_ADDR;
-        len = pick_type_name_start[ptype + 1] - pick_type_name_start[ptype];
+        len = pick_type_name_len[ptype];
         for (i = 0; i < MAX_EQUIPS; ++i) {
           if (equip_type[i] == PICKUP_TYPE_NONE) {
             // Use this slot
@@ -2393,7 +2485,7 @@ redo:
   if (tile == TILE_SAW) {
     u8 hp = mob_hp[mob];
     hitmob(mob, 3);
-    if (mob != PLAYER_MOB && hp < 3) {
+    if (mob != PLAYER_MOB && hp <= 3) {
       droppick_rnd(pos);
     }
     update_tile(pos, TILE_SAW_BROKEN);
@@ -2657,6 +2749,9 @@ void addmob(MobType type, u8 pos) {
   mob_active[num_mobs] = 0;
   mob_charge[num_mobs] = 0;
   mob_hp[num_mobs] = mob_type_hp[type];
+  mob_flash[num_mobs] = 0;
+  mob_stun[num_mobs] = 0;
+  mob_trigger[num_mobs] = 0;
   ++num_mobs;
   mobmap[pos] = num_mobs; // index+1
 }
@@ -2692,6 +2787,9 @@ void delmob(u8 index) {
     mob_active[index] = mob_active[num_mobs];
     mob_charge[index] = mob_charge[num_mobs];
     mob_hp[index] = mob_hp[num_mobs];
+    mob_flash[index] = mob_flash[num_mobs];
+    mob_stun[index] = mob_stun[num_mobs];
+    mob_trigger[index] = mob_trigger[num_mobs];
     mobmap[mob_pos[index]] = index + 1;
   }
 }
