@@ -1,3 +1,14 @@
+_clear_wram::
+  ld hl, #l__DATA
+  push hl
+  ld hl, #0
+  push hl
+  ld hl, #s__DATA
+  push hl
+  call _memset
+  add sp, #6
+  ret
+
 ; u16 drag(u16 x)
 ;
 ; equivalent to:  x -= (x >> 3), but handles sign properly

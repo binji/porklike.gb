@@ -932,6 +932,7 @@ const u16 boom_spr_dy[] = {33,    65518, 65432, 190,   65389, 65472,
 
 u8 xrnd(void) __preserves_regs(b, c);
 void xrnd_init(u16) __preserves_regs(b, c);
+void clear_wram(void) __preserves_regs(b, c);
 
 void init(void);
 void do_turn(void);
@@ -1172,9 +1173,6 @@ u16 steps;
 
 u8 obj_pal1_timer, obj_pal1_index;
 
-u16 myclock;
-void tim_interrupt(void) { ++myclock; }
-
 void main(void) {
   init();
   mapgen();
@@ -1224,21 +1222,21 @@ void main(void) {
 
 void init(void) {
   DISPLAY_OFF;
-  // TODO: clear WRAM to 0
+  clear_wram();
 
   // 0:LightGray 1:DarkGray 2:Black 3:White
   BGP_REG = OBP0_REG = OBP1_REG = fadepal[0];
   obj_pal1_timer = OBJ1_PAL_FRAMES;
-  obj_pal1_index = 0;
 
+#if 0
   add_TIM(tim_interrupt);
   TMA_REG = 0;      // Divide clock by 256 => 16Hz
   TAC_REG = 0b100;  // 4096Hz, timer on.
   IE_REG |= TIM_IFLAG;
+#endif
 
   enable_interrupts();
 
-  floor = 0;
   xrnd_init(0x1234);  // TODO: seed with DIV on button press
 
   gb_decompress_bkg_data(0, bg_bin);
@@ -1250,38 +1248,19 @@ void init(void) {
   WX_REG = 23;
   WY_REG = 128;
 
-  num_picks = 0;
-  num_mobs = 0;
-  num_dead_mobs = 0;
   addmob(MOB_TYPE_PLAYER, 0);
-
-  doupdatemap = 0;
-  donextlevel = 0;
-  doblind = 0;
-  dosight = 0;
 
   floor_tile[0] = TILE_0;
   floor_tile[1] = 0;
 
   turn = TURN_PLAYER;
-  noturn = 0;
-  is_targeting = 0;
 
   next_float = BASE_FLOAT;
 
-  inv_anim_up = 0;
-  inv_anim_timer = 0;
-  inv_select = 0;
   inv_select_timer = INV_SELECT_FRAMES;
-  inv_select_frame = 0;
   inv_target_timer = INV_TARGET_FRAMES;
-  inv_target_frame = 0;
   inv_msg_update = 1;
 
-  equip_type[0] = equip_type[1] = equip_type[2] = equip_type[3] = 0;
-  equip_charge[0] = equip_charge[1] = equip_charge[2] = equip_charge[3] = 0;
-
-  tile_inc = 0;
   tile_timer = TILE_ANIM_FRAMES;
   tile_code[0] = mob_tile_code[0] = 0xc9; // ret
   add_VBL(vbl_interrupt);
