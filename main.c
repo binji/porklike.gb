@@ -200,6 +200,7 @@ typedef void (*vfp)(void);
 #define TILE_CRACKED_DIFF 0x34
 
 // Sprite tiles
+#define TILE_SHOT 0x1
 #define TILE_ARROW_L 0x9
 #define TILE_ARROW_R 0xa
 #define TILE_ARROW_U 0xb
@@ -278,6 +279,10 @@ typedef enum PickupType {
 
 typedef enum SprType {
   SPR_TYPE_BOOM,
+  SPR_TYPE_BOLT,
+  SPR_TYPE_PUSH,
+  SPR_TYPE_GRAPPLE,
+  SPR_TYPE_HOOK,
   SPR_TYPE_SPIN,
 } SprType;
 
@@ -913,6 +918,8 @@ void pass_turn(void);
 void begin_animate(void);
 void move_player(void);
 void use_pickup(void);
+u8 shoot(u8 pos, u8 hit);
+u8 shoot_dist_over_3(u8 pos, u8 hit);
 void mobdir(u8 index, u8 dir);
 void mobwalk(u8 index, u8 dir);
 void mobbump(u8 index, u8 dir);
@@ -920,7 +927,7 @@ void mobhop(u8 index, u8 pos);
 void mobhopnew(u8 index, u8 pos);
 void pickhop(u8 index, u8 pos);
 void hitmob(u8 index, u8 dmg);
-void hitpos(u8 pos, u8 dmg);
+void hitpos(u8 pos, u8 dmg, u8 stun);
 void update_wall_face(u8 pos);
 void do_ai(void);
 void do_ai_weeds(void);
@@ -1092,6 +1099,7 @@ u16 spr_x[MAX_SPRS], spr_y[MAX_SPRS];   // 8.8 fixed point
 u16 spr_dx[MAX_SPRS], spr_dy[MAX_SPRS]; // 8.8 fixed point
 u8 spr_timer[MAX_SPRS];
 u8 spr_drag[MAX_SPRS];
+u8 spr_trigger_val[MAX_SPRS]; // Which value to use for trigger action
 u8 num_sprs;
 
 u8 tile_code[TILE_CODE_SIZE];         // code for animating tiles
@@ -1470,9 +1478,21 @@ void use_pickup(void) {
   u8 validb = validmap[pos] & dirvalid[invdir[target_dir]];
   u8 posb = POS_DIR(pos, invdir[target_dir]);
 
+  u8 valid, hit, land;
+  hit = pos;
+  do {
+    valid = validmap[hit] & dirvalid[target_dir];
+    if (valid) {
+      land = hit;
+      hit = POS_DIR(hit, target_dir);
+    }
+  } while(valid && !IS_WALL_OR_MOB(tmap[hit], hit));
+
   u8 mob1 = mobmap[pos1];
   u8 mob2 = mobmap[pos2];
+  u8 mobh = mobmap[hit];
 
+  u8 spr;
   switch (inv_selected_pick) {
     case PICKUP_TYPE_JUMP:
       if (valid2 && !IS_WALL_OR_MOB(tmap[pos2], pos2)) {
@@ -1483,10 +1503,22 @@ void use_pickup(void) {
       }
       break;
 
+    case PICKUP_TYPE_BOLT:
+      spr = shoot(pos, hit);
+      spr_type[spr] = SPR_TYPE_BOLT;
+      spr_trigger_val[spr] = hit;
+      break;
+
+    case PICKUP_TYPE_PUSH:
+      spr = shoot(pos, hit);
+      spr_type[spr] = SPR_TYPE_PUSH;
+      spr_trigger_val[spr] = mobh;
+      break;
+
     case PICKUP_TYPE_SMASH:
       mobbump(PLAYER_MOB, target_dir);
       if (valid1) {
-        hitpos(pos1, 2);
+        hitpos(pos1, 2, 0);
         if (IS_BREAKABLE_WALL(tmap[pos1])) {
           update_tile(pos1, dirt_tiles[xrnd() & 3]);
           update_wall_face(pos1);
@@ -1522,6 +1554,32 @@ void use_pickup(void) {
   mob_trigger[PLAYER_MOB] = 1;
   dosight = 1;
   is_targeting = 0;
+}
+
+u8 shoot(u8 pos, u8 hit) {
+  static const u8 shoot_dx[] = {0xfd, 3, 0, 0}; // L R U D
+  static const u8 shoot_dy[] = {0, 0, 0xfd, 3}; // L R U D
+
+  spr_anim_frame[num_sprs] = TILE_SHOT;
+  spr_anim_timer[num_sprs] = spr_anim_speed[num_sprs] = 255;
+  spr_x[num_sprs] = POS_TO_X(pos) << 8;
+  spr_y[num_sprs] = POS_TO_Y(pos) << 8;
+  spr_dx[num_sprs] = shoot_dx[target_dir] << 8;
+  spr_dy[num_sprs] = shoot_dy[target_dir] << 8;
+  spr_drag[num_sprs] = 0;
+  spr_timer[num_sprs] = shoot_dist_over_3(pos, hit);
+  return num_sprs++;
+}
+
+u8 shoot_dist_over_3(u8 pos, u8 hit) {
+  static const u8 calc[] = {0,  3,  6,  8,  11, 14, 16, 19,
+                            22, 24, 27, 30, 32, 35, 38, 40};
+
+  u8 dist = (target_dir == DIR_LEFT)    ? pos - hit
+            : (target_dir == DIR_RIGHT) ? hit - pos
+            : (target_dir == DIR_UP)    ? (pos - hit) >> 4
+                                        : (hit - pos) >> 4;
+  return calc[dist];
 }
 
 void mobdir(u8 index, u8 dir) {
@@ -1660,7 +1718,7 @@ void hitmob(u8 index, u8 dmg) {
           }
           update_tile(newpos, tile);
         noupdate:
-          hitpos(newpos, dmg);
+          hitpos(newpos, dmg, 0);
         }
       } while (dir--);
       update_tile(pos, TILE_BOMB_EXPLODED);
@@ -1709,11 +1767,14 @@ void hitmob(u8 index, u8 dmg) {
   }
 }
 
-void hitpos(u8 pos, u8 dmg) {
+void hitpos(u8 pos, u8 dmg, u8 stun) {
   u8 tile, mob;
   tile = tmap[pos];
   if ((mob = mobmap[pos])) {
     hitmob(mob - 1, dmg); // XXX maybe recursive...
+    if (stun) {
+      mob_stun[mob - 1] = 1;
+    }
   }
   if (tmap[pos] == TILE_SAW) {
     nop_saw_anim(pos);
@@ -2587,6 +2648,30 @@ void update_floats_and_msg_and_sprs(void) {
   // Draw sprs using the same ones allocated for messages
   for (i = 0; i < num_sprs;) {
     if (--spr_timer[i] == 0) {
+      switch (spr_type[i]) {
+        case SPR_TYPE_BOLT:
+          hitpos(spr_trigger_val[i], 1, 1);
+          break;
+
+        case SPR_TYPE_PUSH: {
+          u8 mob = spr_trigger_val[i];
+          if (mob) {
+            u8 pos = mob_pos[mob - 1];
+            if (validmap[pos] & dirvalid[target_dir]) {
+              u8 newpos = POS_DIR(pos, target_dir);
+              if (!IS_WALL_OR_MOB(tmap[newpos], newpos)) {
+                mobwalk(mob - 1, target_dir);
+              } else {
+                mobbump(mob - 1, target_dir);
+              }
+            }
+            mob_stun[mob - 1] = 1;
+            // TODO: make visible
+          }
+          break;
+        }
+      }
+
       if (--num_sprs != i) {
         spr_type[i] = spr_type[num_sprs];
         spr_anim_frame[i] = spr_anim_frame[num_sprs];
@@ -2598,6 +2683,7 @@ void update_floats_and_msg_and_sprs(void) {
         spr_dy[i] = spr_dy[num_sprs];
         spr_drag[i] = spr_drag[num_sprs];
         spr_timer[i] = spr_timer[num_sprs];
+        spr_trigger_val[i] = spr_trigger_val[num_sprs];
       }
       hide_sprite(num_sprs);
     } else {
@@ -2839,7 +2925,11 @@ void droppick(PickupType type, u8 pos) {
 }
 
 void droppick_rnd(u8 pos) {
+#if 1
   droppick(randint(10) + 2, pos);
+#else
+  droppick(PICKUP_TYPE_PUSH, pos);
+#endif
 }
 
 void adddeadmob(u8 index) {
