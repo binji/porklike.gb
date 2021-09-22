@@ -990,6 +990,8 @@ u8 dropspot(u8 pos);
 
 void adddeadmob(u8 index);
 
+u8 addspr(u8 speed, u16 x, u16 y, u16 dx, u16 dy, u8 drag, u8 timer, u8 prop);
+
 void initdtmap(void);
 
 // Map generation
@@ -1213,8 +1215,6 @@ void main(void) {
     wait_vbl_done();
   }
 }
-
-extern u16 s__DATA, l__DATA;
 
 void init(void) {
   DISPLAY_OFF;
@@ -1600,16 +1600,11 @@ void use_pickup(void) {
 }
 
 u8 shoot(u8 pos, u8 hit, u8 tile, u8 prop) {
-  spr_anim_frame[num_sprs] = tile;
-  spr_anim_timer[num_sprs] = spr_anim_speed[num_sprs] = 255;
-  spr_x[num_sprs] = POS_TO_X(pos) << 8;
-  spr_y[num_sprs] = POS_TO_Y(pos) << 8;
-  spr_dx[num_sprs] = shoot_dx[target_dir] << 8;
-  spr_dy[num_sprs] = shoot_dy[target_dir] << 8;
-  spr_drag[num_sprs] = 0;
-  spr_timer[num_sprs] = n_over_3[shoot_dist(pos, hit)];
-  spr_prop[num_sprs] = prop;
-  return num_sprs++;
+  u8 spr = addspr(255, POS_TO_X(pos) << 8, POS_TO_Y(pos) << 8,
+                  shoot_dx[target_dir] << 8, shoot_dy[target_dir] << 8, 0,
+                  n_over_3[shoot_dist(pos, hit)], prop);
+  spr_anim_frame[spr] = tile;
+  return spr;
 }
 
 u8 shoot_dist(u8 pos, u8 hit) {
@@ -1658,21 +1653,11 @@ u8 rope(u8 from, u8 to) {
   }
 
   do {
-    spr_type[num_sprs] = SPR_TYPE_NONE;
-    spr_anim_frame[num_sprs] = tail;
-    spr_anim_timer[num_sprs] = spr_anim_speed[num_sprs] = 255;
-    spr_x[num_sprs] = x;
-    spr_y[num_sprs] = y;
-    spr_dx[num_sprs] = dx;
-    spr_dy[num_sprs] = dy;
-    spr_drag[num_sprs] = 0;
-    spr_timer[num_sprs] = timer;
-    spr_prop[num_sprs] = prop;
-
+    u8 spr = addspr(255, x, y, dx, dy, 0, timer, prop);
+    spr_type[spr] = SPR_TYPE_NONE;
+    spr_anim_frame[spr] = tail;
     dx += ddx;
     dy += ddy;
-    num_sprs++;
-
     pos = POS_DIR(pos, target_dir);
   } while(pos != to);
 
@@ -1823,18 +1808,13 @@ void hitmob(u8 index, u8 dmg) {
       x = POS_TO_X(pos) << 8;
       y = POS_TO_Y(pos) << 8;
 
+      u8 spr;
       for (i = 0; i < sizeof(boom_spr_speed); ++i) {
-        spr_type[num_sprs] = SPR_TYPE_BOOM;
-        spr_anim_frame[num_sprs] = TILE_BOOM;
-        spr_anim_timer[num_sprs] = spr_anim_speed[num_sprs] =
-            boom_spr_anim_speed[i];
-        spr_x[num_sprs] = x + boom_spr_x[i];
-        spr_y[num_sprs] = y + boom_spr_y[i];
-        spr_dx[num_sprs] = boom_spr_dx[i];
-        spr_dy[num_sprs] = boom_spr_dy[i];
-        spr_drag[num_sprs] = 1;
-        spr_timer[num_sprs] = boom_spr_speed[i];
-        ++num_sprs;
+        spr =
+            addspr(boom_spr_anim_speed[i], x + boom_spr_x[i], y + boom_spr_y[i],
+                   boom_spr_dx[i], boom_spr_dy[i], 1, boom_spr_speed[i], 0);
+        spr_type[spr] = SPR_TYPE_BOOM;
+        spr_anim_frame[spr] = TILE_BOOM;
       }
     }
   } else {
@@ -1933,17 +1913,14 @@ u8 do_mob_ai(u8 index) {
 
       case MOB_AI_WEED:
         valid = validmap[pos];
-        if ((valid & VALID_L) && (mob = mobmap[POS_L(pos)])) {
-          dir = 0;
-        } else if ((valid & VALID_R) && (mob = mobmap[POS_R(pos)])) {
-          dir = 1;
-        } else if ((valid & VALID_U) && (mob = mobmap[POS_U(pos)])) {
-          dir = 2;
-        } else if ((valid & VALID_D) && (mob = mobmap[POS_D(pos)])) {
-          dir = 3;
-        } else {
-          return 0;
+        for (dir = 0; dir < 4; ++dir) {
+          if ((valid & dirvalid[dir]) && (mob = mobmap[POS_DIR(pos, dir)])) {
+            goto doweed;
+          }
         }
+        return 0;
+
+      doweed:
         mobbump(index, dir);
         hitmob(mob - 1, 1);
         return 1;
@@ -2016,18 +1993,14 @@ u8 ai_dobump(u8 index) {
   // Use mobsightmap as a quick check to determine whether this mob is close to
   // the player.
   if (mobsightmap[pos]) {
-    if (diff == 0xff) { // left
-      dir = 0;
-    } else if (diff == 1) { // right
-      dir = 1;
-    } else if (diff == 0xf0) { // up
-      dir = 2;
-    } else if (diff == 0x10) { // down
-      dir = 3;
-    } else {
-      return 0;
+    for (dir = 0; dir < 4; ++dir) {
+      if (diff == dirpos[dir]) {
+        goto ok;
+      }
     }
+    return 0;
 
+ok:
     mobbump(index, dir);
     hitmob(PLAYER_MOB, 1);
     if (mob_type[index] == MOB_TYPE_SCORPION) {
@@ -2055,78 +2028,46 @@ u8 ai_tcheck(u8 index) {
 }
 
 u8 ai_getnextstep(u8 index) {
-  u8 pos, newpos, bestval, bestdir, dist, valid;
+  u8 pos, newpos, bestval, bestdir, dist, valid, dir;
   pos = mob_pos[index];
   calcdist_ai(pos, mob_target_pos[index]);
   bestval = bestdir = 255;
   valid = validmap[pos];
 
-  newpos = POS_L(pos);
-  if ((valid & VALID_L) && !IS_SMARTMOB(tmap[newpos], newpos) &&
-      (dist = distmap[newpos]) && dist < bestval) {
-    bestval = dist;
-    bestdir = 0;
-  }
-  newpos = POS_R(pos);
-  if ((valid & VALID_R) && !IS_SMARTMOB(tmap[newpos], newpos) &&
-      (dist = distmap[newpos]) && dist < bestval) {
-    bestval = dist;
-    bestdir = 1;
-  }
-  newpos = POS_U(pos);
-  if ((valid & VALID_U) && !IS_SMARTMOB(tmap[newpos], newpos) &&
-      (dist = distmap[newpos]) && dist < bestval) {
-    bestval = dist;
-    bestdir = 2;
-  }
-  newpos = POS_D(pos);
-  if ((valid & VALID_D) && !IS_SMARTMOB(tmap[newpos], newpos) &&
-      (dist = distmap[newpos]) && dist < bestval) {
-    bestval = dist;
-    bestdir = 3;
+  for (dir = 0; dir < 4; ++dir) {
+    newpos = POS_DIR(pos, dir);
+    if ((valid & dirvalid[dir]) && !IS_SMARTMOB(tmap[newpos], newpos) &&
+        (dist = distmap[newpos]) && dist < bestval) {
+      bestval = dist;
+      bestdir = dir;
+    }
   }
   return bestdir;
 }
 
 // TODO: combine with above?
 u8 ai_getnextstep_rev(u8 index) {
-  u8 pos, newpos, bestval, bestdir, dist, valid;
+  u8 pos, newpos, bestval, bestdir, dist, valid, dir;
   pos = mob_pos[index];
   calcdist_ai(pos, mob_target_pos[index]);
   bestval = 0;
   bestdir = 255;
   valid = validmap[pos];
 
-  newpos = POS_L(pos);
-  if ((valid & VALID_L) && !IS_SMARTMOB(tmap[newpos], newpos) &&
-      (dist = distmap[newpos]) && dist > bestval) {
-    bestval = dist;
-    bestdir = 0;
-  }
-  newpos = POS_R(pos);
-  if ((valid & VALID_R) && !IS_SMARTMOB(tmap[newpos], newpos) &&
-      (dist = distmap[newpos]) && dist > bestval) {
-    bestval = dist;
-    bestdir = 1;
-  }
-  newpos = POS_U(pos);
-  if ((valid & VALID_U) && !IS_SMARTMOB(tmap[newpos], newpos) &&
-      (dist = distmap[newpos]) && dist > bestval) {
-    bestval = dist;
-    bestdir = 2;
-  }
-  newpos = POS_D(pos);
-  if ((valid & VALID_D) && !IS_SMARTMOB(tmap[newpos], newpos) &&
-      (dist = distmap[newpos]) && dist > bestval) {
-    bestval = dist;
-    bestdir = 3;
+  for (dir = 0; dir < 4; ++dir) {
+    newpos = POS_DIR(pos, dir);
+    if ((valid & dirvalid[dir]) && !IS_SMARTMOB(tmap[newpos], newpos) &&
+        (dist = distmap[newpos]) && dist > bestval) {
+      bestval = dist;
+      bestdir = dir;
+    }
   }
   return bestdir;
 }
 
 void sight(void) {
   u8 ppos, pos, adjpos, diff, head, oldtail, newtail, sig, valid, first,
-      dist, maxdist;
+      dist, maxdist, dir;
   memset(mobsightmap, 0, sizeof(mobsightmap));
 
   // Put a "ret" at the beginning of the tile animation code in case it is
@@ -2179,37 +2120,19 @@ void sight(void) {
 
         // Unfog neighboring walls, within player sight range
         if (dist < maxdist) {
-          if ((valid & VALID_U) && fogmap[adjpos = POS_U(pos)] &&
-              IS_WALL_TILE(tmap[adjpos])) {
-            unfog_tile(adjpos);
-            fogmap[adjpos] = 0;
-          }
-          if ((valid & VALID_L) && fogmap[adjpos = POS_L(pos)] &&
-              IS_WALL_TILE(tmap[adjpos])) {
-            unfog_tile(adjpos);
-            fogmap[adjpos] = 0;
-          }
-          if ((valid & VALID_R) && fogmap[adjpos = POS_R(pos)] &&
-              IS_WALL_TILE(tmap[adjpos])) {
-            unfog_tile(adjpos);
-            fogmap[adjpos] = 0;
-          }
-          if ((valid & VALID_D) && fogmap[adjpos = POS_D(pos)] &&
-              IS_WALL_TILE(tmap[adjpos])) {
-            unfog_tile(adjpos);
-            fogmap[adjpos] = 0;
+          for (dir = 0; dir < 4; ++dir) {
+            if ((valid & dirvalid[dir]) && fogmap[adjpos = POS_DIR(pos, dir)] &&
+                IS_WALL_TILE(tmap[adjpos])) {
+              unfog_tile(adjpos);
+              fogmap[adjpos] = 0;
+            }
           }
         }
 
         sig = sightsig[(u8)(68 + diff)] & valid;
-        if (sig & VALID_UL) { cands[newtail++] = POS_UL(diff); }
-        if (sig & VALID_U)  { cands[newtail++] = POS_U (diff); }
-        if (sig & VALID_UR) { cands[newtail++] = POS_UR(diff); }
-        if (sig & VALID_L)  { cands[newtail++] = POS_L (diff); }
-        if (sig & VALID_R)  { cands[newtail++] = POS_R (diff); }
-        if (sig & VALID_DL) { cands[newtail++] = POS_DL(diff); }
-        if (sig & VALID_D)  { cands[newtail++] = POS_D (diff); }
-        if (sig & VALID_DR) { cands[newtail++] = POS_DR(diff); }
+        for (dir = 0; dir < 8; ++dir) {
+          if (sig & dirvalid[dir]) { cands[newtail++] = POS_DIR(diff, dir); }
+        }
       }
     } while(head != oldtail);
     ++dist;
@@ -2256,7 +2179,7 @@ void blind(void) {
 }
 
 void calcdist_ai(u8 from, u8 to) {
-  u8 pos, head, oldtail, newtail, valid, dist, newpos, maxdist;
+  u8 pos, head, oldtail, newtail, valid, dist, newpos, maxdist, dir;
   cands[head = 0] = pos = to;
   newtail = 1;
 
@@ -2273,17 +2196,10 @@ void calcdist_ai(u8 from, u8 to) {
       if (!distmap[pos]) {
         distmap[pos] = dist;
         valid = validmap[pos];
-        if ((valid & VALID_U) && !distmap[newpos = POS_U(pos)]) {
-          if (!IS_MOB_AI(tmap[newpos], newpos)) { cands[newtail++] = newpos; }
-        }
-        if ((valid & VALID_L) && !distmap[newpos = POS_L(pos)]) {
-          if (!IS_MOB_AI(tmap[newpos], newpos)) { cands[newtail++] = newpos; }
-        }
-        if ((valid & VALID_R) && !distmap[newpos = POS_R(pos)]) {
-          if (!IS_MOB_AI(tmap[newpos], newpos)) { cands[newtail++] = newpos; }
-        }
-        if ((valid & VALID_D) && !distmap[newpos = POS_D(pos)]) {
-          if (!IS_MOB_AI(tmap[newpos], newpos)) { cands[newtail++] = newpos; }
+        for (dir = 0; dir < 4; ++dir) {
+          if ((valid & dirvalid[dir]) && !distmap[newpos = POS_DIR(pos, dir)]) {
+            if (!IS_MOB_AI(tmap[newpos], newpos)) { cands[newtail++] = newpos; }
+          }
         }
       }
     } while (head != oldtail);
@@ -3054,6 +2970,18 @@ void adddeadmob(u8 index) {
   ++num_dead_mobs;
 }
 
+u8 addspr(u8 speed, u16 x, u16 y, u16 dx, u16 dy, u8 drag, u8 timer, u8 prop) {
+  spr_anim_timer[num_sprs] = spr_anim_speed[num_sprs] = speed;
+  spr_x[num_sprs] = x;
+  spr_y[num_sprs] = y;
+  spr_dx[num_sprs] = dx;
+  spr_dy[num_sprs] = dy;
+  spr_drag[num_sprs] = drag;
+  spr_timer[num_sprs] = timer;
+  spr_prop[num_sprs] = prop;
+  return num_sprs++;
+}
+
 void initdtmap(void) {
   u8 pos = 0;
   do {
@@ -3244,7 +3172,7 @@ void roomgen(void) {
 void copymap(u8 index) {
   const u8 *src;
   u8 *dst;
-  u8 pos, valid, i, w, h;
+  u8 pos, valid, i, w, h, dir;
 
   // Fill map with default tiles. TILE_NONE is used for floor0 and floor10, and
   // TILE_WALL is used for all gate maps
@@ -3312,17 +3240,18 @@ void copymap(u8 index) {
         ds_sizes[ds_nextid] = 1;
 
         valid = validmap[pos];
-        if (valid & VALID_U) { ds_union(ds_nextid, ds_sets[POS_U(pos)]); }
-        if (valid & VALID_L) { ds_union(ds_nextid, ds_sets[POS_L(pos)]); }
-        if (valid & VALID_R) { ds_union(ds_nextid, ds_sets[POS_R(pos)]); }
-        if (valid & VALID_D) { ds_union(ds_nextid, ds_sets[POS_D(pos)]); }
+        for (dir = 0; dir < 4; ++dir) {
+          if (valid & dirvalid[dir]) {
+            ds_union(ds_nextid, ds_sets[POS_DIR(pos, dir)]);
+          }
+        }
         break;
     }
   } while (++pos);
 }
 
 void mazeworms(void) {
-  u8 pos, cand, valid;
+  u8 pos, cand, valid, dir;
 
   memset(tempmap, 0, sizeof(tempmap));
 
@@ -3354,10 +3283,11 @@ void mazeworms(void) {
       // tile can be connect to another region (since it would not be
       // carvable). So we only need to merge regions here.
       valid = validmap[pos];
-      if (valid & VALID_U) { ds_union(ds_nextid, ds_sets[POS_U(pos)]); }
-      if (valid & VALID_L) { ds_union(ds_nextid, ds_sets[POS_L(pos)]); }
-      if (valid & VALID_R) { ds_union(ds_nextid, ds_sets[POS_R(pos)]); }
-      if (valid & VALID_D) { ds_union(ds_nextid, ds_sets[POS_D(pos)]); }
+      for (dir = 0; dir < 4; ++dir) {
+        if (valid & dirvalid[dir]) {
+          ds_union(ds_nextid, ds_sets[POS_DIR(pos, dir)]);
+        }
+      }
     }
   } while(num_cands > 1);
 }
@@ -3394,7 +3324,7 @@ u8 nexttoroom8(u8 pos, u8 valid) {
 }
 
 void digworm(u8 pos) {
-  u8 dir, step, num_dirs, valid;
+  u8 dir, step, num_dirs, valid, i;
 
   // Pick a random direction
   dir = xrnd() & 3;
@@ -3409,14 +3339,9 @@ void digworm(u8 pos) {
 
     // Update neighbors
     valid = validmap[pos];
-    if (valid & VALID_UL) { update_carve1(POS_UL(pos)); }
-    if (valid & VALID_U)  { update_carve1(POS_U (pos)); }
-    if (valid & VALID_UR) { update_carve1(POS_UR(pos)); }
-    if (valid & VALID_L)  { update_carve1(POS_L (pos)); }
-    if (valid & VALID_R)  { update_carve1(POS_R (pos)); }
-    if (valid & VALID_DL) { update_carve1(POS_DL(pos)); }
-    if (valid & VALID_D)  { update_carve1(POS_D (pos)); }
-    if (valid & VALID_DR) { update_carve1(POS_DR(pos)); }
+    for (i = 0; i < 8; ++i) {
+      if (valid & dirvalid[i]) { update_carve1(POS_DIR(pos, i)); }
+    }
 
     // Update the disjoint set
     ds_sets[pos] = ds_nextid;
@@ -3428,10 +3353,11 @@ void digworm(u8 pos) {
         (XRND_50_PERCENT() && step > 2)) {
       step = 0;
       num_dirs = 0;
-      if ((valid & VALID_L) && tempmap[POS_L(pos)]) { cands[num_dirs++] = 0; }
-      if ((valid & VALID_R) && tempmap[POS_R(pos)]) { cands[num_dirs++] = 1; }
-      if ((valid & VALID_U) && tempmap[POS_U(pos)]) { cands[num_dirs++] = 2; }
-      if ((valid & VALID_D) && tempmap[POS_D(pos)]) { cands[num_dirs++] = 3; }
+      for (i = 0; i < 4; ++i) {
+        if ((valid & dirvalid[i]) && tempmap[POS_DIR(pos, i)]) {
+          cands[num_dirs++] = i;
+        }
+      }
       if (num_dirs == 0) return;
       dir = cands[randint(num_dirs)];
     }
@@ -3541,7 +3467,7 @@ void carvecuts(void) {
 }
 
 void calcdist(u8 pos) {
-  u8 head, oldtail, newtail, sig, valid, dist, newpos;
+  u8 head, oldtail, newtail, sig, valid, dist, newpos, dir;
   cands[head = 0] = pos;
   newtail = 1;
 
@@ -3555,21 +3481,11 @@ void calcdist(u8 pos) {
       pos = cands[head++];
       valid = validmap[pos];
       sig = ~sigmap[pos] & valid;
-      if (!distmap[newpos = POS_U(pos)]) {
-        if (valid & VALID_U) { distmap[newpos] = dist; }
-        if (sig & VALID_U) { cands[newtail++] = newpos; }
-      }
-      if (!distmap[newpos = POS_L(pos)]) {
-        if (valid & VALID_L) { distmap[newpos] = dist; }
-        if (sig & VALID_L) { cands[newtail++] = newpos; }
-      }
-      if (!distmap[newpos = POS_R(pos)]) {
-        if (valid & VALID_R) { distmap[newpos] = dist; }
-        if (sig & VALID_R) { cands[newtail++] = newpos; }
-      }
-      if (!distmap[newpos = POS_D(pos)]) {
-        if (valid & VALID_D) { distmap[newpos] = dist; }
-        if (sig & VALID_D) { cands[newtail++] = newpos; }
+      for (dir = 0; dir < 4; ++dir) {
+        if (!distmap[newpos = POS_DIR(pos, dir)]) {
+          if (valid & dirvalid[dir]) { distmap[newpos] = dist; }
+          if (sig & dirvalid[dir]) { cands[newtail++] = newpos; }
+        }
       }
     } while (head != oldtail);
   } while (oldtail != newtail);
@@ -3668,7 +3584,7 @@ u8 startscore(u8 pos) {
 }
 
 void fillends(void) {
-  u8 pos, valid;
+  u8 pos, valid, dir;
   memset(tempmap, 0, sizeof(tempmap));
 
   // Find all starting positions (dead ends)
@@ -3691,14 +3607,11 @@ void fillends(void) {
       tempmap[pos] = 0;
 
       valid = validmap[pos];
-      if (valid & VALID_UL) { update_fill1(POS_UL(pos)); }
-      if (valid & VALID_U)  { update_fill1(POS_U (pos)); }
-      if (valid & VALID_UR) { update_fill1(POS_UR(pos)); }
-      if (valid & VALID_L)  { update_fill1(POS_L (pos)); }
-      if (valid & VALID_R)  { update_fill1(POS_R (pos)); }
-      if (valid & VALID_DL) { update_fill1(POS_DL(pos)); }
-      if (valid & VALID_D)  { update_fill1(POS_D (pos)); }
-      if (valid & VALID_DR) { update_fill1(POS_DR(pos)); }
+      for (dir = 0; dir < 8; ++dir) {
+        if (valid & dirvalid[dir]) {
+          update_fill1(POS_DIR(pos, dir));
+        }
+      }
     }
   } while (num_cands);
 }
