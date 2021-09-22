@@ -201,6 +201,10 @@ typedef void (*vfp)(void);
 
 // Sprite tiles
 #define TILE_SHOT 0x1
+#define TILE_ROPE_TIP_V 0x2
+#define TILE_ROPE_TIP_H 0x3
+#define TILE_ROPE_TAIL_H 0x4
+#define TILE_ROPE_TAIL_V 0xd
 #define TILE_ARROW_L 0x9
 #define TILE_ARROW_R 0xa
 #define TILE_ARROW_U 0xb
@@ -278,6 +282,7 @@ typedef enum PickupType {
 } PickupType;
 
 typedef enum SprType {
+  SPR_TYPE_NONE,
   SPR_TYPE_BOOM,
   SPR_TYPE_BOLT,
   SPR_TYPE_PUSH,
@@ -323,8 +328,18 @@ const u8 obj_pal1[] = {
 };
 
 const Dir invdir[] = {DIR_RIGHT, DIR_LEFT, DIR_DOWN, DIR_UP}; // L R U D
+
 const u8 dirx[] = {0xff, 1, 0, 0};                            // L R U D
 const u8 diry[] = {0, 0, 0xff, 1};                            // L R U D
+const u8 shoot_dx[] = {0xfd, 3, 0, 0};                        // L R U D
+const u8 shoot_dy[] = {0, 0, 0xfd, 3};                        // L R U D
+const u8 rope_dx[] = {0xfc, 4, 0, 0};                         // L R U D
+const u8 rope_dy[] = {0, 0, 0xfc, 4};                         // L R U D
+const u8 n_over_3[] = {0,  3,  6,  8,  11, 14, 16, 19,
+                       22, 24, 27, 30, 32, 35, 38, 40};
+const u16 three_over_n[] = {768, 384, 256, 192, 154, 128, 110, 96,
+                            85,  77,  70,  64,  59,  55,  51};
+
 const u8 dirpos[] = {0xff, 1,    0xf0, 16,
                      0xef, 0xf1, 15,   17}; // L R U D UL UR DL DR
 const u8 dirvalid[] = {VALID_L,  VALID_R,  VALID_U,  VALID_D,
@@ -918,8 +933,9 @@ void pass_turn(void);
 void begin_animate(void);
 void move_player(void);
 void use_pickup(void);
-u8 shoot(u8 pos, u8 hit);
-u8 shoot_dist_over_3(u8 pos, u8 hit);
+u8 shoot(u8 pos, u8 hit, u8 tile, u8 prop);
+u8 shoot_dist(u8 pos, u8 hit);
+u8 rope(u8 from, u8 to);
 void mobdir(u8 index, u8 dir);
 void mobwalk(u8 index, u8 dir);
 void mobbump(u8 index, u8 dir);
@@ -1100,6 +1116,7 @@ u16 spr_dx[MAX_SPRS], spr_dy[MAX_SPRS]; // 8.8 fixed point
 u8 spr_timer[MAX_SPRS];
 u8 spr_drag[MAX_SPRS];
 u8 spr_trigger_val[MAX_SPRS]; // Which value to use for trigger action
+u8 spr_prop[MAX_SPRS];                  // Hardware sprite property
 u8 num_sprs;
 
 u8 tile_code[TILE_CODE_SIZE];         // code for animating tiles
@@ -1479,7 +1496,7 @@ void use_pickup(void) {
   u8 posb = POS_DIR(pos, invdir[target_dir]);
 
   u8 valid, hit, land;
-  hit = pos;
+  land = hit = pos;
   do {
     valid = validmap[hit] & dirvalid[target_dir];
     if (valid) {
@@ -1504,15 +1521,35 @@ void use_pickup(void) {
       break;
 
     case PICKUP_TYPE_BOLT:
-      spr = shoot(pos, hit);
+      spr = shoot(pos, hit, TILE_SHOT, 0);
       spr_type[spr] = SPR_TYPE_BOLT;
       spr_trigger_val[spr] = hit;
       break;
 
     case PICKUP_TYPE_PUSH:
-      spr = shoot(pos, hit);
+      spr = shoot(pos, hit, TILE_SHOT, 0);
       spr_type[spr] = SPR_TYPE_PUSH;
       spr_trigger_val[spr] = mobh;
+      break;
+
+    case PICKUP_TYPE_GRAPPLE:
+      spr = rope(pos, land);
+      spr_type[spr] = SPR_TYPE_GRAPPLE;
+      spr_trigger_val[spr] = land;
+      break;
+
+    case PICKUP_TYPE_SPEAR:
+      if (valid1) {
+        if (valid2) {
+          spr = rope(pos, pos2);
+          hitpos(pos2, 1, 0);
+        } else {
+          spr = rope(pos, pos1);
+        }
+        spr_type[spr] = SPR_TYPE_NONE;
+        hitpos(pos1, 1, 0);
+      }
+      mobbump(PLAYER_MOB, target_dir);
       break;
 
     case PICKUP_TYPE_SMASH:
@@ -1524,6 +1561,12 @@ void use_pickup(void) {
           update_wall_face(pos1);
         }
       }
+      break;
+
+    case PICKUP_TYPE_HOOK:
+      spr = rope(pos, hit);
+      spr_type[spr] = SPR_TYPE_HOOK;
+      spr_trigger_val[spr] = mobh;
       break;
 
     case PICKUP_TYPE_SUPLEX:
@@ -1556,30 +1599,84 @@ void use_pickup(void) {
   is_targeting = 0;
 }
 
-u8 shoot(u8 pos, u8 hit) {
-  static const u8 shoot_dx[] = {0xfd, 3, 0, 0}; // L R U D
-  static const u8 shoot_dy[] = {0, 0, 0xfd, 3}; // L R U D
-
-  spr_anim_frame[num_sprs] = TILE_SHOT;
+u8 shoot(u8 pos, u8 hit, u8 tile, u8 prop) {
+  spr_anim_frame[num_sprs] = tile;
   spr_anim_timer[num_sprs] = spr_anim_speed[num_sprs] = 255;
   spr_x[num_sprs] = POS_TO_X(pos) << 8;
   spr_y[num_sprs] = POS_TO_Y(pos) << 8;
   spr_dx[num_sprs] = shoot_dx[target_dir] << 8;
   spr_dy[num_sprs] = shoot_dy[target_dir] << 8;
   spr_drag[num_sprs] = 0;
-  spr_timer[num_sprs] = shoot_dist_over_3(pos, hit);
+  spr_timer[num_sprs] = n_over_3[shoot_dist(pos, hit)];
+  spr_prop[num_sprs] = prop;
   return num_sprs++;
 }
 
-u8 shoot_dist_over_3(u8 pos, u8 hit) {
-  static const u8 calc[] = {0,  3,  6,  8,  11, 14, 16, 19,
-                            22, 24, 27, 30, 32, 35, 38, 40};
-
+u8 shoot_dist(u8 pos, u8 hit) {
   u8 dist = (target_dir == DIR_LEFT)    ? pos - hit
             : (target_dir == DIR_RIGHT) ? hit - pos
             : (target_dir == DIR_UP)    ? (pos - hit) >> 4
                                         : (hit - pos) >> 4;
-  return calc[dist];
+  return dist;
+}
+
+u8 rope(u8 from, u8 to) {
+  u8 tip, tail, prop;
+  prop = 0;
+  if (from == to) { return 0; }
+
+  u8 pos = from;
+  u16 x = (POS_TO_X(pos) + rope_dx[target_dir]) << 8;
+  u16 y = (POS_TO_Y(pos) + rope_dy[target_dir]) << 8;
+  u16 dx = 0;
+  u16 dy = 0;
+  u16 ddx, ddy;
+  u8 dist = shoot_dist(from, to);
+  u8 timer = n_over_3[dist];
+  u16 delta = three_over_n[dist];
+
+  if (target_dir == DIR_LEFT || target_dir == DIR_RIGHT) {
+    tip = TILE_ROPE_TIP_H;
+    tail = TILE_ROPE_TAIL_H;
+    if (target_dir == DIR_LEFT) {
+      ddx = -delta;
+    } else {
+      prop = S_FLIPX;
+      ddx = delta;
+    }
+    ddy = 0;
+  } else {
+    tip = TILE_ROPE_TIP_V;
+    tail = TILE_ROPE_TAIL_V;
+    if (target_dir == DIR_UP) {
+      ddy = -delta;
+    } else {
+      prop = S_FLIPY;
+      ddy = delta;
+    }
+    ddx = 0;
+  }
+
+  do {
+    spr_type[num_sprs] = SPR_TYPE_NONE;
+    spr_anim_frame[num_sprs] = tail;
+    spr_anim_timer[num_sprs] = spr_anim_speed[num_sprs] = 255;
+    spr_x[num_sprs] = x;
+    spr_y[num_sprs] = y;
+    spr_dx[num_sprs] = dx;
+    spr_dy[num_sprs] = dy;
+    spr_drag[num_sprs] = 0;
+    spr_timer[num_sprs] = timer;
+    spr_prop[num_sprs] = prop;
+
+    dx += ddx;
+    dy += ddy;
+    num_sprs++;
+
+    pos = POS_DIR(pos, target_dir);
+  } while(pos != to);
+
+  return shoot(from, to, tip, prop);
 }
 
 void mobdir(u8 index, u8 dir) {
@@ -2360,6 +2457,7 @@ void do_animate(void) {
         dmob_y[i] = dmob_y[num_dead_mobs];
         dmob_tile[i] = dmob_tile[num_dead_mobs];
         dmob_prop[i] = dmob_prop[num_dead_mobs];
+        dmob_timer[i] = dmob_timer[num_dead_mobs];
       }
     } else {
       *psprite++ = dmob_y[i];
@@ -2648,21 +2746,30 @@ void update_floats_and_msg_and_sprs(void) {
   // Draw sprs using the same ones allocated for messages
   for (i = 0; i < num_sprs;) {
     if (--spr_timer[i] == 0) {
+      u8 dir;
       switch (spr_type[i]) {
         case SPR_TYPE_BOLT:
           hitpos(spr_trigger_val[i], 1, 1);
           break;
 
-        case SPR_TYPE_PUSH: {
+        case SPR_TYPE_HOOK:
+          dir = invdir[target_dir];
+          goto push;
+
+        case SPR_TYPE_PUSH:
+          dir = target_dir;
+          goto push;
+
+        push: {
           u8 mob = spr_trigger_val[i];
           if (mob) {
             u8 pos = mob_pos[mob - 1];
-            if (validmap[pos] & dirvalid[target_dir]) {
-              u8 newpos = POS_DIR(pos, target_dir);
+            if (validmap[pos] & dirvalid[dir]) {
+              u8 newpos = POS_DIR(pos, dir);
               if (!IS_WALL_OR_MOB(tmap[newpos], newpos)) {
-                mobwalk(mob - 1, target_dir);
+                mobwalk(mob - 1, dir);
               } else {
-                mobbump(mob - 1, target_dir);
+                mobbump(mob - 1, dir);
               }
             }
             mob_stun[mob - 1] = 1;
@@ -2670,6 +2777,10 @@ void update_floats_and_msg_and_sprs(void) {
           }
           break;
         }
+
+        case SPR_TYPE_GRAPPLE:
+          mobhop(PLAYER_MOB, spr_trigger_val[i]);
+          break;
       }
 
       if (--num_sprs != i) {
@@ -2684,6 +2795,7 @@ void update_floats_and_msg_and_sprs(void) {
         spr_drag[i] = spr_drag[num_sprs];
         spr_timer[i] = spr_timer[num_sprs];
         spr_trigger_val[i] = spr_trigger_val[num_sprs];
+        spr_prop[i] = spr_prop[num_sprs];
       }
       hide_sprite(num_sprs);
     } else {
@@ -2700,7 +2812,7 @@ void update_floats_and_msg_and_sprs(void) {
       shadow_OAM[i].x = spr_x[i] >> 8;
       shadow_OAM[i].y = spr_y[i] >> 8;
       shadow_OAM[i].tile = spr_anim_frame[i];
-      shadow_OAM[i].prop = 0;
+      shadow_OAM[i].prop = spr_prop[i];
       ++i;
     }
   }
@@ -2928,7 +3040,7 @@ void droppick_rnd(u8 pos) {
 #if 1
   droppick(randint(10) + 2, pos);
 #else
-  droppick(PICKUP_TYPE_PUSH, pos);
+  droppick(PICKUP_TYPE_SPEAR, pos);
 #endif
 }
 
