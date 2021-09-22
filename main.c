@@ -79,6 +79,9 @@ typedef void (*vfp)(void);
 #define INV_SELECT_FRAMES 8
 #define INV_TARGET_FRAMES 2
 
+#define SPIN_SPR_FRAMES 12
+#define SPIN_SPR_ANIM_SPEED 3
+
 #define QUEEN_CHARGE_MOVES 2
 #define AI_COOL_MOVES 8
 #define RECOVER_MOVES 30
@@ -209,6 +212,7 @@ typedef void (*vfp)(void);
 #define TILE_ARROW_R 0xa
 #define TILE_ARROW_U 0xb
 #define TILE_ARROW_D 0xc
+#define TILE_SPIN 0x10
 #define TILE_BLIND 0x37
 #define TILE_BOOM 0x05
 
@@ -329,12 +333,14 @@ const u8 obj_pal1[] = {
 
 const Dir invdir[] = {DIR_RIGHT, DIR_LEFT, DIR_DOWN, DIR_UP}; // L R U D
 
-const u8 dirx[] = {0xff, 1, 0, 0};                            // L R U D
-const u8 diry[] = {0, 0, 0xff, 1};                            // L R U D
-const u8 shoot_dx[] = {0xfd, 3, 0, 0};                        // L R U D
-const u8 shoot_dy[] = {0, 0, 0xfd, 3};                        // L R U D
-const u8 rope_dx[] = {0xfc, 4, 0, 0};                         // L R U D
-const u8 rope_dy[] = {0, 0, 0xfc, 4};                         // L R U D
+const u8 dirx[] = {0xff, 1, 0, 0};  // L R U D
+const u8 diry[] = {0, 0, 0xff, 1};  // L R U D
+const u8 dirx2[] = {0xfe, 2, 0, 0}; // L R U D
+const u8 diry2[] = {0, 0, 0xfe, 2}; // L R U D
+const u8 dirx3[] = {0xfd, 3, 0, 0}; // L R U D
+const u8 diry3[] = {0, 0, 0xfd, 3}; // L R U D
+const u8 dirx4[] = {0xfc, 4, 0, 0}; // L R U D
+const u8 diry4[] = {0, 0, 0xfc, 4}; // L R U D
 const u8 n_over_3[] = {0,  3,  6,  8,  11, 14, 16, 19,
                        22, 24, 27, 30, 32, 35, 38, 40};
 const u16 three_over_n[] = {768, 384, 256, 192, 154, 128, 110, 96,
@@ -1569,6 +1575,24 @@ void use_pickup(void) {
       spr_trigger_val[spr] = mobh;
       break;
 
+    case PICKUP_TYPE_SPIN: {
+      u16 x = POS_TO_X(pos) << 8;
+      u16 y = POS_TO_Y(pos) << 8;
+      u8 valid = validmap[pos];
+      u8 dir;
+      for (dir = 0; dir < 4; ++dir) {
+        if (valid & dirvalid[dir]) {
+          spr = addspr(SPIN_SPR_ANIM_SPEED + dir, x, y, dirx2[dir] << 8,
+                       diry2[dir] << 8, 1, SPIN_SPR_FRAMES + (dir << 2), 0);
+          spr_type[spr] = SPR_TYPE_SPIN;
+          spr_anim_frame[spr] = TILE_SPIN;
+          spr_trigger_val[spr] = POS_DIR(pos, dir);
+        }
+      }
+      mobhop(PLAYER_MOB, pos);
+      break;
+    }
+
     case PICKUP_TYPE_SUPLEX:
       if (valid1 && validb && mob1 && !IS_WALL_OR_MOB(tmap[posb], posb)) {
         mobhop(mob1 - 1, posb);
@@ -1614,7 +1638,7 @@ void use_pickup(void) {
 
 u8 shoot(u8 pos, u8 hit, u8 tile, u8 prop) {
   u8 spr = addspr(255, POS_TO_X(pos) << 8, POS_TO_Y(pos) << 8,
-                  shoot_dx[target_dir] << 8, shoot_dy[target_dir] << 8, 0,
+                  dirx3[target_dir] << 8, diry3[target_dir] << 8, 0,
                   n_over_3[shoot_dist(pos, hit)], prop);
   spr_anim_frame[spr] = tile;
   return spr;
@@ -1634,8 +1658,8 @@ u8 rope(u8 from, u8 to) {
   if (from == to) { return 0; }
 
   u8 pos = from;
-  u16 x = (POS_TO_X(pos) + rope_dx[target_dir]) << 8;
-  u16 y = (POS_TO_Y(pos) + rope_dy[target_dir]) << 8;
+  u16 x = (POS_TO_X(pos) + dirx4[target_dir]) << 8;
+  u16 y = (POS_TO_Y(pos) + diry4[target_dir]) << 8;
   u16 dx = 0;
   u16 dy = 0;
   u16 ddx, ddy;
@@ -1867,6 +1891,7 @@ void hitpos(u8 pos, u8 dmg, u8 stun) {
     }
   }
   if (tmap[pos] == TILE_SAW) {
+    tile = TILE_SAW_BROKEN;
     nop_saw_anim(pos);
   } else if (IS_CRACKED_WALL_TILE(tile)) {
     tile = dirt_tiles[xrnd() & 3];
@@ -2675,10 +2700,18 @@ void update_floats_and_msg_and_sprs(void) {
   // Draw sprs using the same ones allocated for messages
   for (i = 0; i < num_sprs;) {
     if (--spr_timer[i] == 0) {
-      u8 dir;
+      u8 dir, stun;
       switch (spr_type[i]) {
+        case SPR_TYPE_SPIN:
+          stun = 0;
+          goto hit;
+
         case SPR_TYPE_BOLT:
-          hitpos(spr_trigger_val[i], 1, 1);
+          stun = 1;
+          goto hit;
+
+        hit:
+          hitpos(spr_trigger_val[i], 1, stun);
           break;
 
         case SPR_TYPE_HOOK:
@@ -2969,7 +3002,7 @@ void droppick_rnd(u8 pos) {
 #if 1
   droppick(randint(10) + 2, pos);
 #else
-  droppick(PICKUP_TYPE_SPEAR, pos);
+  droppick(PICKUP_TYPE_SPIN, pos);
 #endif
 }
 
