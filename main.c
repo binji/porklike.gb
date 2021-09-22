@@ -1577,6 +1577,19 @@ void use_pickup(void) {
         mobbump(PLAYER_MOB, target_dir);
       }
       break;
+
+    case PICKUP_TYPE_SLAP:
+      if (validb) {
+        if (IS_WALL_OR_MOB(tmap[posb], posb)) {
+          mobbump(PLAYER_MOB, invdir[target_dir]);
+        } else {
+          mobhop(PLAYER_MOB, posb);
+        }
+      }
+      if (valid1) {
+        hitpos(pos1, 1, 1);
+      }
+      break;
   }
 
   u16 equip_addr = INV_EQUIP_ADDR - 2 + (inv_select << 5);
