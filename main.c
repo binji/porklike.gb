@@ -2618,7 +2618,8 @@ redo:
       mob_pos[mob] = newpos;
 
       // Reset mob anim timer so the tile is updated next frame
-      mob_anim_frame[mob] = 1;
+      mob_anim_timer[mob] = 1;
+      set_tile_during_vbl(pos, dtmap[pos]);
 
       teleported = 1;
       goto redo;
