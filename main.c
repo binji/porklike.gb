@@ -5,6 +5,7 @@
 #include "tilebg.c"
 #include "tileshared.c"
 #include "tilesprites.c"
+#include "tiledead.c"
 #include "map.c"
 #include "flags.c"
 
@@ -56,6 +57,12 @@ typedef void (*vfp)(void);
 #define INV_ROW_LEN 14
 #define INV_BLANK_ROW_OFFSET 49 /* offset into inventory_map */
 #define NUM_INV_ROWS 4
+
+#define GAMEOVER_FRAMES 70
+#define GAMEOVER_X_OFFSET 5
+#define GAMEOVER_Y_OFFSET 2
+#define GAMEOVER_WIDTH 9
+#define GAMEOVER_HEIGHT 13
 
 #define TILE_ANIM_FRAMES 8
 #define TILE_ANIM_FRAME_DIFF 16
@@ -668,16 +675,16 @@ const u8 pick_type_anim_start[] = {
 const u8 pick_type_sprite_tile[] = {
     0,    // PICKUP_TYPE_HEART,
     0,    // PICKUP_TYPE_KEY,
-    0xf1, // PICKUP_TYPE_JUMP,
-    0xf2, // PICKUP_TYPE_BOLT,
-    0xf3, // PICKUP_TYPE_PUSH,
-    0xf4, // PICKUP_TYPE_GRAPPLE,
-    0xf5, // PICKUP_TYPE_SPEAR,
-    0xf6, // PICKUP_TYPE_SMASH,
-    0xf7, // PICKUP_TYPE_HOOK,
-    0xf8, // PICKUP_TYPE_SPIN,
-    0xf9, // PICKUP_TYPE_SUPLEX,
-    0xfa, // PICKUP_TYPE_SLAP,
+    0xf2, // PICKUP_TYPE_JUMP,
+    0xf3, // PICKUP_TYPE_BOLT,
+    0xf4, // PICKUP_TYPE_PUSH,
+    0xf5, // PICKUP_TYPE_GRAPPLE,
+    0xf6, // PICKUP_TYPE_SPEAR,
+    0xf7, // PICKUP_TYPE_SMASH,
+    0xf8, // PICKUP_TYPE_HOOK,
+    0xf9, // PICKUP_TYPE_SPIN,
+    0xfa, // PICKUP_TYPE_SUPLEX,
+    0xfb, // PICKUP_TYPE_SLAP,
 };
 
 const u8 pick_type_name_tile[] = {
@@ -930,11 +937,29 @@ const u16 boom_spr_dy[] = {33,    65518, 65432, 190,   65389, 65472,
                            115,   140,   65318, 65477, 65512, 65400,
                            65459, 243,   180,   65519};
 
+const u8 gameover_map[] = {
+    0,   0,   0,   1,   2,   3,   4,   0,   0,
+    0,   0,   0,   5,   6,   7,   8,   0,   0,
+    0,   0,   0,   0,   9,  10,   0,   0,   0,
+    0,   0,   0,   0,   0,   0,   0,   0,   0,
+    0,   227, 217, 223, 0,   206, 211, 207, 206,
+    0,   0,   0,   0,   0,   0,   0,   0,   0,
+    0,   0,   0,   0,   0,   0,   0,   0,   0,
+    208, 214, 217, 217, 220, 241, 0,   0,   0,
+    221, 222, 207, 218, 221, 241, 0,   0,   0,
+    213, 211, 214, 214, 221, 241, 0,   0,   0,
+    0,   0,   0,   0,   0,   0,   0,   0,   0,
+    0,   0,   0,   0,   0,   0,   0,   0,   0,
+    0,   218, 220, 207, 221, 221, 0,   252, 0,
+};
+
 u8 xrnd(void) __preserves_regs(b, c);
 void xrnd_init(u16) __preserves_regs(b, c);
 void clear_wram(void) __preserves_regs(b, c);
 
 void init(void);
+void gameinit(void);
+void reset_anim_code(void);
 void do_turn(void);
 void pass_turn(void);
 void begin_animate(void);
@@ -964,7 +989,7 @@ void blind(void);
 void calcdist_ai(u8 from, u8 to);
 void do_animate(void);
 void end_animate(void);
-void hide_float_sprites(void);
+void hide_sprites(void);
 void set_tile_during_vbl(u8 pos, u8 tile);
 void set_digit_tile_during_vbl(u16 addr, u8 value);
 void set_tile_range_during_vbl(u16 addr, u8* source, u8 len);
@@ -1146,13 +1171,15 @@ u8 msg_timer;
 
 Turn turn;
 u8 noturn;
+u8 gameover;
+u8 gameover_timer;
 
 u8 is_targeting;
 Dir target_dir;
 
 u8 joy, lastjoy, newjoy;
 
-u8 doupdatemap, donextlevel, doblind, dosight;
+u8 doupdatemap, dofadeout, doloadfloor, donextfloor, doblind, dosight;
 OAM_item_t *next_sprite, *last_next_sprite;
 
 u8 inv_anim_up;
@@ -1186,36 +1213,78 @@ void main(void) {
     joy = joypad();
     newjoy = (joy ^ lastjoy) & joy;
 
-    if (donextlevel || (joy & J_START)) {
-      donextlevel = 0;
-      hide_float_sprites();
+    if (gameover) {
+      if (gameover == 1) {
+        gameover = 2;
+        hide_sprites();
+        fadeout();
+        IE_REG &= ~VBL_IFLAG;
 
-      if (++floor == 11) { floor = 0; }
-      fadeout();
-      IE_REG &= ~VBL_IFLAG;
-      mapgen();
-      // Reset the animations so they don't draw on this new map
-      begin_animate();
-      end_animate();
-      if (floor == 10) {
-        floor_tile[0] = TILE_1;
-        floor_tile[1] = TILE_0;
+        // Hide window
+        move_win(23, 160);
+        reset_anim_code();
+        gb_decompress_bkg_data(0, dead_bin);
+        init_bkg(0);
+        set_bkg_tiles(GAMEOVER_X_OFFSET, GAMEOVER_Y_OFFSET, GAMEOVER_WIDTH,
+                      GAMEOVER_HEIGHT, gameover_map);
+
+        IE_REG |= VBL_IFLAG;
+        fadein();
       } else {
-        floor_tile[0] = TILE_0 + floor;
-        floor_tile[1] = 0;
-      }
-      IE_REG |= VBL_IFLAG;
-      doupdatemap = 1;
-      fadein();
-    }
+        // Wait for keypress
+        if (newjoy & J_A) {
+          floor = 0;
+          gameover = 0;
+          doloadfloor = 1;
+          fadeout();
 
-    begin_animate();
-    do_turn();
-    do_animate();
-    update_floats_and_msg_and_sprs();
-    inv_animate();
-    end_animate();
-    update_obj1_pal();
+          // reset initial state
+          gameinit();
+        }
+      }
+    } else {
+      if (dofadeout) {
+        dofadeout = 0;
+        fadeout();
+      }
+      if (donextfloor) {
+        donextfloor = 0;
+        if (++floor == 11) { floor = 0; }
+        if (floor == 10) {
+          floor_tile[0] = TILE_1;
+          floor_tile[1] = TILE_0;
+        } else {
+          floor_tile[0] = TILE_0 + floor;
+          floor_tile[1] = 0;
+        }
+      }
+      if (doloadfloor) {
+        doloadfloor = 0;
+        hide_sprites();
+        IE_REG &= ~VBL_IFLAG;
+        mapgen();
+        reset_anim_code();
+        IE_REG |= VBL_IFLAG;
+        doupdatemap = 1;
+        fadein();
+      }
+
+      begin_animate();
+
+      if (gameover_timer) {
+        if (--gameover_timer == 0) {
+          gameover = 1;
+        }
+      } else {
+        do_turn();
+      }
+
+      do_animate();
+      update_floats_and_msg_and_sprs();
+      inv_animate();
+      end_animate();
+      update_obj1_pal();
+    }
     wait_vbl_done();
   }
 }
@@ -1239,31 +1308,42 @@ void init(void) {
 
   xrnd_init(0x1234);  // TODO: seed with DIV on button press
 
-  gb_decompress_bkg_data(0, bg_bin);
   gb_decompress_bkg_data(0x80, shared_bin);
   gb_decompress_sprite_data(0, sprites_bin);
   set_win_tiles(0, 0, INV_WIDTH, INV_HEIGHT, inventory_map);
+
+  add_VBL(vbl_interrupt);
+  gameinit();
+}
+
+void gameinit(void) {
+  reset_anim_code();
+  tile_timer = TILE_ANIM_FRAMES;
+
+  // Reload bg tiles
+  gb_decompress_bkg_data(0, bg_bin);
   init_bkg(0);
 
-  WX_REG = 23;
-  WY_REG = 128;
-
+  // Reset player mob
+  num_mobs = 0;
   addmob(MOB_TYPE_PLAYER, 0);
-
-  floor_tile[0] = TILE_0;
-  floor_tile[1] = 0;
+  set_vram_byte((void*)INV_HP_ADDR, TILE_0 + mob_hp[PLAYER_MOB]);
 
   turn = TURN_PLAYER;
-
   next_float = BASE_FLOAT;
 
+  // Set up inventory window
+  move_win(23, 128);
   inv_select_timer = INV_SELECT_FRAMES;
   inv_target_timer = INV_TARGET_FRAMES;
   inv_msg_update = 1;
 
-  tile_timer = TILE_ANIM_FRAMES;
+  floor_tile[0] = TILE_0;
+  floor_tile[1] = 0;
+}
+
+void reset_anim_code(void) {
   tile_code[0] = mob_tile_code[0] = 0xc9; // ret
-  add_VBL(vbl_interrupt);
 }
 
 void begin_animate(void) {
@@ -1296,9 +1376,9 @@ void end_animate(void) {
   }
 }
 
-void hide_float_sprites(void) {
+void hide_sprites(void) {
   u8 i;
-  for (i = BASE_FLOAT; i < next_float; ++i) {
+  for (i = 0; i < 40; ++i) {
     hide_sprite(i);
   }
   next_float = BASE_FLOAT;
@@ -1850,6 +1930,11 @@ void hitmob(u8 index, u8 dmg) {
       }
       // TODO: restore to 5hp if reaper killed, and drop key
       set_tile_during_vbl(pos, dtmap[pos]);
+
+      if (index == PLAYER_MOB) {
+        set_digit_tile_during_vbl(INV_HP_ADDR, 0);
+        gameover_timer = GAMEOVER_FRAMES;
+      }
     } else {
       mob_flash[index] = MOB_FLASH_FRAMES;
       mob_hp[index] -= dmg;
@@ -2488,7 +2573,7 @@ redo:
     dosight = 1;
 
     if (tile == TILE_END) {
-      donextlevel = 1;
+      dofadeout = doloadfloor = donextfloor = 1;
       recover = 1; // Recover blindness on the next floor
     }
 
