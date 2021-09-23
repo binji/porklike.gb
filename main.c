@@ -260,6 +260,7 @@ u8 mob_hp[MAX_MOBS];
 u8 mob_flash[MAX_MOBS];
 u8 mob_stun[MAX_MOBS];
 u8 mob_trigger[MAX_MOBS]; // Trigger a step action after this anim finishes?
+u8 mob_vis[MAX_MOBS];     // Whether mob is visible on fogged tiles (for ghosts)
 u8 num_mobs;
 u8 key_mob;
 
@@ -407,6 +408,10 @@ void main(void) NONBANKED {
         }
       }
     } else {
+      if (newjoy & J_START) { // XXX cheat
+        dofadeout = donextfloor = doloadfloor = 1;
+      }
+
       if (dofadeout) {
         dofadeout = 0;
         fadeout();
@@ -1077,6 +1082,7 @@ void hitmob(u8 index, u8 dmg) {
     } else {
       mob_flash[index] = MOB_FLASH_FRAMES;
       mob_hp[index] -= dmg;
+      mob_vis[index] = 1;
       if (index == PLAYER_MOB) {
         set_digit_tile_during_vbl(INV_HP_ADDR, mob_hp[PLAYER_MOB]);
       }
@@ -1180,12 +1186,17 @@ u8 do_mob_ai(u8 index) {
         break;
 
       case MOB_AI_ATTACK:
+        mob_vis[index] = 1;
         if (ai_dobump(index)) {
           return 1;
         } else if (ai_tcheck(index)) {
           dir = ai_getnextstep(index);
           if (dir != 255) {
             mobwalk(index, dir);
+            if (mob_type[index] == MOB_TYPE_GHOST && distmap[pos] > 1 &&
+                XRND_33_PERCENT()) {
+              mob_vis[index] = 0;
+            }
             return 1;
           }
         }
@@ -1519,7 +1530,7 @@ void do_animate(void) {
     // their triggers but not draw anything. We also probably want to display
     // mobs that are partially fogged; if the start or end position is
     // unfogged.
-    if (fogmap[mob_pos[i]]) { continue; }
+    if (fogmap[mob_pos[i]] || !mob_vis[i]) { continue; }
 
     dosprite = dotile = 0;
     if (tile_timer == 1 && IS_ANIMATED_TILE(tmap[mob_pos[i]])) {
@@ -1933,8 +1944,7 @@ void update_floats_and_msg_and_sprs(void) {
                 mobbump(mob - 1, dir);
               }
             }
-            mob_stun[mob - 1] = 1;
-            // TODO: make visible
+            mob_stun[mob - 1] = mob_vis[mob - 1] = 1;
           }
           break;
         }
@@ -2109,6 +2119,7 @@ void addmob(MobType type, u8 pos) NONBANKED {
   mob_flash[num_mobs] = 0;
   mob_stun[num_mobs] = 0;
   mob_trigger[num_mobs] = 0;
+  mob_vis[num_mobs] = 1;
   ++num_mobs;
   mobmap[pos] = num_mobs; // index+1
 }
@@ -2147,6 +2158,7 @@ void delmob(u8 index) NONBANKED {  // XXX: only used in bank 1
     mob_flash[index] = mob_flash[num_mobs];
     mob_stun[index] = mob_stun[num_mobs];
     mob_trigger[index] = mob_trigger[num_mobs];
+    mob_vis[index] = mob_vis[num_mobs];
     mobmap[mob_pos[index]] = index + 1;
   }
 }
