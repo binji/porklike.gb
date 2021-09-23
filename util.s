@@ -37,15 +37,15 @@ _drag::
   ld d, a
   ; is bc < 0?
   bit 7, b
-  jr z, $0
+  jr z, 1$
   ; bc >= 0, complement carry
   ccf
-$0:
+1$:
   ; did subtraction overflow?
-  jr nc, $1
+  jr nc, 2$
   ; overflow, de = 0
   ld de, #0
-$1:
+2$:
   ret
 
 ; u8 is_valid(u8 pos, u8 diff)
@@ -128,4 +128,144 @@ _xrnd_init::
   ld (#xrnd_seed), a
   ld a, (hl)
   ld (#xrnd_seed + 1), a
+  ret
+
+
+_counter_zero::
+  ldhl sp, #2
+  ld a, (hl+)
+  ld e, a
+  ld a, (hl)
+  ld h, a
+  ld l, e
+
+  ld a, #4
+  ld (hl+), a  ; start=4
+  ld a, #0xe5
+  ld (hl+), a  ; 0
+  ld (hl+), a  ; 0
+  ld (hl+), a  ; 0
+  ld (hl+), a  ; 0
+  ld (hl), a   ; 0
+  ret
+
+_counter_inc::
+  ldhl sp, #2
+  ld a, (hl+)
+  ld e, a
+  ld a, (hl)
+  ld h, a
+  ld l, e
+
+  ld d, #4
+  inc hl
+  inc hl
+  inc hl
+  inc hl
+  inc hl
+
+  ;; index 4
+  inc (hl)    ; increment digit
+  ld a, (hl)
+  sub a, #0xef    ; is > 9?
+  ret nz
+  dec d
+  ld a, #0xe5
+  ld (hl-), a ; set to digit 0
+
+  ;; index 3
+  inc (hl)    ; increment digit
+  ld a, (hl)
+  sub a, #0xef    ; is > 9?
+  jr nz, 1$
+  dec d
+  ld a, #0xe5
+  ld (hl-), a ; set to digit 0
+
+  ;; index 2
+  inc (hl)    ; increment digit
+  ld a, (hl)
+  sub a, #0xef    ; is > 9?
+  jr nz, 2$
+  dec d
+  ld a, #0xe5
+  ld (hl-), a ; set to digit 0
+
+  ;; index 1
+  inc (hl)    ; increment digit
+  ld a, (hl)
+  sub a, #0xef    ; is > 9?
+  jr nz, 3$
+  dec d
+  ld a, #0xe5
+  ld (hl-), a ; set to digit 0
+
+  ;; index 0
+  inc (hl)    ; increment digit
+  ld a, (hl)
+  sub a, #0xef    ; is > 9?
+  jr nz, 4$
+  ld a, #0xe5
+  ld (hl), a  ; set to digit 0
+  jr 5$
+
+1$: dec hl
+2$: dec hl
+3$: dec hl
+4$: dec hl
+5$:
+
+  ; update start, if necessary
+  ld a, (hl)
+  sub a, d
+  ret c
+  ; write new start value
+  ld a, d
+  ld (hl), a
+
+  ret
+
+
+_counter_out::
+  ldhl sp, #2
+  ld a, (hl+)
+  ld e, a
+  ld a, (hl)
+  ld h, a
+  ld l, e
+
+  ld a, (hl+)  ; read start value
+  ld b, a      ; copy it to b
+  ld a, #5
+  sub a, b
+  ld c, a      ; c is len
+
+  ld a, b      ; move forward to first non-zero digit
+  add a, l
+  ld l, a
+  ld a, h
+  adc a, #0
+  ld h, a
+
+  ld e, l      ; de = source
+  ld d, h
+
+  ldhl sp, #4
+  ld a, (hl+)
+  ld b, a
+  ld a, (hl)
+  ld h, a
+  ld l, b      ; hl = dest
+
+1$:
+  ldh a, (#0x41) ; wait until VRAM is unlocked
+  and a, #2
+  jr nz, 1$
+
+  ld a, (de)    ; copy tile
+  inc de
+  ld (hl+), a
+
+  dec c
+  jr nz, 1$
   ret

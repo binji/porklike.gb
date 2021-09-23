@@ -98,6 +98,11 @@ typedef void (*vfp)(void);
 
 typedef u8 Map[MAP_WIDTH * MAP_HEIGHT];
 
+typedef struct Counter {
+  u8 start;   // First digit index in data[]
+  u8 data[5]; // Digits as tile indexes, left padded
+} Counter;
+
 typedef enum Dir {
   DIR_LEFT,
   DIR_RIGHT,
@@ -225,6 +230,9 @@ void clear_wram(void) __preserves_regs(b, c);
 u16 drag(u16 x);
 u8 xrnd(void) __preserves_regs(b, c);
 void xrnd_init(u16) __preserves_regs(b, c);
+void counter_zero(Counter* c) __preserves_regs(b, c);
+void counter_inc(Counter* c) __preserves_regs(b, c);
+void counter_out(Counter* c, u16 vram);
 
 void fadeout(void);
 void fadein(void);

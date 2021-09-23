@@ -49,6 +49,9 @@
 #define GAMEOVER_Y_OFFSET 2
 #define GAMEOVER_WIDTH 9
 #define GAMEOVER_HEIGHT 13
+#define GAMEOVER_FLOOR_ADDR 0x992c
+#define GAMEOVER_STEPS_ADDR 0x994c
+#define GAMEOVER_KILLS_ADDR 0x996c
 
 #define TILE_ANIM_FRAMES 8
 #define TILE_ANIM_FRAME_DIFF 16
@@ -119,7 +122,6 @@
 
 // Shared tiles
 #define TILE_0 0xe5
-#define TILE_1 0xe6
 
 #define FLOAT_FOUND 0xe
 #define FLOAT_LOST 0xf
@@ -234,7 +236,7 @@ u8 room_avoid[MAX_ROOMS]; // ** only used during mapgen
 u8 num_rooms;
 
 u8 start_room;
-u8 floor, floor_tile[2];
+u8 floor;
 u8 startpos;
 
 u8 cands[MAX_CANDS];
@@ -334,6 +336,10 @@ u8 num_keys;
 u8 recover; // how long until recovering from blind
 u16 steps;
 
+Counter st_floor;
+Counter st_steps;
+Counter st_kills;
+
 u8 obj_pal1_timer, obj_pal1_index;
 
 void main(void) NONBANKED {
@@ -384,13 +390,15 @@ void main(void) NONBANKED {
         init_bkg(0);
         set_bkg_tiles(GAMEOVER_X_OFFSET, GAMEOVER_Y_OFFSET, GAMEOVER_WIDTH,
                       GAMEOVER_HEIGHT, gameover_map);
+        counter_out(&st_floor, GAMEOVER_FLOOR_ADDR);
+        counter_out(&st_steps, GAMEOVER_STEPS_ADDR);
+        counter_out(&st_kills, GAMEOVER_KILLS_ADDR);
 
         IE_REG |= VBL_IFLAG;
         fadein();
       } else {
         // Wait for keypress
         if (newjoy & J_A) {
-          floor = 0;
           gameover = 0;
           doloadfloor = 1;
           fadeout();
@@ -406,14 +414,8 @@ void main(void) NONBANKED {
       }
       if (donextfloor) {
         donextfloor = 0;
-        if (++floor == 11) { floor = 0; }
-        if (floor == 10) {
-          floor_tile[0] = TILE_1;
-          floor_tile[1] = TILE_0;
-        } else {
-          floor_tile[0] = TILE_0 + floor;
-          floor_tile[1] = 0;
-        }
+        ++floor;
+        counter_inc(&st_floor);
       }
       if (doloadfloor) {
         doloadfloor = 0;
@@ -470,8 +472,10 @@ void gameinit(void) {
   inv_target_timer = INV_TARGET_FRAMES;
   inv_msg_update = 1;
 
-  floor_tile[0] = TILE_0;
-  floor_tile[1] = 0;
+  floor = 0;
+  counter_zero(&st_floor);
+  counter_zero(&st_steps);
+  counter_zero(&st_kills);
 }
 
 void reset_anim_code(void) {
@@ -659,6 +663,7 @@ void move_player(void) {
           } else {
             mobwalk(PLAYER_MOB, dir);
             ++steps;
+            counter_inc(&st_steps);
             goto done;
           }
         }
@@ -1066,6 +1071,8 @@ void hitmob(u8 index, u8 dmg) {
       if (index == PLAYER_MOB) {
         set_digit_tile_during_vbl(INV_HP_ADDR, 0);
         gameover_timer = GAMEOVER_FRAMES;
+      } else {
+        counter_inc(&st_kills);
       }
     } else {
       mob_flash[index] = MOB_FLASH_FRAMES;
@@ -1826,8 +1833,7 @@ redo:
 void vbl_interrupt(void) NONBANKED {
   if (doupdatemap) {
     // update floor number
-    *(u8 *)(INV_FLOOR_ADDR) = floor_tile[0];
-    *(u8 *)(INV_FLOOR_ADDR + 1) = floor_tile[1];
+    counter_out(&st_floor, INV_FLOOR_ADDR);
     set_bkg_tiles(MAP_X_OFFSET, MAP_Y_OFFSET, MAP_WIDTH, MAP_HEIGHT, dtmap);
     doupdatemap = 0;
   }
