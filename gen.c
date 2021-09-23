@@ -10,6 +10,8 @@
 #define MAX_DS_SET 64 /* XXX can be smaller */
 #define MAX_VOIDS 10 /* XXX Figure out what this should be */
 
+#define MIN_CARVECUT_DIST 21
+
 #define NUM_GATE_MAPS 14
 
 #define MASK_UL  0b11111110
@@ -153,6 +155,7 @@ void digworm(u8 pos);
 void carvedoors(void);
 void update_door1(u8 pos);
 void carvecuts(void);
+u8 is_valid_cut(u8 from, u8 to);
 void calcdist(u8 pos);
 void startend(void);
 u8 startscore(u8 pos);
@@ -371,7 +374,7 @@ void roomgen(void) {
 void copymap(u8 index) {
   const u8 *src;
   u8 *dst;
-  u8 pos, valid, i, w, h, dir;
+  u8 pos, valid, i, w, h;
 
   // Fill map with default tiles. TILE_NONE is used for floor0 and floor10, and
   // TILE_WALL is used for all gate maps
@@ -439,18 +442,17 @@ void copymap(u8 index) {
         ds_sizes[ds_nextid] = 1;
 
         valid = validmap[pos];
-        for (dir = 0; dir < 4; ++dir) {
-          if (valid & dirvalid[dir]) {
-            ds_union(ds_nextid, ds_sets[POS_DIR(pos, dir)]);
-          }
-        }
+        if (valid & VALID_L) { ds_union(ds_nextid, ds_sets[POS_L(pos)]); }
+        if (valid & VALID_R) { ds_union(ds_nextid, ds_sets[POS_R(pos)]); }
+        if (valid & VALID_U) { ds_union(ds_nextid, ds_sets[POS_U(pos)]); }
+        if (valid & VALID_D) { ds_union(ds_nextid, ds_sets[POS_D(pos)]); }
         break;
     }
   } while (++pos);
 }
 
 void mazeworms(void) {
-  u8 pos, cand, valid, dir;
+  u8 pos, cand, valid;
 
   memset(tempmap, 0, sizeof(tempmap));
 
@@ -482,11 +484,10 @@ void mazeworms(void) {
       // tile can be connect to another region (since it would not be
       // carvable). So we only need to merge regions here.
       valid = validmap[pos];
-      for (dir = 0; dir < 4; ++dir) {
-        if (valid & dirvalid[dir]) {
-          ds_union(ds_nextid, ds_sets[POS_DIR(pos, dir)]);
-        }
-      }
+      if (valid & VALID_L) { ds_union(ds_nextid, ds_sets[POS_L(pos)]); }
+      if (valid & VALID_R) { ds_union(ds_nextid, ds_sets[POS_R(pos)]); }
+      if (valid & VALID_U) { ds_union(ds_nextid, ds_sets[POS_U(pos)]); }
+      if (valid & VALID_D) { ds_union(ds_nextid, ds_sets[POS_D(pos)]); }
     }
   } while(num_cands > 1);
 }
@@ -523,7 +524,7 @@ u8 nexttoroom8(u8 pos, u8 valid) {
 }
 
 void digworm(u8 pos) {
-  u8 dir, step, num_dirs, valid, i;
+  u8 dir, step, num_dirs, valid;
 
   // Pick a random direction
   dir = xrnd() & 3;
@@ -538,9 +539,14 @@ void digworm(u8 pos) {
 
     // Update neighbors
     valid = validmap[pos];
-    for (i = 0; i < 8; ++i) {
-      if (valid & dirvalid[i]) { update_carve1(POS_DIR(pos, i)); }
-    }
+    if (valid & VALID_L) { update_carve1(POS_L(pos)); }
+    if (valid & VALID_R) { update_carve1(POS_R(pos)); }
+    if (valid & VALID_U) { update_carve1(POS_U(pos)); }
+    if (valid & VALID_D) { update_carve1(POS_D(pos)); }
+    if (valid & VALID_UL) { update_carve1(POS_UL(pos)); }
+    if (valid & VALID_UR) { update_carve1(POS_UR(pos)); }
+    if (valid & VALID_DL) { update_carve1(POS_DL(pos)); }
+    if (valid & VALID_DR) { update_carve1(POS_DR(pos)); }
 
     // Update the disjoint set
     ds_sets[pos] = ds_nextid;
@@ -552,11 +558,11 @@ void digworm(u8 pos) {
         (XRND_50_PERCENT() && step > 2)) {
       step = 0;
       num_dirs = 0;
-      for (i = 0; i < 4; ++i) {
-        if ((valid & dirvalid[i]) && tempmap[POS_DIR(pos, i)]) {
-          cands[num_dirs++] = i;
-        }
-      }
+
+      if ((valid & VALID_L) && tempmap[POS_L(pos)]) { cands[num_dirs++] = 0; }
+      if ((valid & VALID_R) && tempmap[POS_R(pos)]) { cands[num_dirs++] = 1; }
+      if ((valid & VALID_U) && tempmap[POS_U(pos)]) { cands[num_dirs++] = 2; }
+      if ((valid & VALID_D) && tempmap[POS_D(pos)]) { cands[num_dirs++] = 3; }
       if (num_dirs == 0) return;
       dir = cands[randint(num_dirs)];
     }
@@ -646,27 +652,63 @@ void carvecuts(void) {
     // Calculate distance from one side of the door to the other.
     match = IS_DOOR(pos);
     diff = match == 1 ? 16 : 1; // 1: horizontal, 2: vertical
-    // TODO: we only need the distance to the other size of the door; use a
-    // faster routine for this?
-    calcdist(pos + diff);
-
-    // Remove this candidate
-    tempmap[pos] = 0;
-    --num_cands;
 
     // Connect the regions (creating a cycle) if the distance between the two
-    // sides is > 20 steps (21 is used because the distance starts at 1; that's
-    // so that 0 can be used to represent an unvisited cell).
-    if (distmap[(u8)(pos - diff)] > 21) {
+    // sides is > MIN_CARVECUT_DIST steps.
+    if (is_valid_cut(pos + diff, pos - diff)) {
       tmap[pos] = 1;
       sigempty(pos); // Update neighbor signatures.
       --maxcuts;
     }
+
+    // Remove this candidate
+    tempmap[pos] = 0;
+    --num_cands;
   } while (num_cands && maxcuts);
 }
 
+u8 is_valid_cut(u8 pos, u8 to) {
+  u8 head, oldtail, newtail, sig, valid, dist, newpos;
+  cands[head = 0] = pos;
+  newtail = 1;
+
+  memset(distmap, 0, sizeof(distmap));
+  distmap[pos] = dist = 1;
+
+  do {
+    oldtail = newtail;
+    ++dist;
+    do {
+      pos = cands[head++];
+      if (pos == to) { return 0; }
+
+      valid = validmap[pos];
+      sig = ~sigmap[pos] & valid;
+      if (!distmap[newpos = POS_L(pos)]) {
+        if (valid & VALID_L) { distmap[newpos] = dist; }
+        if (sig & VALID_L) { cands[newtail++] = newpos; }
+      }
+      if (!distmap[newpos = POS_R(pos)]) {
+        if (valid & VALID_R) { distmap[newpos] = dist; }
+        if (sig & VALID_R) { cands[newtail++] = newpos; }
+      }
+      if (!distmap[newpos = POS_U(pos)]) {
+        if (valid & VALID_U) { distmap[newpos] = dist; }
+        if (sig & VALID_U) { cands[newtail++] = newpos; }
+      }
+      if (!distmap[newpos = POS_D(pos)]) {
+        if (valid & VALID_D) { distmap[newpos] = dist; }
+        if (sig & VALID_D) { cands[newtail++] = newpos; }
+      }
+    } while (head != oldtail);
+  } while (dist < MIN_CARVECUT_DIST && oldtail != newtail);
+
+  // Distance is greater than MIN_CARVECUT_DIST
+  return 1;
+}
+
 void calcdist(u8 pos) {
-  u8 head, oldtail, newtail, sig, valid, dist, newpos, dir;
+  u8 head, oldtail, newtail, sig, valid, dist, newpos;
   cands[head = 0] = pos;
   newtail = 1;
 
@@ -680,11 +722,21 @@ void calcdist(u8 pos) {
       pos = cands[head++];
       valid = validmap[pos];
       sig = ~sigmap[pos] & valid;
-      for (dir = 0; dir < 4; ++dir) {
-        if (!distmap[newpos = POS_DIR(pos, dir)]) {
-          if (valid & dirvalid[dir]) { distmap[newpos] = dist; }
-          if (sig & dirvalid[dir]) { cands[newtail++] = newpos; }
-        }
+      if (!distmap[newpos = POS_L(pos)]) {
+        if (valid & VALID_L) { distmap[newpos] = dist; }
+        if (sig & VALID_L) { cands[newtail++] = newpos; }
+      }
+      if (!distmap[newpos = POS_R(pos)]) {
+        if (valid & VALID_R) { distmap[newpos] = dist; }
+        if (sig & VALID_R) { cands[newtail++] = newpos; }
+      }
+      if (!distmap[newpos = POS_U(pos)]) {
+        if (valid & VALID_U) { distmap[newpos] = dist; }
+        if (sig & VALID_U) { cands[newtail++] = newpos; }
+      }
+      if (!distmap[newpos = POS_D(pos)]) {
+        if (valid & VALID_D) { distmap[newpos] = dist; }
+        if (sig & VALID_D) { cands[newtail++] = newpos; }
       }
     } while (head != oldtail);
   } while (oldtail != newtail);
@@ -783,7 +835,7 @@ u8 startscore(u8 pos) {
 }
 
 void fillends(void) {
-  u8 pos, valid, dir;
+  u8 pos, valid;
   memset(tempmap, 0, sizeof(tempmap));
 
   // Find all starting positions (dead ends)
@@ -806,11 +858,10 @@ void fillends(void) {
       tempmap[pos] = 0;
 
       valid = validmap[pos];
-      for (dir = 0; dir < 8; ++dir) {
-        if (valid & dirvalid[dir]) {
-          update_fill1(POS_DIR(pos, dir));
-        }
-      }
+      if (valid & VALID_L) { update_fill1(POS_L(pos)); }
+      if (valid & VALID_R) { update_fill1(POS_R(pos)); }
+      if (valid & VALID_U) { update_fill1(POS_U(pos)); }
+      if (valid & VALID_D) { update_fill1(POS_D(pos)); }
     }
   } while (num_cands);
 }
@@ -855,7 +906,7 @@ void prettywalls(void) {
 }
 
 void voids(void) {
-  u8 pos, head, oldtail, newtail, valid, newpos, dir, num_walls, id, exit;
+  u8 pos, head, oldtail, newtail, valid, newpos, num_walls, id, exit;
 
   pos = 0;
   num_voids = 0;
@@ -882,14 +933,36 @@ void voids(void) {
             tmap[pos] = void_tiles[randint(sizeof(void_tiles))];
             valid = validmap[pos];
 
-            for (dir = 0; dir < 4; ++dir) {
-              if (valid & dirvalid[dir]) {
-                if (!tmap[newpos = POS_DIR(pos, dir)]) {
-                  cands[newtail++] = newpos;
-                } else if (TILE_HAS_CRACKED_VARIANT(tmap[newpos])) {
-                  ++num_walls;
-                  tempmap[newpos] = id;
-                }
+            if (valid & VALID_L) {
+              if (!tmap[newpos = POS_L(pos)]) {
+                cands[newtail++] = newpos;
+              } else if (TILE_HAS_CRACKED_VARIANT(tmap[newpos])) {
+                ++num_walls;
+                tempmap[newpos] = id;
+              }
+            }
+            if (valid & VALID_R) {
+              if (!tmap[newpos = POS_R(pos)]) {
+                cands[newtail++] = newpos;
+              } else if (TILE_HAS_CRACKED_VARIANT(tmap[newpos])) {
+                ++num_walls;
+                tempmap[newpos] = id;
+              }
+            }
+            if (valid & VALID_U) {
+              if (!tmap[newpos = POS_U(pos)]) {
+                cands[newtail++] = newpos;
+              } else if (TILE_HAS_CRACKED_VARIANT(tmap[newpos])) {
+                ++num_walls;
+                tempmap[newpos] = id;
+              }
+            }
+            if (valid & VALID_D) {
+              if (!tmap[newpos = POS_D(pos)]) {
+                cands[newtail++] = newpos;
+              } else if (TILE_HAS_CRACKED_VARIANT(tmap[newpos])) {
+                ++num_walls;
+                tempmap[newpos] = id;
               }
             }
           }
