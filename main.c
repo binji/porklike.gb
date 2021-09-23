@@ -317,7 +317,8 @@ u8 is_targeting;
 Dir target_dir;
 
 u8 joy, lastjoy, newjoy;
-u8 doupdatemap, dofadeout, doloadfloor, donextfloor, doblind, dosight;
+u8 doupdatemap, doupdatewin, dofadeout, doloadfloor, donextfloor, doblind,
+    dosight;
 u8 *next_sprite, *last_next_sprite;
 
 u8 inv_anim_up;
@@ -349,10 +350,6 @@ void main(void) NONBANKED {
   xrnd_init(0x1234);  // TODO: seed with DIV on button press
   BGP_REG = OBP0_REG = OBP1_REG = fadepal[0];
   obj_pal1_timer = OBJ1_PAL_FRAMES;
-
-  // Set up the window tiles early, while the screen is still turned off, even
-  // though we won't need them yet.
-  set_win_tiles(0, 0, INV_WIDTH, INV_HEIGHT, inventory_map);
   enable_interrupts();
 
   SWITCH_ROM_MBC1(2);
@@ -360,6 +357,7 @@ void main(void) NONBANKED {
   SWITCH_ROM_MBC1(1);
 
   // Initialize for gameplay
+  LCDC_REG = 0b11100011;  // display on, window/bg/obj on, window@9c00
   gb_decompress_bkg_data(0x80, shared_bin);
   gb_decompress_sprite_data(0, sprites_bin);
   add_VBL(vbl_interrupt);
@@ -368,7 +366,6 @@ void main(void) NONBANKED {
   mapgen();
   SWITCH_ROM_MBC1(1);
   doupdatemap = 1;
-  LCDC_REG = 0b11100011;  // display on, window/bg/obj on, window@9c00
   fadein();
 
   while(1) {
@@ -475,6 +472,8 @@ void gameinit(void) {
   inv_select_timer = INV_SELECT_FRAMES;
   inv_target_timer = INV_TARGET_FRAMES;
   inv_msg_update = 1;
+  memset(equip_type, PICKUP_TYPE_NONE, sizeof(equip_type));
+  doupdatewin = 1;
 
   floor = 0;
   counter_zero(&st_floor);
@@ -1843,6 +1842,9 @@ void vbl_interrupt(void) NONBANKED {
     counter_out(&st_floor, INV_FLOOR_ADDR);
     set_bkg_tiles(MAP_X_OFFSET, MAP_Y_OFFSET, MAP_WIDTH, MAP_HEIGHT, dtmap);
     doupdatemap = 0;
+  } else if (doupdatewin) {
+    set_win_tiles(0, 0, INV_WIDTH, INV_HEIGHT, inventory_map);
+    doupdatewin = 0;
   }
   if (--tile_timer == 0) {
     tile_timer = TILE_ANIM_FRAMES;
