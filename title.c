@@ -2,6 +2,7 @@
 #include <gb/gbdecompress.h>
 
 #include "main.h"
+#include "out/tiletitle.h"
 
 #pragma bank 2
 
@@ -9,8 +10,6 @@
 #define TITLE_Y_OFFSET 2
 #define TITLE_WIDTH 16
 #define TITLE_HEIGHT 14
-
-#include "tiletitle.c"
 
 const u8 title_map[] = {
     14, 0,  1,  2,  3,  4,  5,  6,  7,  8,  9,  10, 11, 12, 13, 14,

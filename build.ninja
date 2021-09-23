@@ -1,0 +1,60 @@
+rule rgbgfx
+  command = ../rgbds/rgbgfx -u $in -o $out
+  description = rgbfx $out
+
+rule rgbgfx-tilemap
+  command = ../rgbds/rgbgfx -t $tilemap_file -u $in -o $out
+  description = rgbfx $out
+
+rule gbcompress
+  command = ../gbdk/bin/gbcompress $in $out
+  description = gbcompress $out
+
+rule bin2c
+  command = python ref/bin2c.py $in -o $out
+
+rule lcc
+  depfile = $depfile
+  deps = gcc
+  command = ../gbdk/bin/lcc -MD -Wa-l $in -c -o $out
+  description = lcc $out
+
+rule link
+  command = ../gbdk/bin/lcc -Wl-j -Wl-m -Wl-w -Wl-yo4 -Wl-yt1 -Wm-ynPORKLIKE -Wm-yS $in -o $out
+  description = link $out
+
+build out/bg.bin: rgbgfx bg.png
+build out/shared.bin: rgbgfx shared.png
+build out/sprites.bin: rgbgfx sprites.png
+build out/dead.bin: rgbgfx dead.png
+build out/title.bin: rgbgfx-tilemap title.png
+  tilemap_file = out/title.tilemap
+
+build out/bg.binz: gbcompress out/bg.bin
+build out/shared.binz: gbcompress out/shared.bin
+build out/sprites.binz: gbcompress out/sprites.bin
+build out/dead.binz: gbcompress out/dead.bin
+build out/title.binz: gbcompress out/title.bin
+
+build out/tilebg.c | out/tilebg.h: bin2c out/bg.binz
+build out/tileshared.c | out/tileshared.h: bin2c out/shared.binz
+build out/tilesprites.c | out/tilesprites.h: bin2c out/sprites.binz
+build out/tiledead.c | out/tiledead.h: bin2c out/dead.binz
+build out/tiletitle.c | out/tiletitle.h: bin2c out/title.binz
+
+build out/util.o: lcc util.s
+  depfile = out/util.d
+
+build out/bank0.o: lcc bank0.c
+  depfile = out/bank0.d
+
+build out/title.o: lcc title.c | out/tiletitle.h
+  depfile = out/title.d
+
+build out/gen.o: lcc gen.c
+  depfile = out/gen.d
+
+build out/main.o: lcc main.c | out/tilebg.h out/tileshared.h out/tilesprites.h out/tiledead.h
+  depfile = out/main.d
+
+build porklike.gb: link out/bank0.o out/main.o out/util.o out/title.o out/tiletitle.c out/tilebg.c out/tileshared.c out/tilesprites.c out/tiledead.c out/gen.o

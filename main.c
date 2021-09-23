@@ -5,11 +5,10 @@
 #pragma bank 1
 
 #include "main.h"
-
-#include "tilebg.c"
-#include "tileshared.c"
-#include "tilesprites.c"
-#include "tiledead.c"
+#include "out/tilebg.h"
+#include "out/tileshared.h"
+#include "out/tilesprites.h"
+#include "out/tiledead.h"
 
 #define MAX_CANDS 256
 #define MAX_DEAD_MOBS 4
