@@ -988,7 +988,7 @@ void hitmob(u8 index, u8 dmg) {
   mtype = mob_type[index];
 
   if (mob_type_object[mtype]) {
-    if (mtype == MOB_TYPE_CHEST) {
+    if (mtype == MOB_TYPE_CHEST || mtype == MOB_TYPE_HEART_CHEST) {
       percent = 100;
       tile = TILE_CHEST_OPEN;
       slime = 0;
