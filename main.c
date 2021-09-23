@@ -318,7 +318,7 @@ Dir target_dir;
 
 u8 joy, lastjoy, newjoy;
 u8 doupdatemap, dofadeout, doloadfloor, donextfloor, doblind, dosight;
-OAM_item_t *next_sprite, *last_next_sprite;
+u8 *next_sprite, *last_next_sprite;
 
 u8 inv_anim_up;
 u8 inv_anim_timer;
@@ -491,14 +491,14 @@ void begin_animate(void) {
   *mob_tile_code_ptr++ = 0xc9; // ret
 
   // Start mob sprites after floats
-  next_sprite = shadow_OAM + BASE_FLOAT + MAX_FLOATS;
+  next_sprite = (u8*)shadow_OAM + ((BASE_FLOAT + MAX_FLOATS) << 2);
 }
 
 void end_animate(void) {
   // Hide the rest of the sprites
   while (next_sprite < last_next_sprite) {
-    next_sprite->y = 0;  // hide sprite
-    ++next_sprite;
+    *next_sprite++ = 0;  // hide sprite
+    next_sprite += 3;
   }
   last_next_sprite = next_sprite;
 
@@ -618,7 +618,6 @@ void move_player(void) {
       } else {
         pos = mob_pos[PLAYER_MOB];
         newpos = POS_DIR(pos, dir);
-        mobdir(PLAYER_MOB, dir);
         if (IS_MOB(newpos)) {
           mobbump(PLAYER_MOB, dir);
           if (mob_type[mobmap[newpos] - 1] == MOB_TYPE_SCORPION &&
@@ -922,6 +921,7 @@ void mobwalk(u8 index, u8 dir) {
   mob_trigger[index] = 1;
   mobmap[pos] = 0;
   mobmap[newpos] = index + 1;
+  mobdir(index, dir);
 }
 
 void mobbump(u8 index, u8 dir) {
@@ -934,6 +934,7 @@ void mobbump(u8 index, u8 dir) {
 
   mob_move_timer[index] = BUMP_FRAMES;
   mob_anim_state[index] = MOB_ANIM_STATE_BUMP1;
+  mobdir(index, dir);
 }
 
 void mobhop(u8 index, u8 newpos) {
@@ -1451,9 +1452,6 @@ void do_animate(void) {
   u8 i, dosprite, dotile, sprite, prop, frame, animdone;
   animdone = num_sprs == 0;
 
-  // use u8* pointer instead of OAM_item_t* pointer for better code generation
-  u8* psprite = (u8*)next_sprite;
-
   // Loop through all pickups
   for (i = 0; i < num_picks; ++i) {
     // Don't draw the pickup if it is fogged or a mob is standing on top of it
@@ -1487,20 +1485,22 @@ void do_animate(void) {
     // Since the pickups bounce by 1 pixel up and down, we also display them at
     // WY_REG + 7 so they don't disappear while bouncing.
     if (sprite && pick_y[i] <= WY_REG + 9) {
-      *psprite++ = pick_y[i];
-      *psprite++ = pick_x[i];
-      *psprite++ = sprite;
-      *psprite++ = 0;
+      *next_sprite++ = pick_y[i];
+      *next_sprite++ = pick_x[i];
+      *next_sprite++ = sprite;
+      *next_sprite++ = 0;
     }
 
     if (dotile || pick_move_timer[i]) {
       frame = pick_type_anim_frames[pick_anim_frame[i]];
       if (pick_move_timer[i]) {
         animdone = 0;
-        *psprite++ = pick_y[i];
-        *psprite++ = pick_x[i];
-        *psprite++ = frame;
-        *psprite++ = 0;
+        if (pick_y[i] <= WY_REG + 9) {
+          *next_sprite++ = pick_y[i];
+          *next_sprite++ = pick_x[i];
+          *next_sprite++ = frame;
+          *next_sprite++ = 0;
+        }
 
         pick_x[i] += pick_dx[i];
         pick_y[i] += pick_dy[i] + hopy12[--pick_move_timer[i]];
@@ -1542,18 +1542,17 @@ void do_animate(void) {
     if (dotile || dosprite) {
       frame = mob_type_anim_frames[mob_anim_frame[i]];
 
-      if (dosprite) {
+      if (dosprite && mob_y[i] <= WY_REG + 9) {
         prop = mob_flip[i] ? S_FLIPX : 0;
-
-        *psprite++ = mob_y[i];
-        *psprite++ = mob_x[i];
+        *next_sprite++ = mob_y[i];
+        *next_sprite++ = mob_x[i];
         if (mob_flash[i]) {
-          *psprite++ = frame - TILE_MOB_FLASH_DIFF;
-          *psprite++ = S_PALETTE | prop;
+          *next_sprite++ = frame - TILE_MOB_FLASH_DIFF;
+          *next_sprite++ = S_PALETTE | prop;
           --mob_flash[i];
         } else {
-          *psprite++ = frame;
-          *psprite++ = prop | (i + 1 == key_mob ? S_PALETTE : 0);
+          *next_sprite++ = frame;
+          *next_sprite++ = prop | (i + 1 == key_mob ? S_PALETTE : 0);
         }
       }
 
@@ -1616,16 +1615,14 @@ void do_animate(void) {
         dmob_prop[i] = dmob_prop[num_dead_mobs];
         dmob_timer[i] = dmob_timer[num_dead_mobs];
       }
-    } else {
-      *psprite++ = dmob_y[i];
-      *psprite++ = dmob_x[i];
-      *psprite++ = dmob_tile[i];
-      *psprite++ = dmob_prop[i];
+    } else if (dmob_y[i] <= WY_REG + 9) {
+      *next_sprite++ = dmob_y[i];
+      *next_sprite++ = dmob_x[i];
+      *next_sprite++ = dmob_tile[i];
+      *next_sprite++ = dmob_prop[i];
       ++i;
     }
   }
-
-  next_sprite = (OAM_item_t*)psprite;
 
   if (animdone) {
     pass_turn();
@@ -2009,11 +2006,10 @@ void update_floats_and_msg_and_sprs(void) {
           y += delta;
         }
 
-        next_sprite->y = y;
-        next_sprite->x = x;
-        next_sprite->tile = TILE_ARROW_L + dir;
-        next_sprite->prop = 0;
-        ++next_sprite;
+        *next_sprite++ = y;
+        *next_sprite++ = x;
+        *next_sprite++ = TILE_ARROW_L + dir;
+        *next_sprite++ = 0;
       }
     }
   }
@@ -2031,11 +2027,10 @@ void inv_animate(void) {
       inv_select_timer = INV_SELECT_FRAMES;
       ++inv_select_frame;
     }
-    next_sprite->y = WY_REG + INV_SELECT_Y_OFFSET + (inv_select << 3);
-    next_sprite->x = INV_SELECT_X_OFFSET + pickbounce[inv_select_frame & 7];
-    next_sprite->tile = 0;
-    next_sprite->prop = 0;
-    ++next_sprite;
+    *next_sprite++ = WY_REG + INV_SELECT_Y_OFFSET + (inv_select << 3);
+    *next_sprite++ = INV_SELECT_X_OFFSET + pickbounce[inv_select_frame & 7];
+    *next_sprite++ = 0;
+    *next_sprite++ = 0;
 
     if (inv_msg_update) {
       inv_msg_update = 0;
