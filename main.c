@@ -350,6 +350,7 @@ void main(void) NONBANKED {
   xrnd_init(0x1234);  // TODO: seed with DIV on button press
   BGP_REG = OBP0_REG = OBP1_REG = fadepal[0];
   obj_pal1_timer = OBJ1_PAL_FRAMES;
+  soundinit();
   enable_interrupts();
 
   SWITCH_ROM_MBC1(2);
@@ -2241,7 +2242,9 @@ u8 addspr(u8 speed, u16 x, u16 y, u16 dx, u16 dy, u8 drag, u8 timer, u8 prop) {
 
 void begin_tile_anim(void) NONBANKED {
   u16 addr = (u16)&tile_inc;
-  tile_code[0] = 0xf5; // push af
+  // Initialize the first byte to ret, in case the interrupt handler is called
+  // before we're finished.
+  tile_code[0] = 0xc9; // ret (will be changed to push af)
   tile_code[1] = 0xc5; // push bc
   tile_code[2] = 0xfa; // ld a, (NNNN)
   tile_code[3] = (u8)addr;
@@ -2257,6 +2260,9 @@ void end_tile_anim(void) NONBANKED {
   *ptr++ = 0xc1; // pop bc
   *ptr++ = 0xf1; // pop af
   *ptr = 0xc9;   // ret
+
+  // Fix the first byte to push af, so the code can be executed
+  tile_code[0] = 0xf5; // push af
 }
 
 void add_tile_anim(u8 pos, u8 tile) NONBANKED {

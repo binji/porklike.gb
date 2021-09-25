@@ -224,6 +224,7 @@ extern const u16 boom_spr_dy[];
 
 extern const u8 gameover_map[];
 
+void soundinit(void);
 
 void titlescreen(void);
 void clear_wram(void) __preserves_regs(b, c);
