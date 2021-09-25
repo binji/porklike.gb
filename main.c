@@ -127,11 +127,9 @@
 
 typedef enum Turn {
   TURN_PLAYER,
-  TURN_PLAYER_WAIT,
+  TURN_PLAYER_MOVED,
   TURN_AI,
-  TURN_AI_WAIT,
   TURN_WEEDS,
-  TURN_WEEDS_WAIT,
 } Turn;
 
 typedef enum SprType {
@@ -251,6 +249,8 @@ u8 mob_anim_speed[MAX_MOBS]; // current anim speed (changes when moving)
 u8 mob_pos[MAX_MOBS];
 u8 mob_x[MAX_MOBS], mob_y[MAX_MOBS];   // x,y location of sprite
 u8 mob_dx[MAX_MOBS], mob_dy[MAX_MOBS]; // dx,dy moving sprite
+u8 mob_clear_tile[MAX_MOBS];           // whether to remove the mob tile
+u8 mob_clear_pos[MAX_MOBS];            // which position to clear
 u8 mob_move_timer[MAX_MOBS];           // timer for sprite animation
 MobAnimState mob_anim_state[MAX_MOBS]; // sprite animation state
 u8 mob_flip[MAX_MOBS];                 // 0=facing right 1=facing left
@@ -547,41 +547,34 @@ void do_turn(void) {
             ((newjoy & J_A) != 0) && inv_selected_pick != PICKUP_TYPE_NONE;
       }
     }
-  } else {
-    switch (turn) {
-    case TURN_PLAYER:
-      move_player();
-      break;
-
-    case TURN_AI:
-      turn = TURN_AI_WAIT;
-      do_ai();
-      break;
-
-    case TURN_WEEDS:
-      turn = TURN_WEEDS_WAIT;
-      do_ai();
-      break;
-    }
+  } else if (turn == TURN_PLAYER) {
+    move_player();
   }
 }
 
 void pass_turn(void) {
+  if (dosight) {
+    dosight = 0;
+    sight();
+  }
+
   switch (turn) {
-  case TURN_PLAYER_WAIT:
+  case TURN_PLAYER_MOVED:
     if (noturn) {
       turn = TURN_PLAYER;
       noturn = 0;
     } else {
       turn = TURN_AI;
+      do_ai(); // XXX maybe recursive
     }
     break;
 
-  case TURN_AI_WAIT:
+  case TURN_AI:
     turn = TURN_WEEDS;
+    do_ai(); // XXX maybe recursive
     break;
 
-  case TURN_WEEDS_WAIT:
+  case TURN_WEEDS:
     turn = TURN_PLAYER;
     if (floor && steps == REAPER_AWAKENS_STEPS) {
       ++steps; // Make sure to only spawn reaper once per floor
@@ -593,11 +586,6 @@ void pass_turn(void) {
       dosight = 1;
     }
     break;
-  }
-
-  if (dosight) {
-    dosight = 0;
-    sight();
   }
 }
 
@@ -680,11 +668,11 @@ void move_player(void) {
         mob_trigger[PLAYER_MOB] = !noturn;
         mobbump(PLAYER_MOB, dir);
       done:
-        turn = TURN_PLAYER_WAIT;
+        turn = TURN_PLAYER_MOVED;
       }
     } else if (is_targeting && (newjoy & J_A)) {
       use_pickup();
-      turn = TURN_PLAYER_WAIT;
+      turn = TURN_PLAYER_MOVED;
     } else if (newjoy & J_B) {
       // Open inventory (or back out of targeting)
       inv_anim_timer = INV_ANIM_FRAMES;
@@ -919,7 +907,8 @@ void mobwalk(u8 index, u8 dir) {
   mob_y[index] = POS_TO_Y(pos);
   mob_dx[index] = dirx[dir];
   mob_dy[index] = diry[dir];
-  set_tile_during_vbl(pos, dtmap[pos]);
+  mob_clear_tile[index] = 1;
+  mob_clear_pos[index] = pos;
 
   mob_move_timer[index] = WALK_FRAMES;
   mob_anim_state[index] = MOB_ANIM_STATE_WALK;
@@ -937,7 +926,8 @@ void mobbump(u8 index, u8 dir) {
   mob_y[index] = POS_TO_Y(pos);
   mob_dx[index] = dirx[dir];
   mob_dy[index] = diry[dir];
-  set_tile_during_vbl(pos, dtmap[pos]);
+  mob_clear_tile[index] = 1;
+  mob_clear_pos[index] = pos;
 
   mob_move_timer[index] = BUMP_FRAMES;
   mob_anim_state[index] = MOB_ANIM_STATE_BUMP1;
@@ -947,7 +937,8 @@ void mobbump(u8 index, u8 dir) {
 void mobhop(u8 index, u8 newpos) {
   u8 pos = mob_pos[index];
   mobhopnew(index, newpos);
-  set_tile_during_vbl(pos, dtmap[pos]);
+  mob_clear_tile[index] = 1;
+  mob_clear_pos[index] = pos;
 }
 
 void mobhopnew(u8 index, u8 newpos) {
@@ -1135,7 +1126,7 @@ void do_ai(void) {
   u8 moving = 0;
   u8 i;
   for (i = 0; i < num_mobs; ++i) {
-    if ((mob_type[i] == MOB_TYPE_WEED) == (turn == TURN_WEEDS_WAIT)) {
+    if ((mob_type[i] == MOB_TYPE_WEED) == (turn == TURN_WEEDS)) {
       moving |= do_mob_ai(i);
     }
   }
@@ -1578,14 +1569,21 @@ void do_animate(void) {
 
   // Loop through all mobs, update animations
   for (i = 0; i < num_mobs; ++i) {
+    u8 pos = mob_pos[i];
+
+    if (mob_clear_tile[i]) {
+      mob_clear_tile[i] = 0;
+      set_tile_during_vbl(mob_clear_pos[i], dtmap[mob_clear_pos[i]]);
+    }
+
     // TODO: need to properly handle active fogged mobs; they should still do
     // their triggers but not draw anything. We also probably want to display
     // mobs that are partially fogged; if the start or end position is
     // unfogged.
-    if (fogmap[mob_pos[i]] || !mob_vis[i]) { continue; }
+    if (fogmap[pos] || !mob_vis[i]) { continue; }
 
     dosprite = dotile = 0;
-    if (tile_timer == 1 && IS_ANIMATED_TILE(tmap[mob_pos[i]])) {
+    if (tile_timer == 1 && IS_ANIMATED_TILE(tmap[pos])) {
       dotile = 1;
     }
 
@@ -1651,7 +1649,7 @@ void do_animate(void) {
             case MOB_ANIM_STATE_HOP4:
               mob_anim_state[i] = MOB_ANIM_STATE_NONE;
               mob_dx[i] = mob_dy[i] = 0;
-              set_tile_during_vbl(mob_pos[i], frame);
+              set_tile_during_vbl(pos, frame);
               break;
 
             case MOB_ANIM_STATE_POUNCE:
@@ -1660,7 +1658,7 @@ void do_animate(void) {
                 // Otherwise finish animation
                 mob_anim_state[i] = MOB_ANIM_STATE_NONE;
                 mob_dx[i] = mob_dy[i] = 0;
-                set_tile_during_vbl(mob_pos[i], frame);
+                set_tile_during_vbl(pos, frame);
               }
               break;
           }
@@ -1673,7 +1671,7 @@ void do_animate(void) {
           }
         }
       } else if (dotile) {
-        set_tile_during_vbl(mob_pos[i], frame);
+        set_tile_during_vbl(pos, frame);
       }
     }
   }
@@ -2174,6 +2172,7 @@ void addmob(MobType type, u8 pos) NONBANKED {
   mob_pos[num_mobs] = pos;
   mob_x[num_mobs] = POS_TO_X(pos);
   mob_y[num_mobs] = POS_TO_Y(pos);
+  mob_clear_tile[num_mobs] = 0;
   mob_move_timer[num_mobs] = 0;
   mob_anim_state[num_mobs] = MOB_ANIM_STATE_NONE;
   mob_flip[num_mobs] = 0;
@@ -2213,6 +2212,8 @@ void delmob(u8 index) NONBANKED {  // XXX: only used in bank 1
     mob_y[index] = mob_y[num_mobs];
     mob_dx[index] = mob_dx[num_mobs];
     mob_dy[index] = mob_dy[num_mobs];
+    mob_clear_tile[index] = mob_clear_tile[num_mobs];
+    mob_clear_pos[index] = mob_clear_pos[num_mobs];
     mob_move_timer[index] = mob_move_timer[num_mobs];
     mob_anim_state[index] = mob_anim_state[num_mobs];
     mob_flip[index] = mob_flip[num_mobs];
