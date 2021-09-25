@@ -145,11 +145,14 @@ typedef enum SprType {
 } SprType;
 
 typedef enum MobAnimState {
-  MOB_ANIM_STATE_NONE,
-  MOB_ANIM_STATE_WALK,
-  MOB_ANIM_STATE_BUMP1,
-  MOB_ANIM_STATE_BUMP2,
-  MOB_ANIM_STATE_HOP4,
+  MOB_ANIM_STATE_NONE = 0,
+  MOB_ANIM_STATE_WALK = 1,
+  MOB_ANIM_STATE_BUMP1 = 2,
+  MOB_ANIM_STATE_BUMP2 = 3,
+  MOB_ANIM_STATE_HOP4 = 4,
+  MOB_ANIM_STATE_HOP4_MASK = 7,
+  // Use 8 here so we can use & to check for HOP4 or POUNCE
+  MOB_ANIM_STATE_POUNCE = MOB_ANIM_STATE_HOP4 | 8,
 } MobAnimState;
 
 void gameinit(void);
@@ -1231,6 +1234,55 @@ u8 do_mob_ai(u8 index) {
         break;
 
       case MOB_AI_KONG:
+        if (ai_dobump(index)) {
+          return 1;
+        } else if (ai_tcheck(index)) {
+          // Get the movement direction and (partially) populate the distance
+          // map
+          dir = ai_getnextstep(index);
+
+          // check for a pounce
+          u8 tpos = mob_target_pos[index];
+          u8 x = pos & 0xf, y = pos & 0xf0;
+          u8 tx = tpos & 0xf, ty = tpos & 0xf0;
+          // If x or y coordinate is the same...
+          if (x == tx || y == ty) {
+            // Find the direction from mob to target
+            u8 sdir;
+            if (tx < x) {
+              sdir = DIR_LEFT;
+            } else if (tx > x) {
+              sdir = DIR_RIGHT;
+            } else if (ty < y) {
+              sdir = DIR_UP;
+            } else { // ty > y
+              sdir = DIR_DOWN;
+            }
+
+            // Check whether we can jump all the way to the target
+            u8 spos = pos;
+            u8 tile;
+            while (spos != tpos && !IS_WALL_TILE(tile = tmap[spos])) {
+              spos = POS_DIR(spos, sdir);
+              if (distmap[spos] == 2 && !IS_SMARTMOB(tile, spos)) {
+                // found it, jump here
+                mobdir(index, sdir);
+                mobhop(index, spos);
+                mob_trigger[index] = 1;
+                // override the anim state so we can do a bump when the hop
+                // animation finishes
+                mob_anim_state[index] = MOB_ANIM_STATE_POUNCE;
+                return 1;
+              }
+            }
+          }
+
+          // no pounce, try to move normally
+          if (dir != 255) {
+            mobwalk(index, dir);
+            return 1;
+          }
+        }
         break;
     }
   }
@@ -1576,7 +1628,9 @@ void do_animate(void) {
         mob_y[i] += mob_dy[i];
 
         --mob_move_timer[i];
-        if (mob_anim_state[i] == MOB_ANIM_STATE_HOP4) {
+        // Check for hop4 or pounce
+        if ((mob_anim_state[i] & MOB_ANIM_STATE_HOP4_MASK) ==
+            MOB_ANIM_STATE_HOP4) {
           mob_y[i] += hopy4[mob_move_timer[i]];
         }
 
@@ -1598,6 +1652,16 @@ void do_animate(void) {
               mob_anim_state[i] = MOB_ANIM_STATE_NONE;
               mob_dx[i] = mob_dy[i] = 0;
               set_tile_during_vbl(mob_pos[i], frame);
+              break;
+
+            case MOB_ANIM_STATE_POUNCE:
+              // bump player, if possible
+              if (!ai_dobump(i)) {
+                // Otherwise finish animation
+                mob_anim_state[i] = MOB_ANIM_STATE_NONE;
+                mob_dx[i] = mob_dy[i] = 0;
+                set_tile_during_vbl(mob_pos[i], frame);
+              }
               break;
           }
           // Reset animation speed
