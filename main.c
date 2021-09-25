@@ -60,7 +60,7 @@
 #define TILE_VOID_OPEN_DIFF 3
 
 #define FADE_FRAMES 8
-#define INV_ANIM_FRAMES 43
+#define INV_ANIM_FRAMES 25
 
 #define WALK_FRAMES 8
 #define BUMP_FRAMES 4
