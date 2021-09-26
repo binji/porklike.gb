@@ -235,6 +235,7 @@ void counter_zero(Counter* c) __preserves_regs(b, c);
 void counter_inc(Counter* c) __preserves_regs(b, c);
 void counter_out(Counter* c, u16 vram);
 
+void hide_sprites(void);
 void fadeout(void);
 void fadein(void);
 

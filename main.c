@@ -361,6 +361,7 @@ void main(void) NONBANKED {
   SWITCH_ROM_MBC1(1);
 
   // Initialize for gameplay
+  init_win(0);
   LCDC_REG = 0b11100011;  // display on, window/bg/obj on, window@9c00
   gb_decompress_bkg_data(0x80, shared_bin);
   gb_decompress_sprite_data(0, sprites_bin);
@@ -459,6 +460,8 @@ void gameinit(void) {
   reset_anim_code();
   tile_timer = TILE_ANIM_FRAMES;
 
+  // Reset scroll registers
+  SCX_REG = SCY_REG = 0;
   // Reload bg tiles
   gb_decompress_bkg_data(0, bg_bin);
   init_bkg(0);
@@ -519,11 +522,8 @@ void end_animate(void) {
   }
 }
 
-void hide_sprites(void) {
-  u8 i;
-  for (i = 0; i < 40; ++i) {
-    hide_sprite(i);
-  }
+void hide_sprites(void) NONBANKED {
+  memset(shadow_OAM, 0, 160);
   next_float = BASE_FLOAT;
 }
 
