@@ -2061,9 +2061,11 @@ void update_floats_and_msg_and_sprs(void) {
 
     u8 dir;
     u8 ppos = mob_pos[PLAYER_MOB];
+    u8 valid = validmap[ppos];
 
     for (dir = 0; dir < 4; ++dir) {
-      if (dir == target_dir || inv_selected_pick == PICKUP_TYPE_SPIN) {
+      if ((valid & dirvalid[dir]) &&
+          (dir == target_dir || inv_selected_pick == PICKUP_TYPE_SPIN)) {
         u8 pos = POS_DIR(ppos, dir);
         u8 x = POS_TO_X(pos);
         u8 y = POS_TO_Y(pos);
