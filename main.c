@@ -1854,7 +1854,7 @@ redo:
 
     // Expose the exit button for this void region.
     u8 room;
-    if ((room = roommap[pos]) >= num_rooms) {
+    if ((room = roommap[pos]) > num_rooms) {
       room -= num_rooms + 1;
       u8 exitpos = void_exit[room];
       u8 exittile = tmap[exitpos];
