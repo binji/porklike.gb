@@ -672,7 +672,7 @@ void move_player(void) {
     } else if (is_targeting && (newjoy & J_A)) {
       use_pickup();
       turn = TURN_PLAYER_MOVED;
-    } else if (newjoy & J_B) {
+    } else if (is_targeting && (newjoy & J_B) || (newjoy & J_A)) {
       // Open inventory (or back out of targeting)
       inv_anim_timer = INV_ANIM_FRAMES;
       inv_anim_up ^= 1;
