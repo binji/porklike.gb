@@ -759,7 +759,7 @@ void startend(void) {
   // Find the furthest point from endpos.
   pos = 0;
   do {
-    if (distmap[pos] > best) {
+    if (distmap[pos] > best && !IS_WALL_TILE(tmap[pos])) {
       startpos = pos;
       best = distmap[pos];
     }
