@@ -188,6 +188,7 @@ void titlescreen(void) {
     }
 
     if (newjoy & J_START) {
+      xrnd_init((sys_time << 8) | DIV_REG);
       break;
     }
     wait_vbl_done();

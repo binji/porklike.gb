@@ -350,7 +350,6 @@ void main(void) NONBANKED {
   // Initialize for title screen
   DISPLAY_OFF;
   clear_wram();
-  xrnd_init(0x1234);  // TODO: seed with DIV on button press
   BGP_REG = OBP0_REG = OBP1_REG = fadepal[0];
   obj_pal1_timer = OBJ1_PAL_FRAMES;
   soundinit();
