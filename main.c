@@ -1093,13 +1093,20 @@ void hitmob(u8 index, u8 dmg) {
       } else {
         delmob(index);
       }
-      // TODO: restore to 5hp if reaper killed, and drop key
       set_tile_during_vbl(pos, dtmap[pos]);
 
       if (index == PLAYER_MOB) {
         set_digit_tile_during_vbl(INV_HP_ADDR, 0);
         gameover_timer = GAMEOVER_FRAMES;
       } else {
+        // Killing a reaper restores the your health to 5 and drops a free key
+        if (mob_type[index] == MOB_TYPE_REAPER) {
+          if (mob_hp[PLAYER_MOB] < 5) {
+            mob_hp[PLAYER_MOB] = 5;
+            set_digit_tile_during_vbl(INV_HP_ADDR, mob_hp[PLAYER_MOB]);
+          }
+          droppick(PICKUP_TYPE_KEY, pos);
+        }
         counter_inc(&st_kills);
       }
     } else {
