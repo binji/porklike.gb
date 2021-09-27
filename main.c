@@ -1838,9 +1838,27 @@ redo:
           set_digit_tile_during_vbl(INV_KEYS_ADDR, num_keys);
         }
       } else {
-        // Is there a free spot in the equip?
-        equip_addr = INV_EQUIP_ADDR;
         len = pick_type_name_len[ptype];
+
+        // First check whether this equipment already exists, so we can
+        // increase the number of charges
+        equip_addr = INV_EQUIP_ADDR;
+        for (i = 0; i < MAX_EQUIPS; ++i) {
+          if (equip_type[i] == ptype) {
+            // Increase charges
+            if (equip_charge[i] < 9) {
+              equip_charge[i] += PICKUP_CHARGES;
+              if (equip_charge[i] > 9) { equip_charge[i] = 9; }
+              set_vram_byte((void *)(equip_addr + len - 2),
+                            TILE_0 + equip_charge[i]);
+            }
+            goto pickup;
+          }
+          equip_addr += 32;
+        }
+
+        // Next check whether there is a new spot for this equipment
+        equip_addr = INV_EQUIP_ADDR;
         for (i = 0; i < MAX_EQUIPS; ++i) {
           if (equip_type[i] == PICKUP_TYPE_NONE) {
             // Use this slot
@@ -1856,18 +1874,10 @@ redo:
               inv_msg_update = 1;
             }
             goto pickup;
-          } else if (equip_type[i] == ptype) {
-            // Increase charges
-            if (equip_charge[i] < 9) {
-              equip_charge[i] += PICKUP_CHARGES;
-              if (equip_charge[i] > 9) { equip_charge[i] = 9; }
-              set_vram_byte((void *)(equip_addr + len - 2),
-                            TILE_0 + equip_charge[i]);
-            }
-            goto pickup;
           }
           equip_addr += 32;
         }
+
         // No room, display "full!"
         ptype = PICKUP_TYPE_FULL;
         goto done;
