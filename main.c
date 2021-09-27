@@ -2252,31 +2252,34 @@ void delmob(u8 index) NONBANKED {  // XXX: only used in bank 1
     key_mob = index + 1;
   }
 
-  --num_mobs;
-  if (index != num_mobs) {
-    mob_type[index] = mob_type[num_mobs];
-    mob_anim_frame[index] = mob_anim_frame[num_mobs];
-    mob_anim_timer[index] = mob_anim_timer[num_mobs];
-    mob_anim_speed[index] = mob_anim_speed[num_mobs];
-    mob_pos[index] = mob_pos[num_mobs];
-    mob_x[index] = mob_x[num_mobs];
-    mob_y[index] = mob_y[num_mobs];
-    mob_dx[index] = mob_dx[num_mobs];
-    mob_dy[index] = mob_dy[num_mobs];
-    mob_move_timer[index] = mob_move_timer[num_mobs];
-    mob_anim_state[index] = mob_anim_state[num_mobs];
-    mob_flip[index] = mob_flip[num_mobs];
-    mob_task[index] = mob_task[num_mobs];
-    mob_target_pos[index] = mob_target_pos[num_mobs];
-    mob_ai_cool[index] = mob_ai_cool[num_mobs];
-    mob_active[index] = mob_active[num_mobs];
-    mob_charge[index] = mob_charge[num_mobs];
-    mob_hp[index] = mob_hp[num_mobs];
-    mob_flash[index] = mob_flash[num_mobs];
-    mob_stun[index] = mob_stun[num_mobs];
-    mob_trigger[index] = mob_trigger[num_mobs];
-    mob_vis[index] = mob_vis[num_mobs];
-    mobmap[mob_pos[index]] = index + 1;
+  // Never swap a mob into the player slot.
+  if (index != PLAYER_MOB) {
+    --num_mobs;
+    if (index != num_mobs) {
+      mob_type[index] = mob_type[num_mobs];
+      mob_anim_frame[index] = mob_anim_frame[num_mobs];
+      mob_anim_timer[index] = mob_anim_timer[num_mobs];
+      mob_anim_speed[index] = mob_anim_speed[num_mobs];
+      mob_pos[index] = mob_pos[num_mobs];
+      mob_x[index] = mob_x[num_mobs];
+      mob_y[index] = mob_y[num_mobs];
+      mob_dx[index] = mob_dx[num_mobs];
+      mob_dy[index] = mob_dy[num_mobs];
+      mob_move_timer[index] = mob_move_timer[num_mobs];
+      mob_anim_state[index] = mob_anim_state[num_mobs];
+      mob_flip[index] = mob_flip[num_mobs];
+      mob_task[index] = mob_task[num_mobs];
+      mob_target_pos[index] = mob_target_pos[num_mobs];
+      mob_ai_cool[index] = mob_ai_cool[num_mobs];
+      mob_active[index] = mob_active[num_mobs];
+      mob_charge[index] = mob_charge[num_mobs];
+      mob_hp[index] = mob_hp[num_mobs];
+      mob_flash[index] = mob_flash[num_mobs];
+      mob_stun[index] = mob_stun[num_mobs];
+      mob_trigger[index] = mob_trigger[num_mobs];
+      mob_vis[index] = mob_vis[num_mobs];
+      mobmap[mob_pos[index]] = index + 1;
+    }
   }
 }
 
