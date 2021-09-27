@@ -81,6 +81,7 @@
 #define TILE_DIRT1 0x6a
 #define TILE_DIRT2 0x6b
 #define TILE_DIRT3 0x6c
+#define TILE_KIELBASA 0x6e
 #define TILE_PLANT1 0xc
 #define TILE_PLANT2 0xd
 #define TILE_PLANT3 0x5c
@@ -226,7 +227,9 @@ extern const u16 boom_spr_y[];
 extern const u16 boom_spr_dx[];
 extern const u16 boom_spr_dy[];
 
-extern const u8 gameover_map[];
+extern const u8 dead_map[];
+extern const u8 win_map[];
+extern const u8 stats_map[];
 
 void soundinit(void);
 

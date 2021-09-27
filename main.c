@@ -49,13 +49,30 @@
 #define INV_BLANK_ROW_OFFSET 49 /* offset into inventory_map */
 
 #define GAMEOVER_FRAMES 70
+
 #define GAMEOVER_X_OFFSET 3
 #define GAMEOVER_Y_OFFSET 2
 #define GAMEOVER_WIDTH 9
 #define GAMEOVER_HEIGHT 13
-#define GAMEOVER_FLOOR_ADDR 0x992c
-#define GAMEOVER_STEPS_ADDR 0x994c
-#define GAMEOVER_KILLS_ADDR 0x996c
+
+#define DEAD_X_OFFSET 4
+#define DEAD_Y_OFFSET 2
+#define DEAD_WIDTH 8
+#define DEAD_HEIGHT 5
+
+#define WIN_X_OFFSET 2
+#define WIN_Y_OFFSET 2
+#define WIN_WIDTH 12
+#define WIN_HEIGHT 6
+
+#define STATS_X_OFFSET 3
+#define STATS_Y_OFFSET 9
+#define STATS_WIDTH 9
+#define STATS_HEIGHT 6
+
+#define STATS_FLOOR_ADDR 0x992c
+#define STATS_STEPS_ADDR 0x994c
+#define STATS_KILLS_ADDR 0x996c
 
 #define TILE_ANIM_FRAMES 8
 #define TILE_ANIM_FRAME_DIFF 16
@@ -127,6 +144,13 @@
 
 #define FLOAT_FOUND 0xe
 #define FLOAT_LOST 0xf
+
+typedef enum GameOverState {
+  GAME_OVER_NONE,
+  GAME_OVER_DEAD,
+  GAME_OVER_WIN,
+  GAME_OVER_WAIT,
+} GameOverState;
 
 typedef enum Turn {
   TURN_PLAYER,
@@ -310,7 +334,7 @@ u8 msg_timer;
 Turn turn;
 u8 dopassturn, doai;
 u8 noturn;
-u8 gameover;
+GameOverState gameover_state;
 u8 gameover_timer;
 
 u8 is_targeting;
@@ -370,9 +394,11 @@ void main(void) NONBANKED {
     joy = joypad();
     newjoy = (joy ^ lastjoy) & joy;
 
-    if (gameover) {
-      if (gameover == 1) {
-        gameover = 2;
+    begin_animate();
+
+    if (gameover_state != GAME_OVER_NONE) {
+      if (gameover_state != GAME_OVER_WAIT) {
+        end_animate();
         hide_sprites();
         fadeout();
         IE_REG &= ~VBL_IFLAG;
@@ -381,18 +407,26 @@ void main(void) NONBANKED {
         move_win(23, 160);
         gb_decompress_bkg_data(0, dead_bin);
         init_bkg(0);
-        set_bkg_tiles(GAMEOVER_X_OFFSET, GAMEOVER_Y_OFFSET, GAMEOVER_WIDTH,
-                      GAMEOVER_HEIGHT, gameover_map);
-        counter_out(&st_floor, GAMEOVER_FLOOR_ADDR);
-        counter_out(&st_steps, GAMEOVER_STEPS_ADDR);
-        counter_out(&st_kills, GAMEOVER_KILLS_ADDR);
+        if (gameover_state == GAME_OVER_WIN) {
+          set_bkg_tiles(WIN_X_OFFSET, WIN_Y_OFFSET, WIN_WIDTH, WIN_HEIGHT,
+                        win_map);
+        } else {
+          set_bkg_tiles(DEAD_X_OFFSET, DEAD_Y_OFFSET, DEAD_WIDTH, DEAD_HEIGHT,
+                        dead_map);
+        }
+        set_bkg_tiles(STATS_X_OFFSET, STATS_Y_OFFSET, STATS_WIDTH, STATS_HEIGHT,
+                      stats_map);
+        counter_out(&st_floor, STATS_FLOOR_ADDR);
+        counter_out(&st_steps, STATS_STEPS_ADDR);
+        counter_out(&st_kills, STATS_KILLS_ADDR);
 
+        gameover_state = GAME_OVER_WAIT;
         IE_REG |= VBL_IFLAG;
         fadein();
       } else {
         // Wait for keypress
         if (newjoy & J_A) {
-          gameover = 0;
+          gameover_state = GAME_OVER_NONE;
           doloadfloor = 1;
           fadeout();
 
@@ -425,7 +459,6 @@ void main(void) NONBANKED {
         doloadfloor = 0;
         counter_out(&st_floor, INV_FLOOR_NUM_ADDR);
         hide_sprites();
-        begin_animate();
         IE_REG &= ~VBL_IFLAG;
         SWITCH_ROM_MBC1(3);
         mapgen();
@@ -434,13 +467,12 @@ void main(void) NONBANKED {
         end_animate();
         doupdatemap = 1;
         fadein();
+        begin_animate();
       }
-
-      begin_animate();
 
       if (gameover_timer) {
         if (--gameover_timer == 0) {
-          gameover = 1;
+          gameover_state = GAME_OVER_DEAD;
         }
       } else {
         do_turn();
@@ -722,6 +754,8 @@ void move_player(void) {
                   } else {
                     showmsg(MSG_KEY, MSG_KEY_Y);
                   }
+                } else if (tile == TILE_KIELBASA) {
+                  gameover_state = GAME_OVER_WIN;
                 } else if (tile == TILE_VOID_BUTTON_U ||
                            tile == TILE_VOID_BUTTON_L ||
                            tile == TILE_VOID_BUTTON_R ||
