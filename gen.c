@@ -66,14 +66,6 @@ const u8 void_tiles[] = {TILE_VOID1, TILE_VOID1, TILE_VOID1, TILE_VOID1,
                          TILE_VOID1, TILE_VOID1, TILE_VOID2};
 const u8 plant_tiles[] = {TILE_PLANT1, TILE_PLANT2, TILE_PLANT3};
 
-const u8 room_permutations[][MAX_ROOMS] = {
-    {0, 1, 2, 3}, {0, 1, 3, 2}, {0, 2, 1, 3}, {0, 2, 3, 1}, {0, 3, 1, 2},
-    {0, 3, 2, 1}, {1, 0, 2, 3}, {1, 0, 3, 2}, {1, 2, 0, 3}, {1, 2, 3, 0},
-    {1, 3, 0, 2}, {1, 3, 2, 0}, {2, 0, 1, 3}, {2, 0, 3, 1}, {2, 1, 0, 3},
-    {2, 1, 3, 0}, {2, 3, 0, 1}, {2, 3, 1, 0}, {3, 0, 1, 2}, {3, 0, 2, 1},
-    {3, 1, 0, 2}, {3, 1, 2, 0}, {3, 2, 0, 1}, {3, 2, 1, 0},
-};
-
 const u8 vase_mobs[] = {0, 0, 0, 0, 0, 0, MOB_TYPE_VASE1, MOB_TYPE_VASE2};
 
 const u8 plant_mobs[] = {MOB_TYPE_WEED, MOB_TYPE_WEED, MOB_TYPE_BOMB};
@@ -1052,10 +1044,10 @@ void chests(void) {
 
 void decoration(void) {
   RoomKind kind = ROOM_KIND_VASE;
-  const u8 (*room_perm)[MAX_ROOMS] = room_permutations + randint(24);
+  const u8 *room_perm = permutation_4 + (randint(24) << 2);
   u8 i, room, pos, tile, w, h, mob;
   for (i = 0; i < MAX_ROOMS; ++i) {
-    room = (*room_perm)[i];
+    room = *room_perm++;
     if (room >= num_rooms) { continue; }
 
     pos = room_pos[room];

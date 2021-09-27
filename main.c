@@ -1322,13 +1322,15 @@ u8 ai_tcheck(u8 index) {
 }
 
 u8 ai_getnextstep(u8 index) {
-  u8 pos, newpos, bestval, bestdir, dist, valid, dir;
+  u8 pos, newpos, bestval, bestdir, dist, valid, i;
   pos = mob_pos[index];
   calcdist_ai(pos, mob_target_pos[index]);
   bestval = bestdir = 255;
   valid = validmap[pos];
+  const u8 *dir_perm = permutation_4 + (randint(24) << 2);
 
-  for (dir = 0; dir < 4; ++dir) {
+  for (i = 0; i < 4; ++i) {
+    u8 dir = *dir_perm++;
     newpos = POS_DIR(pos, dir);
     if ((valid & dirvalid[dir]) && !IS_SMARTMOB(tmap[newpos], newpos) &&
         (dist = distmap[newpos]) && dist < bestval) {
@@ -1341,14 +1343,16 @@ u8 ai_getnextstep(u8 index) {
 
 // TODO: combine with above?
 u8 ai_getnextstep_rev(u8 index) {
-  u8 pos, newpos, bestval, bestdir, dist, valid, dir;
+  u8 pos, newpos, bestval, bestdir, dist, valid, i;
   pos = mob_pos[index];
   calcdist_ai(pos, mob_target_pos[index]);
   bestval = 0;
   bestdir = 255;
   valid = validmap[pos];
+  const u8 *dir_perm = permutation_4 + (randint(24) << 2);
 
-  for (dir = 0; dir < 4; ++dir) {
+  for (i = 0; i < 4; ++i) {
+    u8 dir = *dir_perm++;
     newpos = POS_DIR(pos, dir);
     if ((valid & dirvalid[dir]) && !IS_SMARTMOB(tmap[newpos], newpos) &&
         (dist = distmap[newpos]) && dist > bestval) {

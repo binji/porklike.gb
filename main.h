@@ -157,6 +157,7 @@ typedef enum PickupType {
 
 extern const u8 flags_bin[];
 
+extern const u8 permutation_4[];
 extern const u8 fadepal[];
 extern const u8 obj_pal1[];
 extern const Dir invdir[];
