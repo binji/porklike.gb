@@ -149,7 +149,7 @@ _counter_zero::
   ld (hl), a   ; 0
   ret
 
-_counter_inc::
+_counter_thirty::
   ldhl sp, #2
   ld a, (hl+)
   ld e, a
@@ -157,74 +157,113 @@ _counter_inc::
   ld h, a
   ld l, e
 
-  ld d, #4
-  inc hl
-  inc hl
-  inc hl
-  inc hl
-  inc hl
-
-  ;; index 4
-  inc (hl)    ; increment digit
-  ld a, (hl)
-  sub a, #0xef    ; is > 9?
-  ret nz
-  dec d
+  ld a, #3
+  ld (hl+), a  ; start=3
   ld a, #0xe5
-  ld (hl-), a ; set to digit 0
-
-  ;; index 3
-  inc (hl)    ; increment digit
-  ld a, (hl)
-  sub a, #0xef    ; is > 9?
-  jr nz, 1$
-  dec d
-  ld a, #0xe5
-  ld (hl-), a ; set to digit 0
-
-  ;; index 2
-  inc (hl)    ; increment digit
-  ld a, (hl)
-  sub a, #0xef    ; is > 9?
-  jr nz, 2$
-  dec d
-  ld a, #0xe5
-  ld (hl-), a ; set to digit 0
-
-  ;; index 1
-  inc (hl)    ; increment digit
-  ld a, (hl)
-  sub a, #0xef    ; is > 9?
-  jr nz, 3$
-  dec d
-  ld a, #0xe5
-  ld (hl-), a ; set to digit 0
-
-  ;; index 0
-  inc (hl)    ; increment digit
-  ld a, (hl)
-  sub a, #0xef    ; is > 9?
-  jr nz, 4$
-  ld a, #0xe5
-  ld (hl), a  ; set to digit 0
-  jr 5$
-
-1$: dec hl
-2$: dec hl
-3$: dec hl
-4$: dec hl
-5$:
-
-  ; update start, if necessary
-  ld a, (hl)
-  sub a, d
-  ret c
-  ; write new start value
-  ld a, d
-  ld (hl), a
-
+  ld (hl+), a  ; 0
+  ld (hl+), a  ; 0
+  ld (hl+), a  ; 0
+  inc hl
+  ld (hl-), a  ; 0
+  ld a, #0xe8
+  ld (hl), a   ; 3
   ret
 
+_counter_inc::
+  ldhl sp, #2
+  ld a, (hl+)
+  ld e, a
+  ld a, (hl)
+  ld d, a
+  ld h, a
+  ld l, e   ; hl = de = [sp+2]
+
+  inc hl
+  inc hl
+  inc hl
+  inc hl
+  inc hl
+
+  ld c, #5
+0$:
+  inc (hl)      ; increment digit
+  ld a, (hl)
+  sub a, #0xef  ; exit loop if > 9?
+  jr nz, 1$
+  ld a, #0xe5
+  ld (hl-), a   ; set to digit 0
+  dec c
+  jr nz, 0$
+  jr 3$
+1$:
+
+  ;; move hl back to de
+  ld h, d
+  ld l, e
+3$:
+  ; move forward to the most significant digit
+  inc hl
+
+  ; search hl forward counting zeroes
+  ld c, #255
+2$:
+  inc c
+  ld a, (hl+)
+  sub a, #0xe5
+  jr z, 2$
+
+  ; write new start value
+  ld a, c
+  ld (de), a
+  ret
+
+_counter_dec::
+  ldhl sp, #2
+  ld a, (hl+)
+  ld e, a
+  ld a, (hl)
+  ld d, a
+  ld h, a
+  ld l, e   ; hl = de = [sp+2]
+
+  inc hl
+  inc hl
+  inc hl
+  inc hl
+  inc hl
+
+  ld c, #5
+0$:
+  dec (hl)        ; decrement digit
+  ld a, (hl)
+  sub a, #0xe5
+  jr nc, 1$       ; exit loop if >= 0
+  ld a, #0xee
+  ld (hl-), a     ; set to digit 0
+  dec c
+  jr nz, 0$
+  jr 3$
+1$:
+
+  ;; move hl back to de
+  ld h, d
+  ld l, e
+3$:
+  ; move forward to the most significant digit
+  inc hl
+
+  ; search hl forward counting zeroes
+  ld c, #255
+2$:
+  inc c
+  ld a, (hl+)
+  sub a, #0xe5
+  jr z, 2$
+
+  ; write new start value
+  ld a, c
+  ld (de), a
+  ret
 
 _counter_out::
   ldhl sp, #2
@@ -256,6 +295,38 @@ _counter_out::
   ld a, (hl)
   ld h, a
   ld l, b      ; hl = dest
+
+1$:
+  ldh a, (#0x41) ; wait until VRAM is unlocked
+  and a, #2
+  jr nz, 1$
+
+  ld a, (de)    ; copy tile
+  inc de
+  ld (hl+), a
+
+  dec c
+  jr nz, 1$
+  ret
+
+; void vram_copy(u16 dst, void* src, u8 len);
+_vram_copy::
+  ldhl sp, #6
+  ld a, (hl)
+  ld c, a
+
+  ldhl sp, #4
+  ld a, (hl+)
+  ld e, a
+  ld a, (hl)
+  ld d, a  ; de = src
+
+  ldhl sp, #2
+  ld a, (hl+)
+  ld b, a
+  ld a, (hl)
+  ld h, a
+  ld l, b  ; hl = dst
 
 1$:
   ldh a, (#0x41) ; wait until VRAM is unlocked

@@ -35,11 +35,16 @@
 #define INV_HEIGHT 13
 #define INV_HP_ADDR 0x9c22
 #define INV_KEYS_ADDR 0x9c25
-#define INV_FLOOR_ADDR 0x9c2d
+#define INV_FLOOR_ADDR 0x9c27
+#define INV_FLOOR_NUM_ADDR 0x9c2d
 #define INV_EQUIP_ADDR 0x9c63
 #define INV_DESC_ADDR 0x9d01
 #define INV_SELECT_X_OFFSET 32
 #define INV_SELECT_Y_OFFSET 40
+#define INV_FLOOR_LEN 5          /* FLOOR */
+#define INV_FLOOR_3_SPACES_LEN 8 /* "FLOOR   " */
+#define INV_BLIND_LEN 5          /* BLIND */
+#define INV_FLOOR_OFFSET 23      /* offset into inventory_map */
 #define INV_ROW_LEN 14
 #define INV_BLANK_ROW_OFFSET 49 /* offset into inventory_map */
 
@@ -343,6 +348,7 @@ u16 steps;
 Counter st_floor;
 Counter st_steps;
 Counter st_kills;
+Counter st_recover;
 
 u8 obj_pal1_timer, obj_pal1_index;
 
@@ -421,6 +427,13 @@ void main(void) NONBANKED {
         donextfloor = 0;
         ++floor;
         counter_inc(&st_floor);
+
+        // Set back to FLOOR #
+        if (recover != 0) {
+          vram_copy(INV_FLOOR_ADDR, inventory_map + INV_FLOOR_OFFSET,
+                    INV_FLOOR_3_SPACES_LEN);
+          recover = 0;
+        }
       }
       if (doloadfloor) {
         doloadfloor = 0;
@@ -512,9 +525,7 @@ void end_animate(void) {
   last_next_sprite = next_sprite;
 
   // When blinded, don't update any mob animations
-  if (doblind) {
-    doblind = 0;
-  } else {
+  if (!doblind) {
     *mob_tile_code_ptr++ = 0xf1; // pop af
     *mob_tile_code_ptr++ = 0xc9; // ret
     mob_tile_code[0] = 0xf5;     // push af
@@ -581,8 +592,27 @@ void pass_turn(void) {
       mob_active[num_mobs - 1] = 1;
       showmsg(MSG_REAPER, MSG_REAPER_Y);
     }
-    if (recover && --recover == 0) {
-      dosight = 1;
+    if (doblind) {
+      // Update floor to display recover count instead
+      set_tile_range_during_vbl(INV_FLOOR_ADDR, blind_map, INV_BLIND_LEN);
+      counter_thirty(&st_recover);
+      counter_out(&st_recover, INV_FLOOR_NUM_ADDR);
+      doblind = 0;
+    } else if (recover) {
+      if (--recover == 0) {
+        // Set back to FLOOR #
+        set_tile_range_during_vbl(INV_FLOOR_ADDR,
+                                  inventory_map + INV_FLOOR_OFFSET,
+                                  INV_FLOOR_LEN);
+        counter_out(&st_floor, INV_FLOOR_NUM_ADDR);
+        dosight = 1;
+      } else {
+        // Decrement recover counter
+        counter_dec(&st_recover);
+        // Blank out the right tile, in case of 10 -> 9
+        set_vram_byte((u8 *)(INV_FLOOR_NUM_ADDR + 1), 0);
+        counter_out(&st_recover, INV_FLOOR_NUM_ADDR);
+      }
     }
     break;
   }
@@ -811,13 +841,11 @@ void use_pickup(void) {
     inv_msg_update = 1;
 
     // Clear equip display
-    set_tile_range_during_vbl(equip_addr, inventory_map + INV_BLANK_ROW_OFFSET,
-                              INV_ROW_LEN);
+    vram_copy(equip_addr, inventory_map + INV_BLANK_ROW_OFFSET, INV_ROW_LEN);
   } else {
     // Update charge count display
-    set_digit_tile_during_vbl(equip_addr +
-                                  pick_type_name_len[inv_selected_pick],
-                              equip_charge[inv_select]);
+    set_vram_byte((void *)(equip_addr + pick_type_name_len[inv_selected_pick]),
+                  TILE_0 + equip_charge[inv_select]);
   }
 
   mob_trigger[PLAYER_MOB] = 1;
@@ -1785,7 +1813,6 @@ redo:
 
     if (tile == TILE_END) {
       dofadeout = doloadfloor = donextfloor = 1;
-      recover = 1; // Recover blindness on the next floor
     }
 
     // Handle pickups
@@ -1810,9 +1837,8 @@ redo:
             // Use this slot
             equip_type[i] = ptype;
             equip_charge[i] = PICKUP_CHARGES;
-            set_tile_range_during_vbl(
-                equip_addr, pick_type_name_tile + pick_type_name_start[ptype],
-                len);
+            vram_copy(equip_addr,
+                      pick_type_name_tile + pick_type_name_start[ptype], len);
 
             // Update the inventory message if the selection was set to this
             // equip slot
@@ -1826,7 +1852,8 @@ redo:
             if (equip_charge[i] < 9) {
               equip_charge[i] += PICKUP_CHARGES;
               if (equip_charge[i] > 9) { equip_charge[i] = 9; }
-              set_digit_tile_during_vbl(equip_addr + len - 2, equip_charge[i]);
+              set_vram_byte((void *)(equip_addr + len - 2),
+                            TILE_0 + equip_charge[i]);
             }
             goto pickup;
           }
@@ -1905,7 +1932,7 @@ redo:
 void vbl_interrupt(void) NONBANKED {
   if (doupdatemap) {
     // update floor number
-    counter_out(&st_floor, INV_FLOOR_ADDR);
+    counter_out(&st_floor, INV_FLOOR_NUM_ADDR);
     set_bkg_tiles(MAP_X_OFFSET, MAP_Y_OFFSET, MAP_WIDTH, MAP_HEIGHT, dtmap);
     doupdatemap = 0;
   } else if (doupdatewin) {

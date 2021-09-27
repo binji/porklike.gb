@@ -214,6 +214,8 @@ extern const u8 inventory_map[];
 extern const u8 inventory_up_y[];
 extern const u8 inventory_down_y[];
 
+extern const u8 blind_map[];
+
 extern const u8 msg_tiles[];
 
 extern const u8 boom_spr_speed[];
@@ -233,8 +235,12 @@ u16 drag(u16 x);
 u8 xrnd(void) __preserves_regs(b, c);
 void xrnd_init(u16) __preserves_regs(b, c);
 void counter_zero(Counter* c) __preserves_regs(b, c);
-void counter_inc(Counter* c) __preserves_regs(b, c);
+void counter_thirty(Counter* c) __preserves_regs(b, c);
+void counter_inc(Counter* c);
+void counter_dec(Counter* c);
 void counter_out(Counter* c, u16 vram);
+
+void vram_copy(u16 dst, void* src, u8 len);
 
 void hide_sprites(void);
 void fadeout(void);
