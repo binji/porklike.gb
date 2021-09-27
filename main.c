@@ -104,9 +104,7 @@
 #define IS_UNSPECIAL_WALL_TILE(tile)                                           \
   ((flags_bin[tile] & 0b00000011) == 0b00000001)
 
-#define MAP_X_OFFSET 2
-#define MAP_Y_OFFSET 0
-#define POS_TO_ADDR(pos) (0x9802 + (((pos)&0xf0) << 1) + ((pos)&0xf))
+#define POS_TO_ADDR(pos) (0x9800 + (((pos)&0xf0) << 1) + ((pos)&0xf))
 #define POS_TO_X(pos) (((pos & 0xf) << 3) + 24)
 #define POS_TO_Y(pos) (((pos & 0xf0) >> 1) + 16)
 
@@ -371,11 +369,7 @@ void main(void) NONBANKED {
   gb_decompress_sprite_data(0, sprites_bin);
   add_VBL(vbl_interrupt);
   gameinit();
-  SWITCH_ROM_MBC1(3);
-  mapgen();
-  SWITCH_ROM_MBC1(1);
-  doupdatemap = 1;
-  fadein();
+  doloadfloor = 1;
 
   while(1) {
     lastjoy = joy;
@@ -436,6 +430,7 @@ void main(void) NONBANKED {
       }
       if (doloadfloor) {
         doloadfloor = 0;
+        counter_out(&st_floor, INV_FLOOR_NUM_ADDR);
         hide_sprites();
         IE_REG &= ~VBL_IFLAG;
         SWITCH_ROM_MBC1(3);
@@ -472,7 +467,7 @@ void gameinit(void) {
   tile_timer = TILE_ANIM_FRAMES;
 
   // Reset scroll registers
-  SCX_REG = SCY_REG = 0;
+  move_bkg(240, 0);
   // Reload bg tiles
   gb_decompress_bkg_data(0, bg_bin);
   init_bkg(0);
@@ -1949,9 +1944,7 @@ redo:
 
 void vbl_interrupt(void) NONBANKED {
   if (doupdatemap) {
-    // update floor number
-    counter_out(&st_floor, INV_FLOOR_NUM_ADDR);
-    set_bkg_tiles(MAP_X_OFFSET, MAP_Y_OFFSET, MAP_WIDTH, MAP_HEIGHT, dtmap);
+    set_bkg_tiles(0, 0, MAP_WIDTH, MAP_HEIGHT, dtmap);
     doupdatemap = 0;
   }
   if (--tile_timer == 0) {
