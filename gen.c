@@ -888,11 +888,16 @@ void prettywalls(void) {
         tile += TILE_CRACKED_DIFF;
       }
       tmap[pos] = tile;
-    } else if (tmap[pos] == TILE_EMPTY && (validmap[pos] & VALID_U) &&
-               IS_WALL_TILE(tmap[POS_U(pos)])) {
-      tmap[pos] = IS_CRACKED_WALL_TILE(tmap[POS_U(pos)])
-                      ? TILE_WALL_FACE_CRACKED
-                      : TILE_WALL_FACE;
+    } else if (tmap[pos] == TILE_EMPTY) {
+      if (validmap[pos] & VALID_U) {
+        if (IS_WALL_TILE(tmap[POS_U(pos)])) {
+          tmap[pos] = IS_CRACKED_WALL_TILE(tmap[POS_U(pos)])
+                          ? TILE_WALL_FACE_CRACKED
+                          : TILE_WALL_FACE;
+        }
+      } else {
+        tmap[pos] = TILE_WALL_FACE;
+      }
     }
   } while(++pos);
 }
