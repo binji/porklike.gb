@@ -686,6 +686,20 @@ void pass_turn(void) {
       vram_copy(INV_FLOOR_ADDR, blind_map, INV_BLIND_LEN);
       counter_thirty(&st_recover);
       counter_out(&st_recover, INV_FLOOR_NUM_ADDR);
+
+      // Display float
+      u8 i, x, y;
+      x = POS_TO_X(mob_pos[PLAYER_MOB]) + FLOAT_BLIND_X_OFFSET;
+      y = POS_TO_Y(mob_pos[PLAYER_MOB]);
+      for (i = 0; i < 3; ++i) {
+        shadow_OAM[next_float].x = x;
+        shadow_OAM[next_float].y = y;
+        shadow_OAM[next_float].tile = TILE_BLIND + i;
+        float_time[next_float - BASE_FLOAT] = FLOAT_FRAMES;
+        ++next_float;
+        x += 8;
+      }
+
       doblind = 0;
     } else if (recover) {
       if (--recover == 0) {
@@ -1555,21 +1569,8 @@ void sight(void) NONBANKED {
 }
 
 void blind(void) {
-  u8 i, x, y;
   if (!recover) {
     recover = RECOVER_MOVES;
-
-    // Display float
-    x = POS_TO_X(mob_pos[PLAYER_MOB]) + FLOAT_BLIND_X_OFFSET;
-    y = POS_TO_Y(mob_pos[PLAYER_MOB]);
-    for (i = 0; i < 3; ++i) {
-      shadow_OAM[next_float].x = x;
-      shadow_OAM[next_float].y = y;
-      shadow_OAM[next_float].tile = TILE_BLIND + i;
-      float_time[next_float - BASE_FLOAT] = FLOAT_FRAMES;
-      ++next_float;
-      x += 8;
-    }
 
     // Reset fogmap, dtmap and sawmap
     memset(fogmap, 1, sizeof(fogmap));
@@ -1830,6 +1831,7 @@ void update_tile(u8 pos, u8 tile) {
 }
 
 void unfog_tile(u8 pos) NONBANKED {
+  dtmap[pos] = tmap[pos]; // TODO: only needed when blinded
   fogmap[pos] = 0;
   dirty_tile(pos);
 }
