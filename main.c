@@ -619,7 +619,7 @@ void pass_turn(void) {
 }
 
 void move_player(void) {
-  u8 dir, pos, newpos, tile;
+  u8 dir, tile;
 
   if (mob_move_timer[PLAYER_MOB] == 0 && !inv_anim_timer) {
     if (joy & (J_LEFT | J_RIGHT | J_UP | J_DOWN)) {
@@ -640,54 +640,56 @@ void move_player(void) {
           mob_anim_timer[PLAYER_MOB] = 1;  // Update the player's direction
         }
       } else {
-        pos = mob_pos[PLAYER_MOB];
-        newpos = POS_DIR(pos, dir);
-        if (IS_MOB(newpos)) {
-          mobbump(PLAYER_MOB, dir);
-          if (mob_type[mobmap[newpos] - 1] == MOB_TYPE_SCORPION &&
-              XRND_50_PERCENT()) {
-            blind();
-          }
-          hitmob(mobmap[newpos] - 1, 1);
-          goto done;
-        } else if (validmap[pos] & dirvalid[dir]) {
-          tile = tmap[newpos];
-          if (IS_WALL_TILE(tile)) {
-            if (IS_SPECIAL_TILE(tile)) {
-              if (tile == TILE_GATE) {
-                if (num_keys) {
-                  --num_keys;
+        u8 pos = mob_pos[PLAYER_MOB];
+        if (validmap[pos] & dirvalid[dir]) {
+          u8 newpos = POS_DIR(pos, dir);
+          if (IS_MOB(newpos)) {
+            mobbump(PLAYER_MOB, dir);
+            if (mob_type[mobmap[newpos] - 1] == MOB_TYPE_SCORPION &&
+                XRND_50_PERCENT()) {
+              blind();
+            }
+            hitmob(mobmap[newpos] - 1, 1);
+            goto done;
+          } else {
+            tile = tmap[newpos];
+            if (IS_WALL_TILE(tile)) {
+              if (IS_SPECIAL_TILE(tile)) {
+                if (tile == TILE_GATE) {
+                  if (num_keys) {
+                    --num_keys;
 
-                  update_tile(newpos, TILE_EMPTY);
-                  set_digit_tile_during_vbl(INV_KEYS_ADDR, num_keys);
+                    update_tile(newpos, TILE_EMPTY);
+                    set_digit_tile_during_vbl(INV_KEYS_ADDR, num_keys);
+                    dosight = 1;
+                    goto dobump;
+                  } else {
+                    showmsg(MSG_KEY, MSG_KEY_Y);
+                  }
+                } else if (tile == TILE_VOID_BUTTON_U ||
+                           tile == TILE_VOID_BUTTON_L ||
+                           tile == TILE_VOID_BUTTON_R ||
+                           tile == TILE_VOID_BUTTON_D) {
+                  update_tile(newpos, tile + TILE_VOID_OPEN_DIFF);
+                  update_wall_face(newpos);
                   dosight = 1;
                   goto dobump;
-                } else {
-                  showmsg(MSG_KEY, MSG_KEY_Y);
                 }
-              } else if (tile == TILE_VOID_BUTTON_U ||
-                         tile == TILE_VOID_BUTTON_L ||
-                         tile == TILE_VOID_BUTTON_R ||
-                         tile == TILE_VOID_BUTTON_D) {
-                update_tile(newpos, tile + TILE_VOID_OPEN_DIFF);
-                update_wall_face(newpos);
-                dosight = 1;
+              }
+#if 0
+              // XXX: bump to destroy walls for testing
+              else {
+                update_tile(newpos, TILE_EMPTY);
                 goto dobump;
               }
-            }
-#if 0
-            // XXX: bump to destroy walls for testing
-            else {
-              update_tile(newpos, TILE_EMPTY);
-              goto dobump;
-            }
 #endif
-            // fallthrough to bump below...
-          } else {
-            mobwalk(PLAYER_MOB, dir);
-            ++steps;
-            counter_inc(&st_steps);
-            goto done;
+              // fallthrough to bump below...
+            } else {
+              mobwalk(PLAYER_MOB, dir);
+              ++steps;
+              counter_inc(&st_steps);
+              goto done;
+            }
           }
         }
 
