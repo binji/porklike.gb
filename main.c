@@ -325,8 +325,7 @@ u8 is_targeting;
 Dir target_dir;
 
 u8 joy, lastjoy, newjoy;
-u8 doupdatemap, doupdatewin, dofadeout, doloadfloor, donextfloor, doblind,
-    dosight;
+u8 doupdatemap, dofadeout, doloadfloor, donextfloor, doblind, dosight;
 u8 *next_sprite, *last_next_sprite;
 
 u8 inv_anim_up;
@@ -492,7 +491,7 @@ void gameinit(void) {
   inv_target_timer = INV_TARGET_FRAMES;
   inv_msg_update = 1;
   memset(equip_type, PICKUP_TYPE_NONE, sizeof(equip_type));
-  doupdatewin = 1;
+  set_win_tiles(0, 0, INV_WIDTH, INV_HEIGHT, inventory_map);
 
   floor = 0;
   counter_zero(&st_floor);
@@ -1954,9 +1953,6 @@ void vbl_interrupt(void) NONBANKED {
     counter_out(&st_floor, INV_FLOOR_NUM_ADDR);
     set_bkg_tiles(MAP_X_OFFSET, MAP_Y_OFFSET, MAP_WIDTH, MAP_HEIGHT, dtmap);
     doupdatemap = 0;
-  } else if (doupdatewin) {
-    set_win_tiles(0, 0, INV_WIDTH, INV_HEIGHT, inventory_map);
-    doupdatewin = 0;
   }
   if (--tile_timer == 0) {
     tile_timer = TILE_ANIM_FRAMES;
