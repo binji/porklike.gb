@@ -185,12 +185,12 @@ u8 num_voids;
 
 void mapgen(void) {
   u8 fog;
+  anim_tile_ptr = anim_tiles;
   num_picks = 0;
   num_mobs = 1;
   num_dead_mobs = 0;
   steps = 0;
   mapgeninit();
-  begin_tile_anim();
   if (floor == 0) {
     fog = 0;
     copymap(0);
@@ -212,13 +212,13 @@ void mapgen(void) {
     decoration();
     spawnmobs();
   }
-  end_tile_anim();
   memset(fogmap, fog, sizeof(fogmap));
   sight();
   initdtmap();
 }
 
 void mapgeninit(void) {
+  memset(dirtymap, 0, sizeof(dirtymap));
   memset(roommap, 0, sizeof(roommap));
   memset(mobmap, 0, sizeof(mobmap));
   memset(pickmap, 0, sizeof(pickmap));
@@ -412,7 +412,7 @@ void copymap(u8 index) {
 
       case TILE_TORCH_LEFT:
       case TILE_TORCH_RIGHT:
-        add_tile_anim(pos, tmap[pos]);
+        *anim_tile_ptr++ = pos;
         goto empty;
 
       case TILE_HEART:

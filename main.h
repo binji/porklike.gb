@@ -86,6 +86,7 @@
 #define TILE_PLANT3 0x5c
 #define TILE_FIXED_WALL 0x47
 #define TILE_SAW 0x42
+#define TILE_SAW_MASK 0xef
 #define TILE_SAW_BROKEN 0x53
 #define TILE_STEPS 0x60
 #define TILE_ENTRANCE 0x61
@@ -251,14 +252,12 @@ void sight(void);
 void addmob(MobType type, u8 pos);
 void addpick(PickupType type, u8 pos);
 u8 randint(u8 mx);
-void begin_tile_anim(void);
-void end_tile_anim(void);
-void add_tile_anim(u8 pos, u8 tile);
 
 extern u8 joy, lastjoy, newjoy;
 
 extern Map tmap;
 extern Map dtmap;
+extern Map dirtymap;
 extern Map roommap;
 extern Map distmap;
 extern Map mobmap;
@@ -280,6 +279,12 @@ extern u8 num_rooms;
 extern u8 mob_pos[];
 extern u8 num_mobs;
 extern u8 key_mob;
+
+extern u8 dirty[];
+extern u8 *dirty_ptr;
+
+extern u8 anim_tiles[];
+extern u8 *anim_tile_ptr;
 
 extern u8 void_exit[];
 

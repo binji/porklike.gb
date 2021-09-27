@@ -17,7 +17,6 @@
 #define MAX_FLOATS 8   /* For now; we'll probably want more */
 #define MAX_EQUIPS 4
 #define MAX_SPRS 16 /* Animation sprites for explosions, etc. */
-#define MAX_SAWS 32 /* XXX */
 
 #define BASE_FLOAT 18
 
@@ -28,8 +27,9 @@
 #define MSG_LEN 18
 
 // TODO: how big to make these arrays?
-#define TILE_CODE_SIZE 128
-#define MOB_TILE_CODE_SIZE 256
+#define DIRTY_SIZE 128
+#define DIRTY_CODE_SIZE 256
+#define ANIM_TILES_SIZE 64
 
 #define INV_WIDTH 16
 #define INV_HEIGHT 13
@@ -157,7 +157,6 @@ typedef enum MobAnimState {
 } MobAnimState;
 
 void gameinit(void);
-void reset_anim_code(void);
 void do_turn(void);
 void pass_turn(void);
 void begin_animate(void);
@@ -175,23 +174,19 @@ void pickhop(u8 index, u8 pos);
 void hitmob(u8 index, u8 dmg);
 void hitpos(u8 pos, u8 dmg, u8 stun);
 void update_wall_face(u8 pos);
-void do_ai(void);
-void do_ai_weeds(void);
-u8 do_mob_ai(u8 index);
+void ai_run_tasks(void);
+u8 ai_run_mob_task(u8 index);
 u8 ai_dobump(u8 index);
 u8 ai_tcheck(u8 index);
 u8 ai_getnextstep(u8 index);
 u8 ai_getnextstep_rev(u8 index);
 void blind(void);
 void calcdist_ai(u8 from, u8 to);
-void do_animate(void);
+void animate(void);
 void end_animate(void);
 void hide_sprites(void);
-void set_tile_during_vbl(u8 pos, u8 tile);
-void set_digit_tile_during_vbl(u16 addr, u8 value);
-void set_tile_range_during_vbl(u16 addr, u8* source, u8 len);
+void dirty_tile(u8 pos);
 void update_tile(u8 pos, u8 tile);
-void update_tile_if_unfogged(u8 pos, u8 tile);
 void unfog_tile(u8 pos);
 void vbl_interrupt(void);
 
@@ -221,7 +216,8 @@ u8 addspr(u8 speed, u16 x, u16 y, u16 dx, u16 dy, u8 drag, u8 timer, u8 prop);
 void nop_saw_anim(u8 pos);
 
 Map tmap;        // Tile map (everything unfogged)
-Map dtmap;       // Display tile map (w/ fogged tiles)
+Map dtmap;       // Display tile map (w/ fogged tiles) (used for bulk updates)
+Map dirtymap;    // Which display tiles need to be updated
 Map roommap;     // Room/void map
 Map distmap;     // Distance map
 Map mobmap;      // Mob map
@@ -246,14 +242,13 @@ u8 cands[MAX_CANDS];
 u8 num_cands;
 
 MobType mob_type[MAX_MOBS];
+u8 mob_tile[MAX_MOBS];       // Actual tile index
 u8 mob_anim_frame[MAX_MOBS]; // Index into mob_type_anim_frames
 u8 mob_anim_timer[MAX_MOBS]; // 0..mob_anim_speed[type], how long between frames
 u8 mob_anim_speed[MAX_MOBS]; // current anim speed (changes when moving)
 u8 mob_pos[MAX_MOBS];
 u8 mob_x[MAX_MOBS], mob_y[MAX_MOBS];   // x,y location of sprite
 u8 mob_dx[MAX_MOBS], mob_dy[MAX_MOBS]; // dx,dy moving sprite
-u8 mob_clear_tile[MAX_MOBS];           // whether to remove the mob tile
-u8 mob_clear_pos[MAX_MOBS];            // which position to clear
 u8 mob_move_timer[MAX_MOBS];           // timer for sprite animation
 MobAnimState mob_anim_state[MAX_MOBS]; // sprite animation state
 u8 mob_flip[MAX_MOBS];                 // 0=facing right 1=facing left
@@ -278,6 +273,7 @@ u8 dmob_timer[MAX_DEAD_MOBS];
 u8 num_dead_mobs;
 
 PickupType pick_type[MAX_PICKUPS];
+u8 pick_tile[MAX_MOBS];                      // Actual tile index
 u8 pick_pos[MAX_PICKUPS];
 u8 pick_anim_frame[MAX_PICKUPS];             // Index into pick_type_anim_frames
 u8 pick_anim_timer[MAX_PICKUPS];             // 0..pick_type_anim_speed[type]
@@ -298,16 +294,13 @@ u8 spr_trigger_val[MAX_SPRS]; // Which value to use for trigger action
 u8 spr_prop[MAX_SPRS];                  // Hardware sprite property
 u8 num_sprs;
 
-u8 tile_code[TILE_CODE_SIZE];         // code for animating tiles
-u8 mob_tile_code[MOB_TILE_CODE_SIZE]; // code for animating mobs
-u8 *tile_code_ptr;                    // next available index in tile_code
-u16 last_tile_addr;                   // last tile address in HL for tile_code
-u8 last_tile_val;                     // last tile value in A for tile_code
-u8 tile_timer; // timer for animating tiles (every TILE_ANIM_FRAMES frames)
-u8 tile_inc;   // either 0 or TILE_ANIM_FRAME_DIFF, for two frames of animation
-u8 *mob_tile_code_ptr;  // next available index in mob_tile_code
-u16 mob_last_tile_addr; // last tile address in HL for mob_tile_code
-u8 mob_last_tile_val;   // last tile value in A for mob_tile_code
+u8 dirty[DIRTY_SIZE];
+u8 dirty_code[DIRTY_CODE_SIZE];
+u8 *dirty_ptr;
+
+u8 anim_tiles[ANIM_TILES_SIZE];
+u8 *anim_tile_ptr;
+u8 anim_tile_timer; // timer for animating tiles (every TILE_ANIM_FRAMES frames)
 
 u8 float_time[MAX_FLOATS];
 u8 next_float;
@@ -315,6 +308,7 @@ u8 next_float;
 u8 msg_timer;
 
 Turn turn;
+u8 dopassturn, doai;
 u8 noturn;
 u8 gameover;
 u8 gameover_timer;
@@ -385,7 +379,6 @@ void main(void) NONBANKED {
 
         // Hide window
         move_win(23, 160);
-        reset_anim_code();
         gb_decompress_bkg_data(0, dead_bin);
         init_bkg(0);
         set_bkg_tiles(GAMEOVER_X_OFFSET, GAMEOVER_Y_OFFSET, GAMEOVER_WIDTH,
@@ -432,12 +425,13 @@ void main(void) NONBANKED {
         doloadfloor = 0;
         counter_out(&st_floor, INV_FLOOR_NUM_ADDR);
         hide_sprites();
+        begin_animate();
         IE_REG &= ~VBL_IFLAG;
         SWITCH_ROM_MBC1(3);
         mapgen();
         SWITCH_ROM_MBC1(1);
-        reset_anim_code();
         IE_REG |= VBL_IFLAG;
+        end_animate();
         doupdatemap = 1;
         fadein();
       }
@@ -452,7 +446,22 @@ void main(void) NONBANKED {
         do_turn();
       }
 
-      do_animate();
+      do {
+        animate();
+        if (dopassturn) {
+          dopassturn = 0;
+          pass_turn();
+          if (doai) {
+            doai = 0;
+            ai_run_tasks();
+            if (!dopassturn) {
+              // AI took a step, so do 1 round of animation
+              animate();
+            }
+          }
+        }
+      } while (dopassturn);
+
       update_floats_and_msg_and_sprs();
       inv_animate();
       end_animate();
@@ -463,8 +472,10 @@ void main(void) NONBANKED {
 }
 
 void gameinit(void) {
-  reset_anim_code();
-  tile_timer = TILE_ANIM_FRAMES;
+  dirty_ptr = dirty;
+  dirty_code[0] = 0xc9;
+  anim_tile_ptr = anim_tiles;
+  anim_tile_timer = TILE_ANIM_FRAMES;
 
   // Reset scroll registers
   move_bkg(240, 0);
@@ -475,7 +486,7 @@ void gameinit(void) {
   // Reset player mob
   num_mobs = 0;
   addmob(MOB_TYPE_PLAYER, 0);
-  set_vram_byte((void*)INV_HP_ADDR, TILE_0 + mob_hp[PLAYER_MOB]);
+  set_vram_byte((u8 *)INV_HP_ADDR, TILE_0 + mob_hp[PLAYER_MOB]);
 
   turn = TURN_PLAYER;
   next_float = BASE_FLOAT;
@@ -494,18 +505,8 @@ void gameinit(void) {
   counter_zero(&st_kills);
 }
 
-void reset_anim_code(void) {
-  tile_code[0] = mob_tile_code[0] = 0xc9; // ret
-}
-
 void begin_animate(void) {
-  mob_last_tile_addr = 0;
-  mob_last_tile_val = 0xff;
-  mob_tile_code_ptr = mob_tile_code;
-  // Initialize to ret so if a VBL occurs while we're setting the animation it
-  // won't run off the end
-  *mob_tile_code_ptr++ = 0xc9; // ret
-
+  dirty_ptr = dirty;
   // Start mob sprites after floats
   next_sprite = (u8*)shadow_OAM + ((BASE_FLOAT + MAX_FLOATS) << 2);
 }
@@ -518,12 +519,74 @@ void end_animate(void) {
   }
   last_next_sprite = next_sprite;
 
-  // When blinded, don't update any mob animations
-  if (!doblind) {
-    *mob_tile_code_ptr++ = 0xf1; // pop af
-    *mob_tile_code_ptr++ = 0xc9; // ret
-    mob_tile_code[0] = 0xf5;     // push af
+  // Process dirty tiles
+  u8* ptr = dirty;
+  u16 last_addr = 0;
+  u8 last_val = 0;
+
+  dirty_code[0] = 0xc9;     // ret (changed to push af below)
+  dirty_code[1] = 0xaf;     // xor a
+  u8* code = dirty_code + 2;
+
+  while (ptr != dirty_ptr) {
+    u8 pos = *ptr++;
+    u8 index, tile;
+    u16 addr;
+
+    // Prefer mobs, then pickups, and finally floor tiles
+    if (fogmap[pos]) {
+      tile = 0;
+    } else {
+      if ((index = mobmap[pos])) {
+        --index;
+        tile = mob_tile[index];
+        if (!mob_move_timer[index]) {
+          goto ok;
+        }
+      }
+
+      if ((index = pickmap[pos])) {
+        --index;
+        tile = pick_tile[index];
+        if (!pick_move_timer[index]) {
+          goto ok;
+        }
+      }
+
+      tile = tmap[pos];
+    }
+
+ok:
+    addr = POS_TO_ADDR(pos);
+
+    if ((addr >> 8) != (last_addr >> 8)) {
+      *code++ = 0x21; // ld hl, addr
+      *code++ = (u8)addr;
+      *code++ = addr >> 8;
+    } else {
+      *code++ = 0x2e; // ld l, lo(addr)
+      *code++ = (u8)addr;
+    }
+    last_addr = addr;
+    if (tile != last_val) {
+      if (tile == 0) {
+        *code++ = 0xaf; // xor a
+      } else {
+        *code++ = 0x3e; // ld a, tile
+        *code++ = tile;
+      }
+      last_val = tile;
+    }
+    *code++ = 0x77; // ld (hl), a
+
+skip:
+    // clear dirty map as we process tiles
+    dirtymap[pos] = 0;
   }
+
+  *code++ = 0xf1;       // pop af
+  *code++ = 0xc9;       // ret
+  dirty_code[0] = 0xf5; // push af
 }
 
 void hide_sprites(void) NONBANKED {
@@ -569,13 +632,13 @@ void pass_turn(void) {
       noturn = 0;
     } else {
       turn = TURN_AI;
-      do_ai(); // XXX maybe recursive
+      doai = 1;
     }
     break;
 
   case TURN_AI:
     turn = TURN_WEEDS;
-    do_ai(); // XXX maybe recursive
+    doai = 1;
     break;
 
   case TURN_WEEDS:
@@ -588,16 +651,15 @@ void pass_turn(void) {
     }
     if (doblind) {
       // Update floor to display recover count instead
-      set_tile_range_during_vbl(INV_FLOOR_ADDR, blind_map, INV_BLIND_LEN);
+      vram_copy(INV_FLOOR_ADDR, blind_map, INV_BLIND_LEN);
       counter_thirty(&st_recover);
       counter_out(&st_recover, INV_FLOOR_NUM_ADDR);
       doblind = 0;
     } else if (recover) {
       if (--recover == 0) {
         // Set back to FLOOR #
-        set_tile_range_during_vbl(INV_FLOOR_ADDR,
-                                  inventory_map + INV_FLOOR_OFFSET,
-                                  INV_FLOOR_LEN);
+        vram_copy(INV_FLOOR_ADDR, inventory_map + INV_FLOOR_OFFSET,
+                  INV_FLOOR_LEN);
         counter_out(&st_floor, INV_FLOOR_NUM_ADDR);
         dosight = 1;
       } else {
@@ -654,7 +716,7 @@ void move_player(void) {
                     --num_keys;
 
                     update_tile(newpos, TILE_EMPTY);
-                    set_digit_tile_during_vbl(INV_KEYS_ADDR, num_keys);
+                    set_vram_byte((u8 *)INV_KEYS_ADDR, TILE_0 + num_keys);
                     dosight = 1;
                     goto dobump;
                   } else {
@@ -840,7 +902,7 @@ void use_pickup(void) {
     vram_copy(equip_addr, inventory_map + INV_BLANK_ROW_OFFSET, INV_ROW_LEN);
   } else {
     // Update charge count display
-    set_vram_byte((void *)(equip_addr + pick_type_name_len[inv_selected_pick]),
+    set_vram_byte((u8 *)(equip_addr + pick_type_name_len[inv_selected_pick]),
                   TILE_0 + equip_charge[inv_select]);
   }
 
@@ -930,8 +992,7 @@ void mobwalk(u8 index, u8 dir) {
   mob_y[index] = POS_TO_Y(pos);
   mob_dx[index] = dirx[dir];
   mob_dy[index] = diry[dir];
-  mob_clear_tile[index] = 1;
-  mob_clear_pos[index] = pos;
+  dirty_tile(pos);
 
   mob_move_timer[index] = WALK_FRAMES;
   mob_anim_state[index] = MOB_ANIM_STATE_WALK;
@@ -949,8 +1010,7 @@ void mobbump(u8 index, u8 dir) {
   mob_y[index] = POS_TO_Y(pos);
   mob_dx[index] = dirx[dir];
   mob_dy[index] = diry[dir];
-  mob_clear_tile[index] = 1;
-  mob_clear_pos[index] = pos;
+  dirty_tile(pos);
 
   mob_move_timer[index] = BUMP_FRAMES;
   mob_anim_state[index] = MOB_ANIM_STATE_BUMP1;
@@ -960,8 +1020,8 @@ void mobbump(u8 index, u8 dir) {
 void mobhop(u8 index, u8 newpos) {
   u8 pos = mob_pos[index];
   mobhopnew(index, newpos);
-  mob_clear_tile[index] = 1;
-  mob_clear_pos[index] = pos;
+  mob_tile[index] = 0;
+  dirty_tile(pos);
 }
 
 void mobhopnew(u8 index, u8 newpos) {
@@ -1087,17 +1147,18 @@ void hitmob(u8 index, u8 dmg) {
       } else {
         delmob(index);
       }
-      set_tile_during_vbl(pos, dtmap[pos]);
+
+      dirty_tile(pos);
 
       if (index == PLAYER_MOB) {
-        set_digit_tile_during_vbl(INV_HP_ADDR, 0);
+        set_vram_byte((u8 *)INV_HP_ADDR, TILE_0);
         gameover_timer = GAMEOVER_FRAMES;
       } else {
         // Killing a reaper restores the your health to 5 and drops a free key
-        if (mob_type[index] == MOB_TYPE_REAPER) {
+        if (mtype == MOB_TYPE_REAPER) {
           if (mob_hp[PLAYER_MOB] < 5) {
             mob_hp[PLAYER_MOB] = 5;
-            set_digit_tile_during_vbl(INV_HP_ADDR, mob_hp[PLAYER_MOB]);
+            set_vram_byte((u8 *)INV_HP_ADDR, (u8)(TILE_0 + 5));
           }
           droppick(PICKUP_TYPE_KEY, pos);
         }
@@ -1108,7 +1169,7 @@ void hitmob(u8 index, u8 dmg) {
       mob_hp[index] -= dmg;
       mob_vis[index] = 1;
       if (index == PLAYER_MOB) {
-        set_digit_tile_during_vbl(INV_HP_ADDR, mob_hp[PLAYER_MOB]);
+        set_vram_byte((u8 *)INV_HP_ADDR, TILE_0 + mob_hp[PLAYER_MOB]);
       }
     }
   }
@@ -1123,7 +1184,7 @@ void hitpos(u8 pos, u8 dmg, u8 stun) {
       mob_stun[mob - 1] = 1;
     }
   }
-  if (tmap[pos] == TILE_SAW) {
+  if ((tmap[pos] & TILE_SAW_MASK) == TILE_SAW) {
     tile = TILE_SAW_BROKEN;
     nop_saw_anim(pos);
   } else if (IS_CRACKED_WALL_TILE(tile)) {
@@ -1148,24 +1209,21 @@ void update_wall_face(u8 pos) {
     } else if (tile == TILE_WALL_FACE_PLANT) {
       tile = TILE_PLANT1;
     }
-    update_tile_if_unfogged(pos, tile);
+    update_tile(pos, tile);
   }
 }
 
-void do_ai(void) {
-  u8 moving = 0;
+void ai_run_tasks(void) {
+  dopassturn = 1;
   u8 i;
   for (i = 0; i < num_mobs; ++i) {
     if ((mob_type[i] == MOB_TYPE_WEED) == (turn == TURN_WEEDS)) {
-      moving |= do_mob_ai(i);
+      dopassturn &= !ai_run_mob_task(i);
     }
-  }
-  if (!moving) {
-    pass_turn();
   }
 }
 
-u8 do_mob_ai(u8 index) {
+u8 ai_run_mob_task(u8 index) {
   u8 pos, mob, dir, valid;
   if (mob_stun[index]) {
     mob_stun[index] = 0;
@@ -1399,10 +1457,6 @@ void sight(void) NONBANKED {
       dist, maxdist, dir;
   memset(mobsightmap, 0, sizeof(mobsightmap));
 
-  // Put a "ret" at the beginning of the tile animation code in case it is
-  // executed while we are modifying it.
-  tile_code[0] = 0xc9;
-
   ppos = mob_pos[PLAYER_MOB];
 
   cands[head = 0] = 0;
@@ -1430,15 +1484,14 @@ void sight(void) NONBANKED {
       // Unfog this tile, within player sight range
       if (dist < maxdist && fogmap[pos]) {
         unfog_tile(pos);
-        fogmap[pos] = 0;
 
         // Potentially start animating this tile
         if (IS_ANIMATED_TILE(tmap[pos])) {
-          add_tile_anim(pos, tmap[pos]);
+          *anim_tile_ptr++ = pos;
 
-          // Store the offset into tile_code for this animated saw
-          if (tmap[pos] == TILE_SAW) {
-            sawmap[pos] = tile_code_ptr - tile_code - 1;
+          // Store the offset into anim_tiles for this animated saw
+          if ((tmap[pos] & TILE_SAW_MASK) == TILE_SAW) {
+            sawmap[pos] = anim_tile_ptr - anim_tiles - 1;
           }
         }
       }
@@ -1453,7 +1506,6 @@ void sight(void) NONBANKED {
             if ((valid & dirvalid[dir]) && fogmap[adjpos = POS_DIR(pos, dir)] &&
                 IS_WALL_TILE(tmap[adjpos])) {
               unfog_tile(adjpos);
-              fogmap[adjpos] = 0;
             }
           }
         }
@@ -1466,10 +1518,6 @@ void sight(void) NONBANKED {
     } while(head != oldtail);
     ++dist;
   } while (oldtail != newtail);
-
-  // Put the epilog back on, and replace the "ret" with "push af"
-  end_tile_anim();
-  tile_code[0] = 0xf5;
 }
 
 void blind(void) {
@@ -1495,8 +1543,7 @@ void blind(void) {
     memset(sawmap, 0, sizeof(sawmap));
 
     // Reset all tile animations (e.g. saws, torches)
-    begin_tile_anim();
-    end_tile_anim();
+    anim_tile_ptr = anim_tiles;
 
     // Use sight() instead of dosight=1, since the tile updates will be removed
     sight();
@@ -1535,9 +1582,20 @@ void calcdist_ai(u8 from, u8 to) {
   } while (oldtail != newtail && dist != maxdist);
 }
 
-void do_animate(void) {
+void animate(void) {
   u8 i, dosprite, dotile, sprite, prop, frame, animdone;
   animdone = num_sprs == 0;
+
+  // Loop through all animating tiles
+  if (--anim_tile_timer == 0) {
+    anim_tile_timer = TILE_ANIM_FRAMES;
+    u8* ptr = anim_tiles;
+    while (ptr != anim_tile_ptr) {
+      u8 pos = *ptr++;
+      tmap[pos] ^= TILE_ANIM_FRAME_DIFF;
+      dirty_tile(pos);
+    }
+  }
 
   // Loop through all pickups
   for (i = 0; i < num_picks; ++i) {
@@ -1545,9 +1603,6 @@ void do_animate(void) {
     if (fogmap[pick_pos[i]] || mobmap[pick_pos[i]]) { continue; }
 
     dotile = 0;
-    if (tile_timer == 1 && IS_ANIMATED_TILE(tmap[pick_pos[i]])) {
-      dotile = 1;
-    }
 
     sprite = pick_type_sprite_tile[pick_type[i]];
     if (--pick_anim_timer[i] == 0) {
@@ -1579,7 +1634,7 @@ void do_animate(void) {
     }
 
     if (dotile || pick_move_timer[i]) {
-      frame = pick_type_anim_frames[pick_anim_frame[i]];
+      pick_tile[i] = frame = pick_type_anim_frames[pick_anim_frame[i]];
       if (pick_move_timer[i]) {
         animdone = 0;
         if (pick_y[i] <= WY_REG + 9) {
@@ -1593,10 +1648,10 @@ void do_animate(void) {
         pick_y[i] += pick_dy[i] + hopy12[--pick_move_timer[i]];
 
         if (pick_move_timer[i] == 0) {
-          set_tile_during_vbl(pick_pos[i], frame);
+          dirty_tile(pick_pos[i]);
         }
       } else {
-        set_tile_during_vbl(pick_pos[i], frame);
+        dirty_tile(pick_pos[i]);
       }
     }
   }
@@ -1605,11 +1660,6 @@ void do_animate(void) {
   for (i = 0; i < num_mobs; ++i) {
     u8 pos = mob_pos[i];
 
-    if (mob_clear_tile[i]) {
-      mob_clear_tile[i] = 0;
-      set_tile_during_vbl(mob_clear_pos[i], dtmap[mob_clear_pos[i]]);
-    }
-
     // TODO: need to properly handle active fogged mobs; they should still do
     // their triggers but not draw anything. We also probably want to display
     // mobs that are partially fogged; if the start or end position is
@@ -1617,10 +1667,6 @@ void do_animate(void) {
     if (fogmap[pos] || !mob_vis[i]) { continue; }
 
     dosprite = dotile = 0;
-    if (tile_timer == 1 && IS_ANIMATED_TILE(tmap[pos])) {
-      dotile = 1;
-    }
-
     if (--mob_anim_timer[i] == 0) {
       mob_anim_timer[i] = mob_anim_speed[i];
       if (++mob_anim_frame[i] == mob_type_anim_start[mob_type[i] + 1]) {
@@ -1654,6 +1700,8 @@ void do_animate(void) {
         frame += TILE_FLIP_DIFF;
       }
 
+      mob_tile[i] = frame;
+
       if (mob_move_timer[i]) {
         animdone = 0;
         mob_x[i] += mob_dx[i];
@@ -1683,7 +1731,7 @@ void do_animate(void) {
             case MOB_ANIM_STATE_HOP4:
               mob_anim_state[i] = MOB_ANIM_STATE_NONE;
               mob_dx[i] = mob_dy[i] = 0;
-              set_tile_during_vbl(pos, frame);
+              dirty_tile(pos);
               break;
 
             case MOB_ANIM_STATE_POUNCE:
@@ -1692,7 +1740,7 @@ void do_animate(void) {
                 // Otherwise finish animation
                 mob_anim_state[i] = MOB_ANIM_STATE_NONE;
                 mob_dx[i] = mob_dy[i] = 0;
-                set_tile_during_vbl(pos, frame);
+                dirty_tile(pos);
               }
               break;
           }
@@ -1705,7 +1753,7 @@ void do_animate(void) {
           }
         }
       } else if (dotile) {
-        set_tile_during_vbl(pos, frame);
+        dirty_tile(pos);
       }
     }
   }
@@ -1731,74 +1779,25 @@ void do_animate(void) {
   }
 
   if (animdone) {
-    pass_turn();
+    dopassturn = 1;
   }
 }
 
-void set_tile_during_vbl(u8 pos, u8 tile) NONBANKED {
-  u16 addr = POS_TO_ADDR(pos);
-  u8 *ptr = mob_tile_code_ptr;
-  if ((addr >> 8) != (mob_last_tile_addr >> 8)) {
-    *ptr++ = 0x21; // ld hl, addr
-    *ptr++ = (u8)addr;
-    *ptr++ = addr >> 8;
-  } else {
-    *ptr++ = 0x2e; // ld l, lo(addr)
-    *ptr++ = (u8)addr;
+void dirty_tile(u8 pos) NONBANKED {
+  if (!dirtymap[pos]) {
+    dirtymap[pos] = 1;
+    *dirty_ptr++ = pos;
   }
-  mob_last_tile_addr = addr;
-  if (tile != mob_last_tile_val) {
-    *ptr++ = 0x3e; // ld a, tile
-    *ptr++ = tile;
-    mob_last_tile_val = tile;
-  }
-  *ptr++ = 0x77; // ld (hl), a
-  mob_tile_code_ptr = ptr;
-}
-
-void set_digit_tile_during_vbl(u16 addr, u8 value) {
-  u8 *ptr = mob_tile_code_ptr;
-  *ptr++ = 0x21; // ld hl, addr
-  *ptr++ = addr & 0xff;
-  *ptr++ = addr >> 8;
-  *ptr++ = 0x3e; // ld a, tile
-  *ptr++ = mob_last_tile_val = TILE_0 + value;
-  *ptr++ = 0x77; // ld (hl), a
-  mob_last_tile_addr = INV_HP_ADDR;
-  mob_tile_code_ptr = ptr;
-}
-
-void set_tile_range_during_vbl(u16 addr, u8* src, u8 len) {
-  u8 *dst = mob_tile_code_ptr;
-  *dst++ = 0x21; // ld hl, addr
-  *dst++ = addr & 0xff;
-  *dst++ = addr >> 8;
-  do {
-    *dst++ = 0x3e; // ld a, tile
-    *dst++ = *src++;
-    *dst++ = 0x22; // ld (hl+), a
-  } while(--len);
-  mob_last_tile_addr = addr + len;
-  mob_last_tile_val = *--src;
-  mob_tile_code_ptr = dst;
 }
 
 void update_tile(u8 pos, u8 tile) {
-  set_tile_during_vbl(pos, dtmap[pos] = tmap[pos] = tile);
-}
-
-void update_tile_if_unfogged(u8 pos, u8 tile) {
-  // If the tile is already unfogged then updated it, otherwise just
-  // change tmap.
-  if (fogmap[pos]) {
-    tmap[pos] = tile;
-  } else {
-    update_tile(pos, tile);
-  }
+  tmap[pos] = tile;
+  dirty_tile(pos);
 }
 
 void unfog_tile(u8 pos) NONBANKED {
-  set_tile_during_vbl(pos, dtmap[pos] = tmap[pos]);
+  fogmap[pos] = 0;
+  dirty_tile(pos);
 }
 
 void trigger_step(u8 mob) {
@@ -1824,12 +1823,12 @@ redo:
       if (ptype == PICKUP_TYPE_HEART) {
         if (mob_hp[PLAYER_MOB] < 9) {
           ++mob_hp[PLAYER_MOB];
-          set_digit_tile_during_vbl(INV_HP_ADDR, mob_hp[PLAYER_MOB]);
+          set_vram_byte((u8 *)INV_HP_ADDR, mob_hp[PLAYER_MOB]);
         }
       } else if (ptype == PICKUP_TYPE_KEY) {
         if (num_keys < 9) {
           ++num_keys;
-          set_digit_tile_during_vbl(INV_KEYS_ADDR, num_keys);
+          set_vram_byte((u8 *)INV_KEYS_ADDR, num_keys);
         }
       } else {
         len = pick_type_name_len[ptype];
@@ -1843,7 +1842,7 @@ redo:
             if (equip_charge[i] < 9) {
               equip_charge[i] += PICKUP_CHARGES;
               if (equip_charge[i] > 9) { equip_charge[i] = 9; }
-              set_vram_byte((void *)(equip_addr + len - 2),
+              set_vram_byte((u8 *)(equip_addr + len - 2),
                             TILE_0 + equip_charge[i]);
             }
             goto pickup;
@@ -1904,13 +1903,13 @@ redo:
       u8 exittile = tmap[exitpos];
       if (TILE_HAS_CRACKED_VARIANT(exittile)) {
         exittile += TILE_VOID_EXIT_DIFF;
-        update_tile_if_unfogged(exitpos, exittile);
+        update_tile(exitpos, exittile);
       }
     }
   }
 
   // Step on saw
-  if (tile == TILE_SAW) {
+  if ((tile & TILE_SAW_MASK) == TILE_SAW) {
     u8 hp = mob_hp[mob];
     hitmob(mob, 3);
     if (mob != PLAYER_MOB && hp <= 3) {
@@ -1931,10 +1930,7 @@ redo:
       mobmap[pos] = 0;
       mobmap[newpos] = mob + 1;
       mob_pos[mob] = newpos;
-
-      // Reset mob anim timer so the tile is updated next frame
-      mob_anim_timer[mob] = 1;
-      set_tile_during_vbl(pos, dtmap[pos]);
+      dirty_tile(pos);
 
       teleported = 1;
       goto redo;
@@ -1947,13 +1943,7 @@ void vbl_interrupt(void) NONBANKED {
     set_bkg_tiles(0, 0, MAP_WIDTH, MAP_HEIGHT, dtmap);
     doupdatemap = 0;
   }
-  if (--tile_timer == 0) {
-    tile_timer = TILE_ANIM_FRAMES;
-    tile_inc ^= TILE_ANIM_FRAME_DIFF;
-    ((vfp)tile_code)();
-  }
-
-  ((vfp)mob_tile_code)();
+  ((vfp)dirty_code)();
 }
 
 void addfloat(u8 pos, u8 tile) {
@@ -2155,24 +2145,12 @@ void inv_animate(void) {
       for (i = 0; i < NUM_INV_ROWS; ++i) {
         u8 len = pick_type_desc_len[pick][i];
         if (len) {
-          set_tile_range_during_vbl(
-              addr, pick_type_desc_tile + pick_type_desc_start[pick][i], len);
-        } else {
-          *mob_tile_code_ptr++ = 0x21; // ld hl, addr
-          *mob_tile_code_ptr++ = addr & 0xff;
-          *mob_tile_code_ptr++ = addr >> 8;
+          vram_copy(addr, pick_type_desc_tile + pick_type_desc_start[pick][i],
+                    len);
         }
 
         // Fill the rest of the row with 0
-        u8* dst = mob_tile_code_ptr;
-        *dst++ = 0xaf; // xor a
-        while (len < INV_ROW_LEN) {
-          *dst++ = 0x22; // ld (hl+), a
-          ++len;
-        }
-        mob_last_tile_addr = addr + INV_ROW_LEN;
-        mob_last_tile_val = 0;
-        mob_tile_code_ptr = dst;
+        vmemset((u8 *)addr + len, 0, INV_ROW_LEN - len);
         addr += 32;
       }
     }
@@ -2212,7 +2190,6 @@ void addmob(MobType type, u8 pos) NONBANKED {
   mob_pos[num_mobs] = pos;
   mob_x[num_mobs] = POS_TO_X(pos);
   mob_y[num_mobs] = POS_TO_Y(pos);
-  mob_clear_tile[num_mobs] = 0;
   mob_move_timer[num_mobs] = 0;
   mob_anim_state[num_mobs] = MOB_ANIM_STATE_NONE;
   mob_flip[num_mobs] = 0;
@@ -2252,8 +2229,6 @@ void delmob(u8 index) NONBANKED {  // XXX: only used in bank 1
     mob_y[index] = mob_y[num_mobs];
     mob_dx[index] = mob_dx[num_mobs];
     mob_dy[index] = mob_dy[num_mobs];
-    mob_clear_tile[index] = mob_clear_tile[num_mobs];
-    mob_clear_pos[index] = mob_clear_pos[num_mobs];
     mob_move_timer[index] = mob_move_timer[num_mobs];
     mob_anim_state[index] = mob_anim_state[num_mobs];
     mob_flip[index] = mob_flip[num_mobs];
@@ -2345,56 +2320,11 @@ u8 addspr(u8 speed, u16 x, u16 y, u16 dx, u16 dy, u8 drag, u8 timer, u8 prop) {
   return num_sprs++;
 }
 
-void begin_tile_anim(void) NONBANKED {
-  u16 addr = (u16)&tile_inc;
-  // Initialize the first byte to ret, in case the interrupt handler is called
-  // before we're finished.
-  tile_code[0] = 0xc9; // ret (will be changed to push af)
-  tile_code[1] = 0xc5; // push bc
-  tile_code[2] = 0xfa; // ld a, (NNNN)
-  tile_code[3] = (u8)addr;
-  tile_code[4] = addr >> 8;
-  tile_code[5] = 0x47; // ld b, a
-  tile_code_ptr = tile_code + 6;
-  last_tile_addr = 0;
-  last_tile_val = 0;
-}
-
-void end_tile_anim(void) NONBANKED {
-  u8 *ptr = tile_code_ptr;
-  *ptr++ = 0xc1; // pop bc
-  *ptr++ = 0xf1; // pop af
-  *ptr = 0xc9;   // ret
-
-  // Fix the first byte to push af, so the code can be executed
-  tile_code[0] = 0xf5; // push af
-}
-
-void add_tile_anim(u8 pos, u8 tile) NONBANKED {
-  u8* ptr = tile_code_ptr;
-  u16 addr = POS_TO_ADDR(pos);
-  if ((addr >> 8) != (last_tile_addr >> 8)) {
-    *ptr++ = 0x21; // ld hl, NNNN
-    *ptr++ = (u8)addr;
-    *ptr++ = addr >> 8;
-  } else {
-    *ptr++ = 0x2e; // ld l, NN
-    *ptr++ = (u8)addr;
-  }
-  last_tile_addr = addr;
-  if (tile != last_tile_val) {
-    *ptr++ = 0x3e; // ld a, NN
-    *ptr++ = tile;
-    *ptr++ = 0x80; // add b
-    last_tile_val = tile;
-  }
-  *ptr++ = 0x77; // ld (hl), a
-  tile_code_ptr = ptr;
-}
-
 void nop_saw_anim(u8 pos) {
-  // Only nop out the memory write
-  tile_code[sawmap[pos]] = 0;
+  u8 index = sawmap[pos];
+  pos = *--anim_tile_ptr;
+  if (sawmap[pos]) { sawmap[pos] = index; }
+  anim_tiles[index] = pos;
 }
 
 const u8 randmask[] = {
