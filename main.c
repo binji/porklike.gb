@@ -49,7 +49,7 @@
 #define INV_BLANK_ROW_OFFSET 49 /* offset into inventory_map */
 
 #define GAMEOVER_FRAMES 70
-#define GAMEOVER_X_OFFSET 5
+#define GAMEOVER_X_OFFSET 3
 #define GAMEOVER_Y_OFFSET 2
 #define GAMEOVER_WIDTH 9
 #define GAMEOVER_HEIGHT 13
