@@ -2028,7 +2028,7 @@ void update_floats_and_msg_and_sprs(void) {
         hide_sprite(i);
       }
       continue;
-    } else {
+    } else if (shadow_OAM[i].y > 16) {
       shadow_OAM[i].y -= float_diff_y[float_time[j]];
     }
     ++i;
