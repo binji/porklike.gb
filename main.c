@@ -15,10 +15,9 @@
 #define MAX_MOBS 32    /* XXX Figure out what this should be */
 #define MAX_PICKUPS 16 /* XXX Figure out what this should be */
 #define MAX_FLOATS 8   /* For now; we'll probably want more */
+#define MAX_MSG_SPRITES 18
 #define MAX_EQUIPS 4
-#define MAX_SPRS 16 /* Animation sprites for explosions, etc. */
-
-#define BASE_FLOAT 18
+#define MAX_SPRS 32 /* Animation sprites for explosions, etc. */
 
 #define MSG_REAPER 0
 #define MSG_REAPER_Y 83
@@ -217,7 +216,7 @@ void vbl_interrupt(void);
 void trigger_step(u8 index);
 
 void addfloat(u8 pos, u8 tile);
-void update_floats_and_msg_and_sprs(void);
+void update_sprites(void);
 void showmsg(u8 index, u8 y);
 
 void inv_animate(void);
@@ -326,10 +325,11 @@ u8 anim_tiles[ANIM_TILES_SIZE];
 u8 *anim_tile_ptr;
 u8 anim_tile_timer; // timer for animating tiles (every TILE_ANIM_FRAMES frames)
 
-u8 float_time[MAX_FLOATS];
-u8 next_float;
-
+OAM_item_t msg_sprites[MAX_MSG_SPRITES];
 u8 msg_timer;
+
+OAM_item_t float_sprites[MAX_FLOATS];
+u8* next_float;
 
 Turn turn;
 u8 dopassturn, doai;
@@ -478,6 +478,8 @@ void main(void) NONBANKED {
         do_turn();
       }
 
+      update_sprites();
+
       do {
         animate();
         if (dopassturn) {
@@ -494,7 +496,6 @@ void main(void) NONBANKED {
         }
       } while (dopassturn);
 
-      update_floats_and_msg_and_sprs();
       inv_animate();
       end_animate();
       update_obj1_pal();
@@ -521,7 +522,7 @@ void gameinit(void) {
   set_vram_byte((u8 *)INV_HP_ADDR, TILE_0 + mob_hp[PLAYER_MOB]);
 
   turn = TURN_PLAYER;
-  next_float = BASE_FLOAT;
+  next_float = (u8*)float_sprites;
 
   // Set up inventory window
   move_win(23, 128);
@@ -540,7 +541,7 @@ void gameinit(void) {
 void begin_animate(void) {
   dirty_ptr = dirty;
   // Start mob sprites after floats
-  next_sprite = (u8*)shadow_OAM + ((BASE_FLOAT + MAX_FLOATS) << 2);
+  next_sprite = (u8*)shadow_OAM;
 }
 
 void end_animate(void) {
@@ -623,7 +624,9 @@ skip:
 
 void hide_sprites(void) NONBANKED {
   memset(shadow_OAM, 0, 160);
-  next_float = BASE_FLOAT;
+  next_float = (u8*)float_sprites;
+  msg_timer = 0;
+  num_sprs = 0;
 }
 
 void do_turn(void) {
@@ -692,11 +695,10 @@ void pass_turn(void) {
       x = POS_TO_X(mob_pos[PLAYER_MOB]) + FLOAT_BLIND_X_OFFSET;
       y = POS_TO_Y(mob_pos[PLAYER_MOB]);
       for (i = 0; i < 3; ++i) {
-        shadow_OAM[next_float].x = x;
-        shadow_OAM[next_float].y = y;
-        shadow_OAM[next_float].tile = TILE_BLIND + i;
-        float_time[next_float - BASE_FLOAT] = FLOAT_FRAMES;
-        ++next_float;
+        *next_float++ = y;
+        *next_float++ = x;
+        *next_float++ = TILE_BLIND + i;
+        *next_float++ = FLOAT_FRAMES;  // hijack prop for float timer
         x += 8;
       }
 
@@ -1922,11 +1924,10 @@ redo:
       y = POS_TO_Y(pos);
 
       for (i = flt_start; i < flt_end; ++i) {
-        shadow_OAM[next_float].x = x;
-        shadow_OAM[next_float].y = y;
-        shadow_OAM[next_float].tile = float_pick_type_tiles[i];
-        float_time[next_float - BASE_FLOAT] = FLOAT_FRAMES;
-        ++next_float;
+        *next_float++ = y;
+        *next_float++ = x;
+        *next_float++ = float_pick_type_tiles[i];
+        *next_float++ = FLOAT_FRAMES; // hijack prop for float timer
         x += 8;
       }
     }
@@ -1983,16 +1984,17 @@ void vbl_interrupt(void) NONBANKED {
 }
 
 void addfloat(u8 pos, u8 tile) {
-  shadow_OAM[next_float].x = POS_TO_X(pos);
-  shadow_OAM[next_float].y = POS_TO_Y(pos);
-  shadow_OAM[next_float].tile = tile;
-  float_time[next_float - BASE_FLOAT] = FLOAT_FRAMES;
-  ++next_float;
+  if (next_float != (u8*)(float_sprites + MAX_FLOATS)) {
+    *next_float++ = POS_TO_Y(pos);
+    *next_float++ = POS_TO_X(pos);
+    *next_float++ = tile;
+    *next_float++ = FLOAT_FRAMES; // hijack prop for float time
+  }
 }
 
 void showmsg(u8 index, u8 y) {
   u8 i, j;
-  u8* p = (u8*)shadow_OAM;
+  u8* p = (u8*)msg_sprites;
   for (j = 0; j < 2; ++j) {
     for (i = 0; i < 9; ++i) {
       *p++ = y;
@@ -2005,38 +2007,41 @@ void showmsg(u8 index, u8 y) {
   msg_timer = MSG_FRAMES;
 }
 
-void update_floats_and_msg_and_sprs(void) {
-  u8 i, j;
-  // Hide message if timer runs out
-  if (msg_timer && --msg_timer == 0) {
-    for (i = 0; i < MSG_LEN; ++i) {
-      hide_sprite(i);
+void update_sprites(void) {
+  u8 i;
+  // Display message sprites, if any
+  if (msg_timer) {
+    if (--msg_timer != 0) {
+      memcpy(next_sprite, (void*)msg_sprites, MAX_MSG_SPRITES * 4);
+      next_sprite += MAX_MSG_SPRITES * 4;
     }
   }
 
   // Draw float sprites and remove them if timed out
-  for (i = BASE_FLOAT; i < next_float;) {
-    j = i - BASE_FLOAT;
-    --float_time[j];
-    if (float_time[j] == 0) {
-      --next_float;
-      if (next_float != BASE_FLOAT) {
-        shadow_OAM[i].x = shadow_OAM[next_float].x;
-        shadow_OAM[i].y = shadow_OAM[next_float].y;
-        shadow_OAM[i].tile = shadow_OAM[next_float].tile;
-        float_time[j] = float_time[next_float - BASE_FLOAT];
-        hide_sprite(next_float);
-      } else {
-        hide_sprite(i);
+  u8 *spr = (u8 *)float_sprites;
+  while (spr != next_float) {
+    if (--spr[3] == 0) { // float time
+      next_float -= 4;
+      if (spr != next_float) {
+        spr[0] = next_float[0];
+        spr[1] = next_float[1];
+        spr[2] = next_float[2];
+        spr[3] = next_float[3];
       }
       continue;
-    } else if (shadow_OAM[i].y > 16) {
-      shadow_OAM[i].y -= float_diff_y[float_time[j]];
+    } else if (spr[0] > 16) {
+      // Update Y coordinate based on float time
+      spr[0] -= float_diff_y[spr[3]];
     }
-    ++i;
+    // Copy float sprite
+    *next_sprite++ = *spr++;
+    *next_sprite++ = *spr++;
+    *next_sprite++ = *spr++;
+    *next_sprite++ = 0; // Stuff 0 in for prop
+    spr++;              // And increment past the float timer
   }
 
-  // Draw sprs using the same ones allocated for messages
+  // Draw sprs
   for (i = 0; i < num_sprs;) {
     if (--spr_timer[i] == 0) {
       u8 dir, stun;
@@ -2097,7 +2102,6 @@ void update_floats_and_msg_and_sprs(void) {
         spr_trigger_val[i] = spr_trigger_val[num_sprs];
         spr_prop[i] = spr_prop[num_sprs];
       }
-      hide_sprite(num_sprs);
     } else {
       if (--spr_anim_timer[i] == 0) {
         ++spr_anim_frame[i];
@@ -2109,15 +2113,15 @@ void update_floats_and_msg_and_sprs(void) {
         spr_dx[i] = drag(spr_dx[i]);
         spr_dy[i] = drag(spr_dy[i]);
       }
-      shadow_OAM[i].x = spr_x[i] >> 8;
-      shadow_OAM[i].y = spr_y[i] >> 8;
-      shadow_OAM[i].tile = spr_anim_frame[i];
-      shadow_OAM[i].prop = spr_prop[i];
+      *next_sprite++ = spr_y[i] >> 8;
+      *next_sprite++ = spr_x[i] >> 8;
+      *next_sprite++ = spr_anim_frame[i];
+      *next_sprite++ = spr_prop[i];
       ++i;
     }
   }
 
-  // Draw the targeting arrow (also using sprites 0 through 3)
+  // Draw the targeting arrow
   if (is_targeting) {
     if (--inv_target_timer == 0) {
       inv_target_timer = INV_TARGET_FRAMES;
@@ -2219,28 +2223,30 @@ void fadein(void) NONBANKED {
 }
 
 void addmob(MobType type, u8 pos) NONBANKED {
-  mob_type[num_mobs] = type;
-  mob_anim_frame[num_mobs] = mob_type_anim_start[type];
-  mob_anim_timer[num_mobs] = 1;
-  mob_anim_speed[num_mobs] = mob_type_anim_speed[type];
-  mob_pos[num_mobs] = pos;
-  mob_x[num_mobs] = POS_TO_X(pos);
-  mob_y[num_mobs] = POS_TO_Y(pos);
-  mob_move_timer[num_mobs] = 0;
-  mob_anim_state[num_mobs] = MOB_ANIM_STATE_NONE;
-  mob_flip[num_mobs] = 0;
-  mob_task[num_mobs] = mob_type_ai_wait[type];
-  mob_target_pos[num_mobs] = 0;
-  mob_ai_cool[num_mobs] = 0;
-  mob_active[num_mobs] = 0;
-  mob_charge[num_mobs] = 0;
-  mob_hp[num_mobs] = mob_type_hp[type];
-  mob_flash[num_mobs] = 0;
-  mob_stun[num_mobs] = 0;
-  mob_trigger[num_mobs] = 0;
-  mob_vis[num_mobs] = 1;
-  ++num_mobs;
-  mobmap[pos] = num_mobs; // index+1
+  if (num_mobs != MAX_MOBS) {
+    mob_type[num_mobs] = type;
+    mob_anim_frame[num_mobs] = mob_type_anim_start[type];
+    mob_anim_timer[num_mobs] = 1;
+    mob_anim_speed[num_mobs] = mob_type_anim_speed[type];
+    mob_pos[num_mobs] = pos;
+    mob_x[num_mobs] = POS_TO_X(pos);
+    mob_y[num_mobs] = POS_TO_Y(pos);
+    mob_move_timer[num_mobs] = 0;
+    mob_anim_state[num_mobs] = MOB_ANIM_STATE_NONE;
+    mob_flip[num_mobs] = 0;
+    mob_task[num_mobs] = mob_type_ai_wait[type];
+    mob_target_pos[num_mobs] = 0;
+    mob_ai_cool[num_mobs] = 0;
+    mob_active[num_mobs] = 0;
+    mob_charge[num_mobs] = 0;
+    mob_hp[num_mobs] = mob_type_hp[type];
+    mob_flash[num_mobs] = 0;
+    mob_stun[num_mobs] = 0;
+    mob_trigger[num_mobs] = 0;
+    mob_vis[num_mobs] = 1;
+    ++num_mobs;
+    mobmap[pos] = num_mobs; // index+1
+  }
 }
 
 void delmob(u8 index) NONBANKED {  // XXX: only used in bank 1
@@ -2286,13 +2292,15 @@ void delmob(u8 index) NONBANKED {  // XXX: only used in bank 1
 }
 
 void addpick(PickupType type, u8 pos) NONBANKED {
-  pick_type[num_picks] = type;
-  pick_anim_frame[num_picks] = pick_type_anim_start[type];
-  pick_anim_timer[num_picks] = 1;
-  pick_pos[num_picks] = pos;
-  pick_move_timer[num_picks] = 0;
-  ++num_picks;
-  pickmap[pos] = num_picks; // index+1
+  if (num_picks != MAX_PICKUPS) {
+    pick_type[num_picks] = type;
+    pick_anim_frame[num_picks] = pick_type_anim_start[type];
+    pick_anim_timer[num_picks] = 1;
+    pick_pos[num_picks] = pos;
+    pick_move_timer[num_picks] = 0;
+    ++num_picks;
+    pickmap[pos] = num_picks; // index+1
+  }
 }
 
 void delpick(u8 index) NONBANKED {  // XXX: only used in bank 1
@@ -2348,6 +2356,10 @@ void adddeadmob(u8 index) {
 }
 
 u8 addspr(u8 speed, u16 x, u16 y, u16 dx, u16 dy, u8 drag, u8 timer, u8 prop) {
+  if (num_sprs == MAX_SPRS) {
+    // Just overwrite the last spr
+    --num_sprs;
+  }
   spr_anim_timer[num_sprs] = spr_anim_speed[num_sprs] = speed;
   spr_x[num_sprs] = x;
   spr_y[num_sprs] = y;
