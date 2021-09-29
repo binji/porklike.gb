@@ -428,6 +428,7 @@ void main(void) NONBANKED {
       } else {
         // Wait for keypress
         if (newjoy & J_A) {
+          sfx(SFX_OK);
           gameover_state = GAME_OVER_NONE;
           doloadfloor = 1;
           fadeout();
@@ -644,12 +645,21 @@ void do_turn(void) {
         inv_select &= 3;
         inv_msg_update = 1;
         inv_selected_pick = equip_type[inv_select];
+        sfx(SFX_SELECT);
       }
       if (newjoy & (J_B | J_A)) {
         inv_anim_timer = INV_ANIM_FRAMES;
         inv_anim_up ^= 1;
-        is_targeting =
-            ((newjoy & J_A) != 0) && inv_selected_pick != PICKUP_TYPE_NONE;
+        is_targeting = 0;
+        if (newjoy & J_B) {
+          sfx(SFX_BACK);
+        } else if (inv_selected_pick == PICKUP_TYPE_NONE) {
+          sfx(SFX_OOPS);
+          is_targeting = 0;
+        } else {
+          sfx(SFX_OK);
+          is_targeting = 1;
+        }
       }
     }
   } else if (turn == TURN_PLAYER) {
@@ -686,6 +696,7 @@ void pass_turn(void) {
       addmob(MOB_TYPE_REAPER, dropspot(startpos));
       mob_active[num_mobs - 1] = 1;
       showmsg(MSG_REAPER, MSG_REAPER_Y);
+      sfx(SFX_REAPER);
     }
     if (doblind) {
       // Update floor to display recover count instead
@@ -745,6 +756,7 @@ void move_player(void) {
           target_dir = dir;
           mobdir(PLAYER_MOB, dir);
           mob_anim_timer[PLAYER_MOB] = 1;  // Update the player's direction
+          sfx(SFX_SELECT);
         }
       } else {
         u8 pos = mob_pos[PLAYER_MOB];
@@ -769,9 +781,11 @@ void move_player(void) {
                     update_tile(newpos, TILE_EMPTY);
                     set_vram_byte((u8 *)INV_KEYS_ADDR, TILE_0 + num_keys);
                     dosight = 1;
+                    sfx(SFX_BUMP_TILE);
                     goto dobump;
                   } else {
                     showmsg(MSG_KEY, MSG_KEY_Y);
+                    sfx(SFX_OK);
                   }
                 } else if (tile == TILE_KIELBASA) {
                   gameover_state = GAME_OVER_WIN;
@@ -782,6 +796,7 @@ void move_player(void) {
                   update_tile(newpos, tile + TILE_VOID_OPEN_DIFF);
                   update_wall_face(newpos);
                   dosight = 1;
+                  sfx(SFX_BUMP_TILE);
                   goto dobump;
                 }
               }
@@ -797,6 +812,7 @@ void move_player(void) {
               mobwalk(PLAYER_MOB, dir);
               ++steps;
               counter_inc(&st_steps);
+              sfx(SFX_PLAYER_STEP);
               goto done;
             }
           }
@@ -813,7 +829,10 @@ void move_player(void) {
     } else if (is_targeting && (newjoy & J_A)) {
       use_pickup();
       turn = TURN_PLAYER_MOVED;
+      sfx(SFX_OK);
     } else if (is_targeting && (newjoy & J_B) || (newjoy & J_A)) {
+      sfx(SFX_BACK);
+
       // Open inventory (or back out of targeting)
       inv_anim_timer = INV_ANIM_FRAMES;
       inv_anim_up ^= 1;
@@ -853,6 +872,9 @@ void use_pickup(void) {
           mob_stun[mob1 - 1] = 1;
         }
         mobhop(PLAYER_MOB, pos2);
+        sfx(SFX_USE_EQUIP);
+      } else {
+        sfx(SFX_FAIL);
       }
       break;
 
@@ -860,18 +882,21 @@ void use_pickup(void) {
       spr = shoot(pos, hit, TILE_SHOT, 0);
       spr_type[spr] = SPR_TYPE_BOLT;
       spr_trigger_val[spr] = hit;
+      sfx(SFX_USE_EQUIP);
       break;
 
     case PICKUP_TYPE_PUSH:
       spr = shoot(pos, hit, TILE_SHOT, 0);
       spr_type[spr] = SPR_TYPE_PUSH;
       spr_trigger_val[spr] = mobh;
+      sfx(SFX_USE_EQUIP);
       break;
 
     case PICKUP_TYPE_GRAPPLE:
       spr = rope(pos, land);
       spr_type[spr] = SPR_TYPE_GRAPPLE;
       spr_trigger_val[spr] = land;
+      sfx(SFX_USE_EQUIP);
       break;
 
     case PICKUP_TYPE_SPEAR:
@@ -886,6 +911,7 @@ void use_pickup(void) {
         hitpos(pos1, 1, 0);
       }
       mobbump(PLAYER_MOB, target_dir);
+      sfx(SFX_SPEAR);
       break;
 
     case PICKUP_TYPE_SMASH:
@@ -895,6 +921,7 @@ void use_pickup(void) {
         if (IS_BREAKABLE_WALL(tmap[pos1])) {
           update_tile(pos1, dirt_tiles[xrnd() & 3]);
           update_wall_face(pos1);
+          sfx(SFX_DESTROY_WALL);
         }
       }
       break;
@@ -903,6 +930,7 @@ void use_pickup(void) {
       spr = rope(pos, hit);
       spr_type[spr] = SPR_TYPE_HOOK;
       spr_trigger_val[spr] = mobh;
+      sfx(SFX_USE_EQUIP);
       break;
 
     case PICKUP_TYPE_SPIN: {
@@ -920,6 +948,7 @@ void use_pickup(void) {
         }
       }
       mobhop(PLAYER_MOB, pos);
+      sfx(SFX_SPIN);
       break;
     }
 
@@ -929,6 +958,9 @@ void use_pickup(void) {
         mob_stun[mob1 - 1] = 1;
         mob_trigger[mob1 - 1] = 1;
         mobbump(PLAYER_MOB, target_dir);
+        sfx(SFX_USE_EQUIP);
+      } else {
+        sfx(SFX_FAIL);
       }
       break;
 
@@ -938,6 +970,7 @@ void use_pickup(void) {
           mobbump(PLAYER_MOB, invdir[target_dir]);
         } else {
           mobhop(PLAYER_MOB, posb);
+          sfx(SFX_USE_EQUIP);
         }
       }
       if (valid1) {
@@ -1119,14 +1152,18 @@ void hitmob(u8 index, u8 dmg) {
   mtype = mob_type[index];
 
   if (mob_type_object[mtype]) {
+    u8 sound = SFX_OPEN_OBJECT;
+
     if (mtype == MOB_TYPE_CHEST || mtype == MOB_TYPE_HEART_CHEST) {
       percent = 100;
       tile = TILE_CHEST_OPEN;
       slime = 0;
+      sound = SFX_BUMP_TILE;
     } else if (mtype == MOB_TYPE_BOMB) {
       percent = 100;
       tile = TILE_BOMB_EXPLODED;
       slime = 0;
+      sound = SFX_BOOM;
     } else {
       percent = 20;
       tile = dirt_tiles[xrnd() & 3];
@@ -1143,6 +1180,7 @@ void hitmob(u8 index, u8 dmg) {
         mob = num_mobs;
         addmob(MOB_TYPE_SLIME, pos);
         mobhopnew(mob, dropspot(pos));
+        sound = SFX_OOPS;
       } else if (mtype == MOB_TYPE_HEART_CHEST && XRND_20_PERCENT()) {
         droppick(PICKUP_TYPE_HEART, pos);
       } else {
@@ -1185,6 +1223,8 @@ void hitmob(u8 index, u8 dmg) {
         spr_anim_frame[spr] = TILE_BOOM;
       }
     }
+
+    sfx(sound);
   } else {
     addfloat(pos, float_dmg[dmg]);
 
@@ -1214,6 +1254,9 @@ void hitmob(u8 index, u8 dmg) {
             set_vram_byte((u8 *)INV_HP_ADDR, (u8)(TILE_0 + 5));
           }
           droppick(PICKUP_TYPE_KEY, pos);
+          sfx(SFX_HEART);
+        } else {
+          sfx(SFX_HIT_MOB);
         }
         counter_inc(&st_kills);
       }
@@ -1223,6 +1266,9 @@ void hitmob(u8 index, u8 dmg) {
       mob_vis[index] = 1;
       if (index == PLAYER_MOB) {
         set_vram_byte((u8 *)INV_HP_ADDR, TILE_0 + mob_hp[PLAYER_MOB]);
+        sfx(SFX_HIT_PLAYER);
+      } else {
+        sfx(SFX_HIT_MOB);
       }
     }
   }
@@ -1240,9 +1286,11 @@ void hitpos(u8 pos, u8 dmg, u8 stun) {
   if ((tmap[pos] & TILE_SAW_MASK) == TILE_SAW) {
     tile = TILE_SAW_BROKEN;
     nop_saw_anim(pos);
+    sfx(SFX_DESTROY_WALL);
   } else if (IS_CRACKED_WALL_TILE(tile)) {
     tile = dirt_tiles[xrnd() & 3];
     update_wall_face(pos);
+    sfx(SFX_DESTROY_WALL);
   } else {
     goto noupdate;
   }
@@ -1404,6 +1452,7 @@ u8 ai_run_mob_task(u8 index) {
                 // override the anim state so we can do a bump when the hop
                 // animation finishes
                 mob_anim_state[index] = MOB_ANIM_STATE_POUNCE;
+                sfx(SFX_TELEPORT);
                 return 1;
               }
             }
@@ -1591,6 +1640,7 @@ void blind(void) {
     // Clear all the mob updates later (since we may be updating all the mobs
     // right now)
     doblind = 1;
+    sfx(SFX_BLIND);
   }
 }
 
@@ -1856,16 +1906,19 @@ redo:
 
     if (tile == TILE_END) {
       dofadeout = doloadfloor = donextfloor = 1;
+      sfx(SFX_STAIRS);
     }
 
     // Handle pickups
     if ((pindex = pickmap[pos])) {
+      u8 sound = SFX_PICKUP;
       ptype = pick_type[--pindex];
       if (ptype == PICKUP_TYPE_HEART) {
         if (mob_hp[PLAYER_MOB] < 9) {
           ++mob_hp[PLAYER_MOB];
           set_vram_byte((u8 *)INV_HP_ADDR, TILE_0 + mob_hp[PLAYER_MOB]);
         }
+        sound = SFX_HEART;
       } else if (ptype == PICKUP_TYPE_KEY) {
         if (num_keys < 9) {
           ++num_keys;
@@ -1914,6 +1967,7 @@ redo:
 
         // No room, display "full!"
         ptype = PICKUP_TYPE_FULL;
+        sound = SFX_OOPS;
         goto done;
       }
 
@@ -1921,6 +1975,7 @@ redo:
       delpick(pindex);
 
     done:
+      sfx(sound);
       flt_start = float_pick_type_start[ptype];
       flt_end = float_pick_type_start[ptype + 1];
       x = POS_TO_X(pos) + float_pick_type_x_offset[ptype];
@@ -1973,6 +2028,7 @@ redo:
       dirty_tile(pos);
 
       teleported = 1;
+      sfx(SFX_TELEPORT);
       goto redo;
     }
   }
@@ -2082,6 +2138,7 @@ void update_sprites(void) {
               }
             }
             mob_stun[mob - 1] = mob_vis[mob - 1] = 1;
+            sfx(SFX_MOB_PUSH);
           }
           break;
         }

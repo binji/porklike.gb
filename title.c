@@ -44,6 +44,13 @@ const u8 titletop_bounce[] = {
     221, 216, 211, 204, 197, 193, 197, 199, 201, 203, 203, 203, 202,
     200, 197, 194, 193, 194, 195, 195, 194, 192};
 
+const u8 bounce_sfx[] = {
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, SFX_HIT_MOB, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, SFX_HIT_MOB, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, SFX_HIT_MOB, 0, 0, 0, 0, SFX_HIT_MOB};
+
 const u8 gameboy_tiles[] = {
     0xda, 0xdb, 0xdc, 0xdd, 0xde, 0xdf,
     0xe0, 0xe1, 0xe2, 0xe3, 0xe4, 0xe5,
@@ -111,6 +118,9 @@ void titlescreen(void) {
   // drop title down
   for (i = 0; i < sizeof(titletop_bounce); ++i) {
     SCY_REG = titletop_bounce[i];
+    if (bounce_sfx[i] != 0) {
+      sfx(bounce_sfx[i]);
+    }
     wait_vbl_done();
   }
 
@@ -127,6 +137,9 @@ void titlescreen(void) {
     for (j = 0; j < GAMEBOY_OBJS; ++j) {
       shadow_OAM[j].x = gameboy_elastic[i] + gameboy_offset_x[j];
       shadow_OAM[j].y = GAMEBOY_Y + gameboy_offset_y[j];
+    }
+    if (i == 13) {
+      sfx(SFX_OPEN_OBJECT);
     }
     wait_vbl_done();
   }
@@ -189,6 +202,7 @@ void titlescreen(void) {
     }
 
     if (newjoy & J_START) {
+      sfx(SFX_OK);
       xrnd_init((sys_time << 8) | DIV_REG);
       break;
     }
