@@ -47,6 +47,8 @@ build out/tiletitle.c | out/tiletitle.h: bin2c out/title.binz
 
 build out/util.o: asm util.s
 
+build out/music.o: asm music.s
+
 build out/bank0.o: cc bank0.c
   depfile = out/bank0.d
 
@@ -62,4 +64,4 @@ build out/sound.o: cc sound.c
 build out/main.o: cc main.c | out/tilebg.h out/tileshared.h out/tilesprites.h out/tiledead.h
   depfile = out/main.d
 
-build porklike.gb: link out/bank0.o out/main.o out/sound.o out/util.o out/title.o out/tiletitle.c out/tilebg.c out/tileshared.c out/tilesprites.c out/tiledead.c out/gen.o
+build porklike.gb: link out/bank0.o out/main.o out/sound.o out/util.o out/music.o out/title.o out/tiletitle.c out/tilebg.c out/tileshared.c out/tilesprites.c out/tiledead.c out/gen.o

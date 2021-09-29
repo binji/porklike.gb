@@ -1,10 +1,16 @@
 #include "main.h"
 
+void snd_init(void);
+void snd_update(void);
 void tim_interrupt(void);
 
 void soundinit(void) {
   // set up sound registers
   NR52_REG = 0b10000000; // enable sound
+  NR50_REG = 0b01110111; // both speakers full volume
+  NR51_REG = 0b11111111; // output to both speakers
+
+  snd_init();
 
   // set up timer for sound
   TAC_REG = 0b100;     // timer enabled, clock / 1024
@@ -14,4 +20,5 @@ void soundinit(void) {
 }
 
 void tim_interrupt(void) {
+  snd_update();
 }
