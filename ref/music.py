@@ -374,7 +374,7 @@ names = [
 
 ch3_pats = [34, 38, 42, 43, 50, 51, 52, 53]
 ch3_vol = [25, 25, 50, 50, 50, 100, 100, 100]
-fade_time = {25: 8, 50: 15, 100: 21}
+fade_time = {25: 7, 50: 14, 100: 20}
 
 print('-'*80)
 used = set()
@@ -395,7 +395,6 @@ for pat in ch3_pats:
         print(f'  NOTE ch3_{names[note[0]]}')
         last_freq = note[0]
         used.add(note[0])
-        time += 1
 
       if note[3] in [4, 5]:  # fade out (TODO fadein)
         time += fade_time[vol]
@@ -428,6 +427,7 @@ for pat in ch3_pats:
         raise NotImplemented()
     else:
       print(f'  WAIT {speed}')
+  print(f'  RETN')
 
 print()
 for note in used:
@@ -440,7 +440,7 @@ for note in used:
 
 ch_pats = [
     [37, 41, 48, 49, 35, 39, 44, 45],
-    [26, 27, 28, 29, 36, 40, 46, 47],
+    [26, 27, 28, 29, 36, 40, 46, 47, 30, 31, 32, 33, 54, 55, 56, 57],
 ]
 
 def ch12_name(ch, note):
@@ -466,7 +466,7 @@ def env_name(note):
   }[note[3]]
   return f'ENV_{vol}{effect}'
 
-
+print()
 used = set()
 for ch in range(2):
   for pat in ch_pats[ch]:
@@ -495,7 +495,6 @@ for ch in range(2):
           used.add(((note[0], 0, note[2], effect), ch))
 
           # Find how many rests after this note
-          time += 1
           delay = speed - time
           note_delay = delay
           i += 1
@@ -517,7 +516,7 @@ for ch in range(2):
           if note[3] == 0 and i == 32:
             # If holding, and this is the last note of the section, cut the
             # note
-            print(f'  NTWT {name}, {note_delay - 1} {comment}')
+            print(f'  NTWT {name}, {note_delay} {comment}')
             delay -= note_delay
             if delay == 0:
               print(f'  NOTE ch{ch + 1}_mute')
@@ -537,6 +536,7 @@ for ch in range(2):
           delay += speed
           i += 1
         print(f'  WAIT {delay}')
+    print(f'  RETN')
   print()
 
 seen_note = set()
