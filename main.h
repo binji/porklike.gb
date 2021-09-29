@@ -232,6 +232,9 @@ extern const u8 win_map[];
 extern const u8 stats_map[];
 
 void soundinit(void);
+void music_main(void);
+void music_win(void);
+void music_dead(void);
 
 void titlescreen(void);
 void clear_wram(void) __preserves_regs(b, c);

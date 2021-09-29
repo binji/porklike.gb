@@ -408,9 +408,11 @@ void main(void) NONBANKED {
         gb_decompress_bkg_data(0, dead_bin);
         init_bkg(0);
         if (gameover_state == GAME_OVER_WIN) {
+          music_win();
           set_bkg_tiles(WIN_X_OFFSET, WIN_Y_OFFSET, WIN_WIDTH, WIN_HEIGHT,
                         win_map);
         } else {
+          music_dead();
           set_bkg_tiles(DEAD_X_OFFSET, DEAD_Y_OFFSET, DEAD_WIDTH, DEAD_HEIGHT,
                         dead_map);
         }
@@ -431,6 +433,7 @@ void main(void) NONBANKED {
           fadeout();
 
           // reset initial state
+          music_main();
           gameinit();
         }
       }

@@ -141,8 +141,8 @@ def printused(usedlist):
 sounds = readsound()
 music = readmusic()
 
-printsounds(sounds)
-printmusic(music)
+# printsounds(sounds)
+# printmusic(music)
 
 # get instruments used in each pattern
 insused = getused(1)
@@ -372,9 +372,9 @@ names = [
 
 # CHANNEL3 stuff ##############################################################
 
-ch3_pats = [34, 38, 42, 43, 50, 51, 52, 53]
+ch3_pats = [34, 38, 42, 43, 50, 51, 52, 53, 60, 62]
 ch3_vol = [25, 25, 50, 50, 50, 100, 100, 100]
-fade_time = {25: 7, 50: 14, 100: 20}
+fade_time = {25: 7, 50: 14, 100: 18}
 
 print('-'*80)
 used = set()
@@ -396,7 +396,7 @@ for pat in ch3_pats:
         last_freq = note[0]
         used.add(note[0])
 
-      if note[3] in [4, 5]:  # fade out (TODO fadein)
+      if note[3] in [2, 4, 5]:  # fade out (TODO fadein)
         time += fade_time[vol]
         # Find how many rests after this note
         delay = speed - time
@@ -408,6 +408,8 @@ for pat in ch3_pats:
         comment = ''
         if note[3] == 4:
           comment = '  ; TODO: fadein'
+        elif note[3] == 2:
+          comment = '  ; TODO: vibrato'
 
         if delay == 0:
           print(f'  FADE{vol}_NODELAY{comment}')
@@ -426,7 +428,13 @@ for pat in ch3_pats:
         print(f'effect {note[3]}')
         raise NotImplemented()
     else:
-      print(f'  WAIT {speed}')
+      # Find how many rests after this note
+      delay = speed
+      i += 1
+      while i < 32 and notes[i][2] == 0:
+        delay += speed
+        i += 1
+      print(f'  WAIT {delay}')
   print(f'  RETN')
 
 print()
@@ -439,8 +447,8 @@ for note in used:
 # CHANNEL1 stuff ##############################################################
 
 ch_pats = [
-    [37, 41, 48, 49, 35, 39, 44, 45],
-    [26, 27, 28, 29, 36, 40, 46, 47, 30, 31, 32, 33, 54, 55, 56, 57],
+    [37, 41, 48, 49, 35, 39, 44, 45, 59, 63],
+    [26, 27, 28, 29, 36, 40, 46, 47, 30, 31, 32, 33, 54, 55, 56, 57, 58, 61],
 ]
 
 def ch12_name(ch, note):
@@ -448,6 +456,7 @@ def ch12_name(ch, note):
   effect = {
     0: 'hold',
     2: 'fade',
+    3: 'fade',
     4: 'fade',
     5: 'fade',
     6: 'fade',
@@ -460,6 +469,7 @@ def env_name(note):
   effect = {
     0: 'HOLD',
     2: 'FADE',
+    3: 'FADE',
     4: 'FADE',
     5: 'FADE',
     6: 'FADE',
@@ -482,11 +492,12 @@ for ch in range(2):
       # note = [freq, ins, vol, effect]
       if note[2] != 0:
         # (TODO vibrato, fadein, arpeggio)
-        if note[3] in [0, 2, 4, 5, 6]:  # hold, fade out
+        if note[3] in [0, 2, 3, 4, 5, 6]:  # hold, fade out
           # HACK remap effect number
           effect = {
             0: 0,
             2: 5,
+            3: 5,
             4: 5,
             5: 5,
             6: 5,
@@ -497,6 +508,7 @@ for ch in range(2):
           # Find how many rests after this note
           delay = speed - time
           note_delay = delay
+          oldi = i
           i += 1
           while i < 32 and notes[i][2] == 0:
             delay += speed
@@ -505,6 +517,8 @@ for ch in range(2):
           comment = ''
           if note[3] == 2:
             comment = '  ; TODO: vibrato'
+          elif note[3] == 3:
+            comment = '  ; TODO: drop'
           elif note[3] == 4:
             comment = '  ; TODO: fadein'
           elif note[3] == 6:
@@ -513,9 +527,8 @@ for ch in range(2):
           name = ch12_name(ch, note)
 
           assert delay != 0
-          if note[3] == 0 and i == 32:
-            # If holding, and this is the last note of the section, cut the
-            # note
+          if note[3] == 0 and (i == 32 or notes[oldi + 1][2] == 0):
+            # If holding, and there is no next note, then cut the note
             print(f'  NTWT {name}, {note_delay} {comment}')
             delay -= note_delay
             if delay == 0:

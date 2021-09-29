@@ -22,7 +22,21 @@ snddata_end    = ch4_stack      + 2
 
 .area _CODE
 
-snd_data_init::
+song_silence::
+  .db 0      ; ch1
+  .dw seqmute
+  .dw 0
+  .db 0      ; ch2
+  .dw seqmute
+  .dw 0
+  .db 0      ; ch3
+  .dw seqmute
+  .dw 0
+  .db 0      ; ch4
+  .dw seqmute
+  .dw 0
+
+song_main::
   .db 0      ; ch1
   .dw ch1
   .dw 0
@@ -33,19 +47,69 @@ snd_data_init::
   .dw ch3
   .dw 0
   .db 0      ; ch4
-  .dw ch4
+  .dw seqmute
+  .dw 0
+
+song_dead::
+  .db 0      ; ch1
+  .dw ch1_dead
+  .dw 0
+  .db 0      ; ch2
+  .dw ch2_dead
+  .dw 0
+  .db 0      ; ch3
+  .dw ch3_dead
+  .dw 0
+  .db 0      ; ch4
+  .dw seqmute
+  .dw 0
+
+song_win::
+  .db 0      ; ch1
+  .dw ch1_win
+  .dw 0
+  .db 0      ; ch2
+  .dw ch2_win
+  .dw 0
+  .db 0      ; ch3
+  .dw ch3_win
+  .dw 0
+  .db 0      ; ch4
+  .dw seqmute
   .dw 0
 
 
-_snd_init::
+_play_music::
+  di
   ld hl, #snddata_end - #ch1_wait_timer
   push hl
-  ld hl, #snd_data_init
-  push hl
+  push de
   ld hl, #ch1_wait_timer
   push hl
   call _memcpy
   add sp, #6
+  ei
+  ret
+
+_music_main::
+  ld de, #song_main
+  call _play_music
+  ret
+
+_music_dead::
+  ld de, #song_dead
+  call _play_music
+  ret
+
+_music_win::
+  ld de, #song_win
+  call _play_music
+  ret
+
+
+_snd_init::
+  ld de, #song_silence
+  call _play_music
 
   ; TODO: set instrument in song, not here
   call square_90
@@ -212,12 +276,20 @@ square_90:
   WAIT delay
 .endm
 
-.macro FADE100 delay    ; 20 + N
-  NTWT ch3_vol100, 10
+.macro FADE100 delay    ; 18 + N
+  NTWT ch3_vol100, 8
   NTWT ch3_vol50, 6
   NTWT ch3_vol25, 4
   NTWT ch3_mute, delay  ; N
 .endm
+
+.macro FADE100_NODELAY  ; 18 + N
+  NTWT ch3_vol100, 8
+  NTWT ch3_vol50, 6
+  NTWT ch3_vol25, 4
+  NOTE ch3_mute
+.endm
+
 
 .macro FADE50 delay     ; 14 + N
   NTWT ch3_vol50, 9
@@ -250,6 +322,7 @@ square_90:
 .endm
 
 ch1::
+  CALL_ seq00
   CALL_ seq37
   CALL_ seq41
   CALL_ seq48
@@ -269,6 +342,7 @@ ch1::
   JUMP ch1
 
 ch2::
+  CALL_ seq00
   CALL_ seq26
   CALL_ seq27
   CALL_ seq28
@@ -289,6 +363,7 @@ ch2::
 
 ch3::
   CALL_ seq34
+  CALL_ seq34
   CALL_ seq38
   CALL_ seq42
   CALL_ seq43
@@ -306,9 +381,30 @@ ch3::
   CALL_ seq53
   JUMP ch3
 
-ch4::
-  CALL_ seq00
-  JUMP ch4
+ch1_dead::
+  CALL_ seq61
+  JUMP seqmute
+
+ch2_dead::
+  CALL_ seq62
+  JUMP seqmute
+
+ch3_dead::
+  CALL_ seq63
+  JUMP seqmute
+
+
+ch1_win::
+  CALL_ seq59
+  JUMP seqmute
+
+ch2_win::
+  CALL_ seq58
+  JUMP seqmute
+
+ch3_win::
+  CALL_ seq60
+  JUMP seqmute
 
 
 seq00::
@@ -316,6 +412,10 @@ seq00::
   WAIT 255
   WAIT 194
   RETN
+
+seqmute::
+  WAIT 255
+  JUMP seqmute
 
 ;; CHANNEL 3 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -360,6 +460,8 @@ ENV_3FADE = 0b01100011
 ENV_4HOLD = 0b10000000
 ENV_4FADE = 0b10000011
 ENV_5HOLD = 0b10100000
+ENV_6HOLD = 0b11000000
+ENV_7FADE = 0b11100011
 
 .macro CH12_NOTE name lo hi
 name::
@@ -400,14 +502,14 @@ ch2_mute::
 
 seq34::
   NOTE ch3_d0
-  FADE100, 24
+  FADE100, 26
   FADE25, 37
   FADE50, 74
   FADE50, 74
-  FADE100, 46
+  FADE100, 48
   FADE25, 15  ; TODO: fadein
   NOTE ch3_cs0
-  FADE100, 24
+  FADE100, 26
   FADE25, 37
   FADE50, 74
   FADE50, 74
@@ -415,14 +517,14 @@ seq34::
   RETN
 seq38::
   NOTE ch3_d0
-  FADE100, 24
+  FADE100, 26
   FADE25, 37
   FADE50, 74
   FADE50, 74
-  FADE100, 46
+  FADE100, 48
   FADE25, 15  ; TODO: fadein
   NOTE ch3_f0
-  FADE100, 24
+  FADE100, 26
   FADE25, 37
   FADE50, 74
   FADE50, 74
@@ -430,29 +532,29 @@ seq38::
   RETN
 seq42::
   NOTE ch3_g0
-  FADE100, 24
+  FADE100, 26
   FADE25, 37
   FADE50, 74
   FADE50, 74
-  FADE100, 46
+  FADE100, 48
   FADE25, 15  ; TODO: fadein
   NOTE ch3_ds0
-  FADE100, 24
+  FADE100, 26
   FADE25, 37
   FADE50, 74
   FADE50, 74
-  FADE100, 68
+  FADE100, 70
   RETN
 seq43::
   NOTE ch3_a0
-  FADE100, 24
+  FADE100, 26
   FADE25, 37
   FADE50, 74
   FADE50, 74
-  FADE100, 46
+  FADE100, 48
   FADE25, 15  ; TODO: fadein
   NOTE ch3_as0
-  FADE100, 24
+  FADE100, 26
   FADE25, 37
   FADE50, 74
   FADE50, 74
@@ -463,7 +565,7 @@ seq43::
   RETN
 seq50::
   NOTE ch3_d0
-  FADE100, 2
+  FADE100, 4
   NOTE ch3_a0
   FADE50, 8
   NOTE ch3_f1
@@ -484,7 +586,7 @@ seq50::
   NOTE ch3_d0
   FADE25, 15  ; TODO: fadein
   NOTE ch3_cs0
-  FADE100, 2
+  FADE100, 4
   NOTE ch3_gs0
   FADE50, 8
   NOTE ch3_e1
@@ -505,7 +607,7 @@ seq50::
   RETN
 seq51::
   NOTE ch3_d0
-  FADE100, 2
+  FADE100, 4
   NOTE ch3_a0
   FADE50, 8
   NOTE ch3_f1
@@ -519,14 +621,14 @@ seq51::
   FADE25, 37
   NOTE ch3_d0
   FADE50, 74
-  FADE100, 2
+  FADE100, 4
   NOTE ch3_f1
   FADE50, 8
   FADE25, 15
   NOTE ch3_d0
   FADE25, 15  ; TODO: fadein
   NOTE ch3_f0
-  FADE100, 2
+  FADE100, 4
   NOTE ch3_c1
   FADE50, 8
   NOTE ch3_gs1
@@ -547,7 +649,7 @@ seq51::
   RETN
 seq52::
   NOTE ch3_g0
-  FADE100, 2
+  FADE100, 4
   NOTE ch3_d1
   FADE50, 8
   NOTE ch3_as1
@@ -561,14 +663,14 @@ seq52::
   FADE25, 37
   NOTE ch3_g0
   FADE50, 74
-  FADE100, 2
+  FADE100, 4
   NOTE ch3_as1
   FADE50, 8
   FADE25, 15
   NOTE ch3_g0
   FADE25, 15  ; TODO: fadein
   NOTE ch3_ds0
-  FADE100, 2
+  FADE100, 4
   NOTE ch3_as1
   FADE50, 8
   NOTE ch3_g1
@@ -589,7 +691,7 @@ seq52::
   RETN
 seq53::
   NOTE ch3_a0
-  FADE100, 2
+  FADE100, 4
   NOTE ch3_e1
   FADE50, 8
   NOTE ch3_f1
@@ -603,7 +705,7 @@ seq53::
   FADE25, 37
   NOTE ch3_a0
   FADE50, 74
-  FADE100, 2
+  FADE100, 4
   NOTE ch3_e1
   FADE50, 8
   NOTE ch3_cs1
@@ -611,7 +713,7 @@ seq53::
   NOTE ch3_a0
   FADE25, 15  ; TODO: fadein
   NOTE ch3_as0
-  FADE100, 2
+  FADE100, 4
   NOTE ch3_e1
   FADE50, 8
   NOTE ch3_f1
@@ -634,6 +736,58 @@ seq53::
   NOTE ch3_a0
   WAIT 22
   RETN
+seq60::
+  NOTE ch3_f1
+  FADE50, 22
+  NOTE ch3_fs1
+  FADE50, 22
+  NOTE ch3_a1
+  FADE50, 22
+  NOTE ch3_d1
+  FADE100, 18
+  NOTE ch3_fs1
+  FADE50, 22
+  NOTE ch3_a1
+  FADE50, 22
+  NOTE ch3_g1
+  FADE50, 22
+  NOTE ch3_as1
+  FADE50, 22
+  NOTE ch3_d2
+  FADE50, 22
+  NOTE ch3_g1
+  FADE50, 22
+  NOTE ch3_as1
+  FADE50, 22
+  NOTE ch3_e1
+  FADE50, 22
+  NOTE ch3_d1
+  WAIT 18
+  FADE100_NODELAY  ; TODO: vibrato
+  FADE100_NODELAY  ; TODO: vibrato
+  WAIT 90
+  RETN
+seq62::
+  WAIT 152
+  NOTE ch3_d1
+  WAIT 19
+  NOTE ch3_cs1
+  WAIT 19
+  NOTE ch3_as0
+  WAIT 19
+  NOTE ch3_d1
+  FADE50, 5
+  NOTE ch3_cs1
+  FADE50, 24
+  NOTE ch3_as0
+  WAIT 19
+  NOTE ch3_a0
+  WAIT 19
+  NOTE ch3_d1
+  FADE50, 5  ; TODO: vibrato
+  WAIT 19
+  WAIT 266
+  RETN
 
 CH3_NOTE ch3_cs0 0x4a 0x84
 CH3_NOTE ch3_d0  0x83 0x84
@@ -649,10 +803,12 @@ CH3_NOTE ch3_cs1 0x26 0x86
 CH3_NOTE ch3_d1  0x41 0x86
 CH3_NOTE ch3_e1  0x72 0x86
 CH3_NOTE ch3_f1  0x88 0x86
+CH3_NOTE ch3_fs1 0x9d 0x86
 CH3_NOTE ch3_g1  0xb1 0x86
 CH3_NOTE ch3_gs1 0xc4 0x86
 CH3_NOTE ch3_a1  0xd6 0x86
 CH3_NOTE ch3_as1 0xe7 0x86
+CH3_NOTE ch3_d2  0x21 0x87
 
 seq37::
   WAIT 44
@@ -908,6 +1064,45 @@ seq45::
   NTWT ch1_f2_1_fade, 22 
   NTWT ch1_e2_2_fade, 22 
   NTWT ch1_cs2_1_fade, 22 
+  RETN
+seq59::
+  WAIT 36
+  NTWT ch1_a1_3_fade, 18   ; TODO: fadein
+  NTWT ch1_a1_3_hold, 18 
+  NTWT ch1_d2_3_fade, 18   ; TODO: vibrato
+  NTWT ch1_d2_3_hold, 18 
+  NTWT ch1_e2_4_hold, 18 
+  NTWT ch1_e2_4_hold, 18 
+  NTWT ch1_e2_4_fade, 18 
+  NTWT ch1_d2_4_hold, 18 
+  NTWT ch1_a1_4_hold, 18 
+  NTWT ch1_a1_4_fade, 18 
+  NTWT ch1_as1_3_fade, 18   ; TODO: vibrato
+  NTWT ch1_as1_3_hold, 18 
+  NTWT ch1_d2_3_hold, 18 
+  NTWT ch1_d2_3_fade, 18 
+  NTWT ch1_g2_4_hold, 18 
+  NTWT ch1_g2_4_fade, 18 
+  NTWT ch1_as2_4_fade, 18   ; TODO: fadein
+  NTWT ch1_as2_4_hold, 18 
+  NTWT ch1_as2_4_fade, 18   ; TODO: vibrato
+  NTWT ch1_as2_4_fade, 18 
+  NTWT ch1_a2_3_fade, 18   ; TODO: fadein
+  NTWT ch1_g2_3_hold, 18 
+  NTWT ch1_fs2_4_fade, 18   ; TODO: fadein
+  NTWT ch1_fs2_4_hold, 18 
+  NTWT ch1_fs2_4_fade, 18   ; TODO: vibrato
+  NTWT ch1_fs2_4_fade, 90 
+  RETN
+seq63::
+  WAIT 152
+  NTWT ch1_as0_4_fade, 57   ; TODO: drop
+  NTWT ch1_as0_6_hold, 19 
+  NTWT ch1_a0_6_hold, 19 
+  NTWT ch1_mute, 57
+  NTWT ch1_d0_7_fade, 19   ; TODO: vibrato
+  NTWT ch1_d0_7_fade, 19   ; TODO: vibrato
+  NTWT ch1_d0_7_fade, 266   ; TODO: vibrato
   RETN
 
 seq26::
@@ -1388,6 +1583,53 @@ seq57::
   NTWT ch2_f1_4_fade, 22 
   NTWT ch2_e1_1_fade, 22 
   RETN
+seq58::
+  NTWT ch2_fs2_2_hold, 18 
+  NTWT ch2_fs2_2_hold, 18 
+  NTWT ch2_fs2_3_fade, 18   ; TODO: vibrato
+  NTWT ch2_a2_4_hold, 18 
+  NTWT ch2_d2_4_hold, 18 
+  NTWT ch2_fs2_4_hold, 18 
+  NTWT ch2_g2_3_hold, 18 
+  NTWT ch2_g2_3_fade, 18   ; TODO: vibrato
+  NTWT ch2_g2_3_hold, 18 
+  NTWT ch2_g2_3_hold, 18 
+  NTWT ch2_fs2_2_hold, 18 
+  NTWT ch2_fs2_2_hold, 18 
+  NTWT ch2_g2_2_hold, 18 
+  NTWT ch2_g2_2_hold, 18 
+  NTWT ch2_a2_3_hold, 18 
+  NTWT ch2_a2_3_hold, 18 
+  NTWT ch2_as2_3_hold, 18 
+  NTWT ch2_as2_3_fade, 18   ; TODO: vibrato
+  NTWT ch2_f3_2_hold, 18 
+  NTWT ch2_f3_2_hold, 18 
+  NTWT ch2_f3_2_fade, 18   ; TODO: vibrato
+  NTWT ch2_f3_2_fade, 18   ; TODO: vibrato
+  NTWT ch2_e3_2_hold, 18 
+  NTWT ch2_e3_2_hold, 18 
+  NTWT ch2_d3_2_hold, 18 
+  NTWT ch2_d3_2_hold, 18 
+  NTWT ch2_d3_2_fade, 18   ; TODO: vibrato
+  NTWT ch2_d3_2_fade, 90   ; TODO: vibrato
+  RETN
+seq61::
+  NTWT ch2_cs1_2_hold, 19 
+  NTWT ch2_c1_2_hold, 19 
+  NTWT ch2_b0_2_hold, 19 
+  NTWT ch2_mute, 95
+  NTWT ch2_f3_2_hold, 19 
+  NTWT ch2_e3_3_hold, 19 
+  NTWT ch2_d3_2_fade, 19   ; TODO: arpreggio
+  NTWT ch2_d3_4_fade, 19 
+  NTWT ch2_e3_4_hold, 19 
+  NTWT ch2_a2_3_hold, 19 
+  NTWT ch2_f3_2_hold, 19 
+  NTWT ch2_a2_3_fade, 19   ; TODO: vibrato
+  NTWT ch2_d3_3_hold, 19 
+  NTWT ch2_d3_3_fade, 19   ; TODO: vibrato
+  NTWT ch2_d3_3_fade, 266 
+  RETN
 
 CH12_NOTE    ch12_cs0 0x94 0x80
 CH2_NOTE_ENV ch2_cs0_1_fade ENV_1FADE ch12_cs0
@@ -1399,6 +1641,7 @@ CH2_NOTE_ENV ch2_d0_1_fade  ENV_1FADE ch12_d0
 CH2_NOTE_ENV ch2_d0_3_fade  ENV_3FADE ch12_d0
 CH2_NOTE_ENV ch2_d0_4_hold  ENV_4HOLD ch12_d0
 CH2_NOTE_ENV ch2_d0_4_fade  ENV_4FADE ch12_d0
+CH1_NOTE_ENV ch1_d0_7_fade  ENV_7FADE ch12_d0
 CH12_NOTE    ch12_ds0 0x6a 0x81
 CH2_NOTE_ENV ch2_ds0_1_fade ENV_1FADE ch12_ds0
 CH2_NOTE_ENV ch2_ds0_4_fade ENV_4FADE ch12_ds0
@@ -1422,15 +1665,21 @@ CH2_NOTE_ENV ch2_a0_3_hold  ENV_3HOLD ch12_a0
 CH2_NOTE_ENV ch2_a0_3_fade  ENV_3FADE ch12_a0
 CH2_NOTE_ENV ch2_a0_4_hold  ENV_4HOLD ch12_a0
 CH2_NOTE_ENV ch2_a0_4_fade  ENV_4FADE ch12_a0
+CH1_NOTE_ENV ch1_a0_6_hold  ENV_6HOLD ch12_a0
 CH12_NOTE    ch12_as0 0x9a 0x83
 CH2_NOTE_ENV ch2_as0_1_fade ENV_1FADE ch12_as0
 CH2_NOTE_ENV ch2_as0_2_fade ENV_2FADE ch12_as0
 CH2_NOTE_ENV ch2_as0_3_fade ENV_3FADE ch12_as0
 CH2_NOTE_ENV ch2_as0_4_hold ENV_4HOLD ch12_as0
+CH1_NOTE_ENV ch1_as0_4_fade ENV_4FADE ch12_as0
 CH2_NOTE_ENV ch2_as0_4_fade ENV_4FADE ch12_as0
+CH1_NOTE_ENV ch1_as0_6_hold ENV_6HOLD ch12_as0
+CH12_NOTE    ch12_b0  0xd5 0x83
+CH2_NOTE_ENV ch2_b0_2_hold  ENV_2HOLD ch12_b0
 CH12_NOTE    ch12_c1  0x14 0x84
 CH1_NOTE_ENV ch1_c1_1_hold  ENV_1HOLD ch12_c1
 CH2_NOTE_ENV ch2_c1_1_hold  ENV_1HOLD ch12_c1
+CH2_NOTE_ENV ch2_c1_2_hold  ENV_2HOLD ch12_c1
 CH12_NOTE    ch12_cs1 0x4c 0x84
 CH2_NOTE_ENV ch2_cs1_1_hold ENV_1HOLD ch12_cs1
 CH1_NOTE_ENV ch1_cs1_1_fade ENV_1FADE ch12_cs1
@@ -1512,7 +1761,10 @@ CH1_NOTE_ENV ch1_a1_2_hold  ENV_2HOLD ch12_a1
 CH1_NOTE_ENV ch1_a1_2_fade  ENV_2FADE ch12_a1
 CH2_NOTE_ENV ch2_a1_2_fade  ENV_2FADE ch12_a1
 CH1_NOTE_ENV ch1_a1_3_hold  ENV_3HOLD ch12_a1
+CH1_NOTE_ENV ch1_a1_3_fade  ENV_3FADE ch12_a1
 CH2_NOTE_ENV ch2_a1_3_fade  ENV_3FADE ch12_a1
+CH1_NOTE_ENV ch1_a1_4_hold  ENV_4HOLD ch12_a1
+CH1_NOTE_ENV ch1_a1_4_fade  ENV_4FADE ch12_a1
 CH2_NOTE_ENV ch2_a1_4_fade  ENV_4FADE ch12_a1
 CH1_NOTE_ENV ch1_a1_5_hold  ENV_5HOLD ch12_a1
 CH12_NOTE    ch12_as1 0xcd 0x85
@@ -1541,7 +1793,10 @@ CH12_NOTE    ch12_d2  0x41 0x86
 CH1_NOTE_ENV ch1_d2_1_fade  ENV_1FADE ch12_d2
 CH2_NOTE_ENV ch2_d2_1_fade  ENV_1FADE ch12_d2
 CH1_NOTE_ENV ch1_d2_2_fade  ENV_2FADE ch12_d2
+CH1_NOTE_ENV ch1_d2_3_hold  ENV_3HOLD ch12_d2
 CH1_NOTE_ENV ch1_d2_3_fade  ENV_3FADE ch12_d2
+CH1_NOTE_ENV ch1_d2_4_hold  ENV_4HOLD ch12_d2
+CH2_NOTE_ENV ch2_d2_4_hold  ENV_4HOLD ch12_d2
 CH12_NOTE    ch12_ds2 0x5a 0x86
 CH1_NOTE_ENV ch1_ds2_1_fade ENV_1FADE ch12_ds2
 CH2_NOTE_ENV ch2_ds2_1_fade ENV_1FADE ch12_ds2
@@ -1554,6 +1809,8 @@ CH2_NOTE_ENV ch2_e2_1_fade  ENV_1FADE ch12_e2
 CH1_NOTE_ENV ch1_e2_2_hold  ENV_2HOLD ch12_e2
 CH1_NOTE_ENV ch1_e2_2_fade  ENV_2FADE ch12_e2
 CH1_NOTE_ENV ch1_e2_3_fade  ENV_3FADE ch12_e2
+CH1_NOTE_ENV ch1_e2_4_hold  ENV_4HOLD ch12_e2
+CH1_NOTE_ENV ch1_e2_4_fade  ENV_4FADE ch12_e2
 CH12_NOTE    ch12_f2  0x88 0x86
 CH1_NOTE_ENV ch1_f2_1_hold  ENV_1HOLD ch12_f2
 CH2_NOTE_ENV ch2_f2_1_hold  ENV_1HOLD ch12_f2
@@ -1561,13 +1818,25 @@ CH1_NOTE_ENV ch1_f2_1_fade  ENV_1FADE ch12_f2
 CH2_NOTE_ENV ch2_f2_1_fade  ENV_1FADE ch12_f2
 CH1_NOTE_ENV ch1_f2_2_hold  ENV_2HOLD ch12_f2
 CH1_NOTE_ENV ch1_f2_2_fade  ENV_2FADE ch12_f2
+CH12_NOTE    ch12_fs2 0x9e 0x86
+CH2_NOTE_ENV ch2_fs2_2_hold ENV_2HOLD ch12_fs2
+CH2_NOTE_ENV ch2_fs2_3_fade ENV_3FADE ch12_fs2
+CH1_NOTE_ENV ch1_fs2_4_hold ENV_4HOLD ch12_fs2
+CH2_NOTE_ENV ch2_fs2_4_hold ENV_4HOLD ch12_fs2
+CH1_NOTE_ENV ch1_fs2_4_fade ENV_4FADE ch12_fs2
 CH12_NOTE    ch12_g2  0xb2 0x86
 CH1_NOTE_ENV ch1_g2_1_hold  ENV_1HOLD ch12_g2
 CH2_NOTE_ENV ch2_g2_1_hold  ENV_1HOLD ch12_g2
 CH1_NOTE_ENV ch1_g2_1_fade  ENV_1FADE ch12_g2
 CH2_NOTE_ENV ch2_g2_1_fade  ENV_1FADE ch12_g2
 CH1_NOTE_ENV ch1_g2_2_hold  ENV_2HOLD ch12_g2
+CH2_NOTE_ENV ch2_g2_2_hold  ENV_2HOLD ch12_g2
 CH1_NOTE_ENV ch1_g2_2_fade  ENV_2FADE ch12_g2
+CH1_NOTE_ENV ch1_g2_3_hold  ENV_3HOLD ch12_g2
+CH2_NOTE_ENV ch2_g2_3_hold  ENV_3HOLD ch12_g2
+CH2_NOTE_ENV ch2_g2_3_fade  ENV_3FADE ch12_g2
+CH1_NOTE_ENV ch1_g2_4_hold  ENV_4HOLD ch12_g2
+CH1_NOTE_ENV ch1_g2_4_fade  ENV_4FADE ch12_g2
 CH12_NOTE    ch12_gs2 0xc4 0x86
 CH2_NOTE_ENV ch2_gs2_1_hold ENV_1HOLD ch12_gs2
 CH1_NOTE_ENV ch1_gs2_1_fade ENV_1FADE ch12_gs2
@@ -1582,7 +1851,10 @@ CH1_NOTE_ENV ch1_a2_1_fade  ENV_1FADE ch12_a2
 CH2_NOTE_ENV ch2_a2_1_fade  ENV_1FADE ch12_a2
 CH1_NOTE_ENV ch1_a2_2_hold  ENV_2HOLD ch12_a2
 CH1_NOTE_ENV ch1_a2_2_fade  ENV_2FADE ch12_a2
+CH2_NOTE_ENV ch2_a2_3_hold  ENV_3HOLD ch12_a2
 CH1_NOTE_ENV ch1_a2_3_fade  ENV_3FADE ch12_a2
+CH2_NOTE_ENV ch2_a2_3_fade  ENV_3FADE ch12_a2
+CH2_NOTE_ENV ch2_a2_4_hold  ENV_4HOLD ch12_a2
 CH12_NOTE    ch12_as2 0xe7 0x86
 CH1_NOTE_ENV ch1_as2_1_hold ENV_1HOLD ch12_as2
 CH2_NOTE_ENV ch2_as2_1_hold ENV_1HOLD ch12_as2
@@ -1590,6 +1862,10 @@ CH1_NOTE_ENV ch1_as2_1_fade ENV_1FADE ch12_as2
 CH2_NOTE_ENV ch2_as2_1_fade ENV_1FADE ch12_as2
 CH1_NOTE_ENV ch1_as2_2_hold ENV_2HOLD ch12_as2
 CH1_NOTE_ENV ch1_as2_2_fade ENV_2FADE ch12_as2
+CH2_NOTE_ENV ch2_as2_3_hold ENV_3HOLD ch12_as2
+CH2_NOTE_ENV ch2_as2_3_fade ENV_3FADE ch12_as2
+CH1_NOTE_ENV ch1_as2_4_hold ENV_4HOLD ch12_as2
+CH1_NOTE_ENV ch1_as2_4_fade ENV_4FADE ch12_as2
 CH12_NOTE    ch12_cs3 0x13 0x87
 CH1_NOTE_ENV ch1_cs3_1_hold ENV_1HOLD ch12_cs3
 CH2_NOTE_ENV ch2_cs3_1_hold ENV_1HOLD ch12_cs3
@@ -1599,10 +1875,20 @@ CH12_NOTE    ch12_d3  0x21 0x87
 CH2_NOTE_ENV ch2_d3_1_hold  ENV_1HOLD ch12_d3
 CH1_NOTE_ENV ch1_d3_1_fade  ENV_1FADE ch12_d3
 CH2_NOTE_ENV ch2_d3_1_fade  ENV_1FADE ch12_d3
+CH2_NOTE_ENV ch2_d3_2_hold  ENV_2HOLD ch12_d3
+CH2_NOTE_ENV ch2_d3_2_fade  ENV_2FADE ch12_d3
+CH2_NOTE_ENV ch2_d3_3_hold  ENV_3HOLD ch12_d3
+CH2_NOTE_ENV ch2_d3_3_fade  ENV_3FADE ch12_d3
+CH2_NOTE_ENV ch2_d3_4_fade  ENV_4FADE ch12_d3
 CH12_NOTE    ch12_e3  0x39 0x87
 CH1_NOTE_ENV ch1_e3_1_hold  ENV_1HOLD ch12_e3
 CH2_NOTE_ENV ch2_e3_1_hold  ENV_1HOLD ch12_e3
 CH2_NOTE_ENV ch2_e3_1_fade  ENV_1FADE ch12_e3
+CH2_NOTE_ENV ch2_e3_2_hold  ENV_2HOLD ch12_e3
+CH2_NOTE_ENV ch2_e3_3_hold  ENV_3HOLD ch12_e3
+CH2_NOTE_ENV ch2_e3_4_hold  ENV_4HOLD ch12_e3
 CH12_NOTE    ch12_f3  0x44 0x87
 CH2_NOTE_ENV ch2_f3_1_hold  ENV_1HOLD ch12_f3
 CH2_NOTE_ENV ch2_f3_1_fade  ENV_1FADE ch12_f3
+CH2_NOTE_ENV ch2_f3_2_hold  ENV_2HOLD ch12_f3
+CH2_NOTE_ENV ch2_f3_2_fade  ENV_2FADE ch12_f3

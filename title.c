@@ -100,6 +100,7 @@ void titlescreen(void) {
 
   // wait on black
   waitframes(WAIT_FRAMES);
+  music_main();
 
   // Load bkg tiles, set BGP
   SCX_REG = 232;
