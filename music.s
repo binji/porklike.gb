@@ -302,6 +302,13 @@ square_90:
   NTWT ch3_mute, delay  ; N
 .endm
 
+.macro FADEIN25 delay     ; 18 + N
+  NTWT ch3_vol25, 4       ; 4
+  NTWT ch3_vol50, 6       ; 6
+  NTWT ch3_vol100, 8      ; 8
+  WAIT delay              ; N
+.endm
+
 .macro WAIT delay
   .db CMD_WAIT
   .db delay
@@ -453,12 +460,16 @@ ch3_mute::
 
 ENV_1HOLD = 0b00100000
 ENV_1FADE = 0b00100011
+ENV_1FADEIN = 0b00101011
 ENV_2HOLD = 0b01000000
 ENV_2FADE = 0b01000011
+ENV_2FADEIN = 0b01001011
 ENV_3HOLD = 0b01100000
 ENV_3FADE = 0b01100011
+ENV_3FADEIN = 0b01101011
 ENV_4HOLD = 0b10000000
 ENV_4FADE = 0b10000011
+ENV_4FADEIN = 0b10001011
 ENV_5HOLD = 0b10100000
 ENV_6HOLD = 0b11000000
 ENV_7FADE = 0b11100011
@@ -507,7 +518,7 @@ seq34::
   FADE50, 74
   FADE50, 74
   FADE100, 48
-  FADE25, 15  ; TODO: fadein
+  FADEIN25, 4
   NOTE ch3_cs0
   FADE100, 26
   FADE25, 37
@@ -522,7 +533,7 @@ seq38::
   FADE50, 74
   FADE50, 74
   FADE100, 48
-  FADE25, 15  ; TODO: fadein
+  FADEIN25, 4
   NOTE ch3_f0
   FADE100, 26
   FADE25, 37
@@ -537,7 +548,7 @@ seq42::
   FADE50, 74
   FADE50, 74
   FADE100, 48
-  FADE25, 15  ; TODO: fadein
+  FADEIN25, 4
   NOTE ch3_ds0
   FADE100, 26
   FADE25, 37
@@ -552,7 +563,7 @@ seq43::
   FADE50, 74
   FADE50, 74
   FADE100, 48
-  FADE25, 15  ; TODO: fadein
+  FADEIN25, 4
   NOTE ch3_as0
   FADE100, 26
   FADE25, 37
@@ -584,7 +595,7 @@ seq50::
   FADE50, 8
   FADE25, 15
   NOTE ch3_d0
-  FADE25, 15  ; TODO: fadein
+  FADEIN25, 4
   NOTE ch3_cs0
   FADE100, 4
   NOTE ch3_gs0
@@ -626,7 +637,7 @@ seq51::
   FADE50, 8
   FADE25, 15
   NOTE ch3_d0
-  FADE25, 15  ; TODO: fadein
+  FADEIN25, 4
   NOTE ch3_f0
   FADE100, 4
   NOTE ch3_c1
@@ -668,7 +679,7 @@ seq52::
   FADE50, 8
   FADE25, 15
   NOTE ch3_g0
-  FADE25, 15  ; TODO: fadein
+  FADEIN25, 4
   NOTE ch3_ds0
   FADE100, 4
   NOTE ch3_as1
@@ -711,7 +722,7 @@ seq53::
   NOTE ch3_cs1
   FADE25, 15
   NOTE ch3_a0
-  FADE25, 15  ; TODO: fadein
+  FADEIN25, 4
   NOTE ch3_as0
   FADE100, 4
   NOTE ch3_e1
@@ -763,8 +774,8 @@ seq60::
   FADE50, 22
   NOTE ch3_d1
   WAIT 18
-  FADE100_NODELAY  ; TODO: vibrato
-  FADE100_NODELAY  ; TODO: vibrato
+  FADE100, 18  ; TODO: vibrato
+  FADE100, 18  ; TODO: vibrato
   WAIT 90
   RETN
 seq62::
@@ -784,7 +795,7 @@ seq62::
   NOTE ch3_a0
   WAIT 19
   NOTE ch3_d1
-  FADE50, 5  ; TODO: vibrato
+  FADE50, 19  ; TODO: vibrato
   WAIT 19
   WAIT 266
   RETN
@@ -830,7 +841,7 @@ seq37::
   NTWT ch1_gs1_2_fade, 22   ; TODO: vibrato
   NTWT ch1_gs1_2_fade, 22 
   NTWT ch1_gs1_1_fade, 110 
-  NTWT ch1_e1_1_fade, 22   ; TODO: fadein
+  NTWT ch1_e1_1_fadein, 22 
   NTWT ch1_c1_1_hold, 22 
   NTWT ch1_cs1_2_hold, 22 
   NTWT ch1_e1_3_hold, 22 
@@ -946,7 +957,7 @@ seq35::
   NTWT ch1_a2_1_fade, 22 
   NTWT ch1_d1_1_fade, 22 
   NTWT ch1_f1_1_fade, 22 
-  NTWT ch1_gs2_1_fade, 22   ; TODO: fadein
+  NTWT ch1_gs2_1_fadein, 22 
   NTWT ch1_e2_1_hold, 22 
   NTWT ch1_cs2_2_fade, 22 
   NTWT ch1_e2_3_fade, 22 
@@ -964,7 +975,7 @@ seq35::
   NTWT ch1_e1_1_fade, 22 
   RETN
 seq39::
-  NTWT ch1_a2_1_fade, 22   ; TODO: fadein
+  NTWT ch1_a2_1_fadein, 22 
   NTWT ch1_f2_1_hold, 22 
   NTWT ch1_cs2_2_fade, 22 
   NTWT ch1_d2_2_fade, 22 
@@ -980,7 +991,7 @@ seq39::
   NTWT ch1_a2_1_fade, 22 
   NTWT ch1_d1_2_fade, 22 
   NTWT ch1_f1_1_fade, 22 
-  NTWT ch1_gs2_1_fade, 22   ; TODO: fadein
+  NTWT ch1_gs2_1_fadein, 22 
   NTWT ch1_f2_1_hold, 22 
   NTWT ch1_c2_2_fade, 22 
   NTWT ch1_cs2_2_fade, 22 
@@ -1014,7 +1025,7 @@ seq44::
   NTWT ch1_g2_1_fade, 22 
   NTWT ch1_d1_2_fade, 22 
   NTWT ch1_g1_1_fade, 22 
-  NTWT ch1_as2_1_fade, 22   ; TODO: fadein
+  NTWT ch1_as2_1_fadein, 22 
   NTWT ch1_g2_1_hold, 22 
   NTWT ch1_ds2_2_fade, 22 
   NTWT ch1_g2_2_fade, 22 
@@ -1032,7 +1043,7 @@ seq44::
   NTWT ch1_g1_1_fade, 22 
   RETN
 seq45::
-  NTWT ch1_a2_1_fade, 22   ; TODO: fadein
+  NTWT ch1_a2_1_fadein, 22 
   NTWT ch1_e2_1_hold, 22 
   NTWT ch1_cs2_2_fade, 22 
   NTWT ch1_f2_1_fade, 22 
@@ -1048,7 +1059,7 @@ seq45::
   NTWT ch1_a2_1_fade, 22 
   NTWT ch1_cs1_2_fade, 22 
   NTWT ch1_e1_1_fade, 22 
-  NTWT ch1_gs2_1_fade, 22   ; TODO: fadein
+  NTWT ch1_gs2_1_fadein, 22 
   NTWT ch1_f2_1_hold, 22 
   NTWT ch1_d2_2_fade, 22 
   NTWT ch1_as1_1_fade, 22 
@@ -1067,7 +1078,7 @@ seq45::
   RETN
 seq59::
   WAIT 36
-  NTWT ch1_a1_3_fade, 18   ; TODO: fadein
+  NTWT ch1_a1_3_fadein, 18 
   NTWT ch1_a1_3_hold, 18 
   NTWT ch1_d2_3_fade, 18   ; TODO: vibrato
   NTWT ch1_d2_3_hold, 18 
@@ -1083,13 +1094,13 @@ seq59::
   NTWT ch1_d2_3_fade, 18 
   NTWT ch1_g2_4_hold, 18 
   NTWT ch1_g2_4_fade, 18 
-  NTWT ch1_as2_4_fade, 18   ; TODO: fadein
+  NTWT ch1_as2_4_fadein, 18 
   NTWT ch1_as2_4_hold, 18 
   NTWT ch1_as2_4_fade, 18   ; TODO: vibrato
   NTWT ch1_as2_4_fade, 18 
-  NTWT ch1_a2_3_fade, 18   ; TODO: fadein
+  NTWT ch1_a2_3_fadein, 18 
   NTWT ch1_g2_3_hold, 18 
-  NTWT ch1_fs2_4_fade, 18   ; TODO: fadein
+  NTWT ch1_fs2_4_fadein, 18 
   NTWT ch1_fs2_4_hold, 18 
   NTWT ch1_fs2_4_fade, 18   ; TODO: vibrato
   NTWT ch1_fs2_4_fade, 90 
@@ -1237,7 +1248,7 @@ seq36::
   NTWT ch2_a2_1_fade, 22 
   NTWT ch2_d1_1_fade, 22 
   NTWT ch2_f1_1_fade, 22 
-  NTWT ch2_gs2_1_fade, 22   ; TODO: fadein
+  NTWT ch2_gs2_1_fadein, 22 
   NTWT ch2_e2_1_hold, 22 
   NTWT ch2_cs2_1_fade, 22 
   NTWT ch2_e2_1_fade, 22 
@@ -1255,7 +1266,7 @@ seq36::
   RETN
 seq40::
   WAIT 22
-  NTWT ch2_a2_1_fade, 22   ; TODO: fadein
+  NTWT ch2_a2_1_fadein, 22 
   NTWT ch2_f2_1_hold, 22 
   NTWT ch2_cs2_1_fade, 22 
   NTWT ch2_d2_1_fade, 22 
@@ -1271,7 +1282,7 @@ seq40::
   NTWT ch2_a2_1_fade, 22 
   NTWT ch2_d1_1_fade, 22 
   NTWT ch2_f1_1_fade, 22 
-  NTWT ch2_gs2_1_fade, 22   ; TODO: fadein
+  NTWT ch2_gs2_1_fadein, 22 
   NTWT ch2_f2_1_hold, 22 
   NTWT ch2_c2_1_fade, 22 
   NTWT ch2_cs2_1_fade, 22 
@@ -1305,7 +1316,7 @@ seq46::
   NTWT ch2_g2_1_fade, 22 
   NTWT ch2_d1_1_fade, 22 
   NTWT ch2_g1_1_fade, 22 
-  NTWT ch2_as2_1_fade, 22   ; TODO: fadein
+  NTWT ch2_as2_1_fadein, 22 
   NTWT ch2_g2_1_hold, 22 
   NTWT ch2_ds2_1_fade, 22 
   NTWT ch2_g2_1_fade, 22 
@@ -1323,7 +1334,7 @@ seq46::
   RETN
 seq47::
   WAIT 22
-  NTWT ch2_a2_1_fade, 22   ; TODO: fadein
+  NTWT ch2_a2_1_fadein, 22 
   NTWT ch2_e2_1_hold, 22 
   NTWT ch2_cs2_1_fade, 22 
   NTWT ch2_f2_1_fade, 22 
@@ -1339,7 +1350,7 @@ seq47::
   NTWT ch2_a2_1_fade, 22 
   NTWT ch2_cs1_1_fade, 22 
   NTWT ch2_e1_1_fade, 22 
-  NTWT ch2_gs2_1_fade, 22   ; TODO: fadein
+  NTWT ch2_gs2_1_fadein, 22 
   NTWT ch2_f2_1_hold, 22 
   NTWT ch2_d2_1_fade, 22 
   NTWT ch2_as1_1_fade, 22 
@@ -1356,7 +1367,7 @@ seq47::
   NTWT ch2_e2_1_fade, 22 
   RETN
 seq30::
-  NTWT ch2_a0_1_fade, 22   ; TODO: fadein
+  NTWT ch2_a0_1_fadein, 22 
   NTWT ch2_d1_2_hold, 22 
   NTWT ch2_f1_3_hold, 22 
   NTWT ch2_d1_3_hold, 22 
@@ -1364,7 +1375,7 @@ seq30::
   NTWT ch2_d1_2_fade, 22 
   NTWT ch2_f1_3_fade, 22 
   NTWT ch2_d0_3_fade, 22 
-  NTWT ch2_f0_2_fade, 22   ; TODO: fadein
+  NTWT ch2_f0_2_fadein, 22 
   NTWT ch2_d1_2_fade, 22 
   NTWT ch2_f1_3_fade, 22 
   NTWT ch2_d1_3_fade, 22 
@@ -1380,7 +1391,7 @@ seq30::
   NTWT ch2_cs1_3_fade, 22 
   NTWT ch2_e1_2_fade, 22 
   NTWT ch2_cs0_2_fade, 22 
-  NTWT ch2_e0_2_fade, 22   ; TODO: fadein
+  NTWT ch2_e0_2_fadein, 22 
   NTWT ch2_cs1_2_fade, 22 
   NTWT ch2_e1_2_fade, 22 
   NTWT ch2_cs1_2_fade, 22 
@@ -1391,7 +1402,7 @@ seq30::
   NOTE ch2_mute
   RETN
 seq31::
-  NTWT ch2_a0_2_fade, 22   ; TODO: fadein
+  NTWT ch2_a0_2_fadein, 22 
   NTWT ch2_d1_2_hold, 22 
   NTWT ch2_f1_3_hold, 22 
   NTWT ch2_d1_3_hold, 22 
@@ -1399,7 +1410,7 @@ seq31::
   NTWT ch2_d1_4_fade, 22 
   NTWT ch2_f1_3_fade, 22 
   NTWT ch2_d1_3_fade, 22 
-  NTWT ch2_f1_2_fade, 22   ; TODO: fadein
+  NTWT ch2_f1_2_fadein, 22 
   NTWT ch2_d1_2_fade, 22 
   NTWT ch2_f1_3_fade, 22 
   NTWT ch2_d1_3_fade, 22 
@@ -1415,7 +1426,7 @@ seq31::
   NTWT ch2_cs1_3_fade, 22 
   NTWT ch2_f1_2_fade, 22 
   NTWT ch2_cs1_2_fade, 22 
-  NTWT ch2_f1_2_fade, 22   ; TODO: fadein
+  NTWT ch2_f1_2_fadein, 22 
   NTWT ch2_cs1_2_fade, 22 
   NTWT ch2_f1_2_fade, 22 
   NTWT ch2_cs1_2_fade, 22 
@@ -1426,7 +1437,7 @@ seq31::
   NOTE ch2_mute
   RETN
 seq32::
-  NTWT ch2_as0_2_fade, 22   ; TODO: fadein
+  NTWT ch2_as0_2_fadein, 22 
   NTWT ch2_d1_2_hold, 22 
   NTWT ch2_g1_3_hold, 22 
   NTWT ch2_d1_3_hold, 22 
@@ -1434,7 +1445,7 @@ seq32::
   NTWT ch2_d1_4_fade, 22 
   NTWT ch2_g1_3_fade, 22 
   NTWT ch2_d1_3_fade, 22 
-  NTWT ch2_g1_2_fade, 22   ; TODO: fadein
+  NTWT ch2_g1_2_fadein, 22 
   NTWT ch2_d1_2_fade, 22 
   NTWT ch2_g1_3_fade, 22 
   NTWT ch2_d1_3_fade, 22 
@@ -1450,7 +1461,7 @@ seq32::
   NTWT ch2_ds1_3_fade, 22 
   NTWT ch2_g1_2_fade, 22 
   NTWT ch2_ds1_2_fade, 22 
-  NTWT ch2_g1_2_fade, 22   ; TODO: fadein
+  NTWT ch2_g1_2_fadein, 22 
   NTWT ch2_ds1_2_fade, 22 
   NTWT ch2_g1_2_fade, 22 
   NTWT ch2_ds1_2_fade, 22 
@@ -1461,7 +1472,7 @@ seq32::
   NOTE ch2_mute
   RETN
 seq33::
-  NTWT ch2_e1_2_fade, 22   ; TODO: fadein
+  NTWT ch2_e1_2_fadein, 22 
   NTWT ch2_a0_2_hold, 22 
   NTWT ch2_e1_3_hold, 22 
   NTWT ch2_a0_3_hold, 22 
@@ -1469,7 +1480,7 @@ seq33::
   NTWT ch2_a0_4_fade, 22 
   NTWT ch2_e1_3_fade, 22 
   NTWT ch2_a0_3_fade, 22 
-  NTWT ch2_e1_2_fade, 22   ; TODO: fadein
+  NTWT ch2_e1_2_fadein, 22 
   NTWT ch2_a0_2_fade, 22 
   NTWT ch2_e1_3_fade, 22 
   NTWT ch2_a0_3_fade, 22 
@@ -1485,7 +1496,7 @@ seq33::
   NTWT ch2_d1_3_fade, 22 
   NTWT ch2_f1_2_fade, 22 
   NTWT ch2_d1_2_fade, 22 
-  NTWT ch2_f1_2_fade, 22   ; TODO: fadein
+  NTWT ch2_f1_2_fadein, 22 
   NTWT ch2_d1_2_fade, 22 
   NTWT ch2_f1_2_fade, 22 
   NTWT ch2_d1_2_fade, 22 
@@ -1646,10 +1657,10 @@ CH12_NOTE    ch12_ds0 0x6a 0x81
 CH2_NOTE_ENV ch2_ds0_1_fade ENV_1FADE ch12_ds0
 CH2_NOTE_ENV ch2_ds0_4_fade ENV_4FADE ch12_ds0
 CH12_NOTE    ch12_e0  0xc3 0x81
-CH2_NOTE_ENV ch2_e0_2_fade  ENV_2FADE ch12_e0
+CH2_NOTE_ENV ch2_e0_2_fadein ENV_2FADEIN ch12_e0
 CH12_NOTE    ch12_f0  0x20 0x82
 CH2_NOTE_ENV ch2_f0_1_fade  ENV_1FADE ch12_f0
-CH2_NOTE_ENV ch2_f0_2_fade  ENV_2FADE ch12_f0
+CH2_NOTE_ENV ch2_f0_2_fadein ENV_2FADEIN ch12_f0
 CH2_NOTE_ENV ch2_f0_4_fade  ENV_4FADE ch12_f0
 CH12_NOTE    ch12_g0  0xc5 0x82
 CH2_NOTE_ENV ch2_g0_1_fade  ENV_1FADE ch12_g0
@@ -1658,8 +1669,10 @@ CH12_NOTE    ch12_gs0 0x0f 0x83
 CH2_NOTE_ENV ch2_gs0_3_fade ENV_3FADE ch12_gs0
 CH2_NOTE_ENV ch2_gs0_4_hold ENV_4HOLD ch12_gs0
 CH12_NOTE    ch12_a0  0x55 0x83
+CH2_NOTE_ENV ch2_a0_1_fadein ENV_1FADEIN ch12_a0
 CH2_NOTE_ENV ch2_a0_1_fade  ENV_1FADE ch12_a0
 CH2_NOTE_ENV ch2_a0_2_hold  ENV_2HOLD ch12_a0
+CH2_NOTE_ENV ch2_a0_2_fadein ENV_2FADEIN ch12_a0
 CH2_NOTE_ENV ch2_a0_2_fade  ENV_2FADE ch12_a0
 CH2_NOTE_ENV ch2_a0_3_hold  ENV_3HOLD ch12_a0
 CH2_NOTE_ENV ch2_a0_3_fade  ENV_3FADE ch12_a0
@@ -1668,7 +1681,7 @@ CH2_NOTE_ENV ch2_a0_4_fade  ENV_4FADE ch12_a0
 CH1_NOTE_ENV ch1_a0_6_hold  ENV_6HOLD ch12_a0
 CH12_NOTE    ch12_as0 0x9a 0x83
 CH2_NOTE_ENV ch2_as0_1_fade ENV_1FADE ch12_as0
-CH2_NOTE_ENV ch2_as0_2_fade ENV_2FADE ch12_as0
+CH2_NOTE_ENV ch2_as0_2_fadein ENV_2FADEIN ch12_as0
 CH2_NOTE_ENV ch2_as0_3_fade ENV_3FADE ch12_as0
 CH2_NOTE_ENV ch2_as0_4_hold ENV_4HOLD ch12_as0
 CH1_NOTE_ENV ch1_as0_4_fade ENV_4FADE ch12_as0
@@ -1713,9 +1726,11 @@ CH2_NOTE_ENV ch2_ds1_3_fade ENV_3FADE ch12_ds1
 CH2_NOTE_ENV ch2_ds1_4_hold ENV_4HOLD ch12_ds1
 CH12_NOTE    ch12_e1  0xe3 0x84
 CH2_NOTE_ENV ch2_e1_1_hold  ENV_1HOLD ch12_e1
+CH1_NOTE_ENV ch1_e1_1_fadein ENV_1FADEIN ch12_e1
 CH1_NOTE_ENV ch1_e1_1_fade  ENV_1FADE ch12_e1
 CH2_NOTE_ENV ch2_e1_1_fade  ENV_1FADE ch12_e1
 CH2_NOTE_ENV ch2_e1_2_hold  ENV_2HOLD ch12_e1
+CH2_NOTE_ENV ch2_e1_2_fadein ENV_2FADEIN ch12_e1
 CH1_NOTE_ENV ch1_e1_2_fade  ENV_2FADE ch12_e1
 CH2_NOTE_ENV ch2_e1_2_fade  ENV_2FADE ch12_e1
 CH1_NOTE_ENV ch1_e1_3_hold  ENV_3HOLD ch12_e1
@@ -1728,6 +1743,7 @@ CH2_NOTE_ENV ch2_f1_1_hold  ENV_1HOLD ch12_f1
 CH1_NOTE_ENV ch1_f1_1_fade  ENV_1FADE ch12_f1
 CH2_NOTE_ENV ch2_f1_1_fade  ENV_1FADE ch12_f1
 CH2_NOTE_ENV ch2_f1_2_hold  ENV_2HOLD ch12_f1
+CH2_NOTE_ENV ch2_f1_2_fadein ENV_2FADEIN ch12_f1
 CH2_NOTE_ENV ch2_f1_2_fade  ENV_2FADE ch12_f1
 CH1_NOTE_ENV ch1_f1_3_hold  ENV_3HOLD ch12_f1
 CH2_NOTE_ENV ch2_f1_3_hold  ENV_3HOLD ch12_f1
@@ -1740,6 +1756,7 @@ CH1_NOTE_ENV ch1_g1_1_fade  ENV_1FADE ch12_g1
 CH2_NOTE_ENV ch2_g1_1_fade  ENV_1FADE ch12_g1
 CH1_NOTE_ENV ch1_g1_2_hold  ENV_2HOLD ch12_g1
 CH2_NOTE_ENV ch2_g1_2_hold  ENV_2HOLD ch12_g1
+CH2_NOTE_ENV ch2_g1_2_fadein ENV_2FADEIN ch12_g1
 CH2_NOTE_ENV ch2_g1_2_fade  ENV_2FADE ch12_g1
 CH2_NOTE_ENV ch2_g1_3_hold  ENV_3HOLD ch12_g1
 CH2_NOTE_ENV ch2_g1_3_fade  ENV_3FADE ch12_g1
@@ -1761,7 +1778,7 @@ CH1_NOTE_ENV ch1_a1_2_hold  ENV_2HOLD ch12_a1
 CH1_NOTE_ENV ch1_a1_2_fade  ENV_2FADE ch12_a1
 CH2_NOTE_ENV ch2_a1_2_fade  ENV_2FADE ch12_a1
 CH1_NOTE_ENV ch1_a1_3_hold  ENV_3HOLD ch12_a1
-CH1_NOTE_ENV ch1_a1_3_fade  ENV_3FADE ch12_a1
+CH1_NOTE_ENV ch1_a1_3_fadein ENV_3FADEIN ch12_a1
 CH2_NOTE_ENV ch2_a1_3_fade  ENV_3FADE ch12_a1
 CH1_NOTE_ENV ch1_a1_4_hold  ENV_4HOLD ch12_a1
 CH1_NOTE_ENV ch1_a1_4_fade  ENV_4FADE ch12_a1
@@ -1823,6 +1840,7 @@ CH2_NOTE_ENV ch2_fs2_2_hold ENV_2HOLD ch12_fs2
 CH2_NOTE_ENV ch2_fs2_3_fade ENV_3FADE ch12_fs2
 CH1_NOTE_ENV ch1_fs2_4_hold ENV_4HOLD ch12_fs2
 CH2_NOTE_ENV ch2_fs2_4_hold ENV_4HOLD ch12_fs2
+CH1_NOTE_ENV ch1_fs2_4_fadein ENV_4FADEIN ch12_fs2
 CH1_NOTE_ENV ch1_fs2_4_fade ENV_4FADE ch12_fs2
 CH12_NOTE    ch12_g2  0xb2 0x86
 CH1_NOTE_ENV ch1_g2_1_hold  ENV_1HOLD ch12_g2
@@ -1839,6 +1857,8 @@ CH1_NOTE_ENV ch1_g2_4_hold  ENV_4HOLD ch12_g2
 CH1_NOTE_ENV ch1_g2_4_fade  ENV_4FADE ch12_g2
 CH12_NOTE    ch12_gs2 0xc4 0x86
 CH2_NOTE_ENV ch2_gs2_1_hold ENV_1HOLD ch12_gs2
+CH1_NOTE_ENV ch1_gs2_1_fadein ENV_1FADEIN ch12_gs2
+CH2_NOTE_ENV ch2_gs2_1_fadein ENV_1FADEIN ch12_gs2
 CH1_NOTE_ENV ch1_gs2_1_fade ENV_1FADE ch12_gs2
 CH2_NOTE_ENV ch2_gs2_1_fade ENV_1FADE ch12_gs2
 CH1_NOTE_ENV ch1_gs2_2_hold ENV_2HOLD ch12_gs2
@@ -1847,17 +1867,22 @@ CH1_NOTE_ENV ch1_gs2_3_fade ENV_3FADE ch12_gs2
 CH12_NOTE    ch12_a2  0xd6 0x86
 CH1_NOTE_ENV ch1_a2_1_hold  ENV_1HOLD ch12_a2
 CH2_NOTE_ENV ch2_a2_1_hold  ENV_1HOLD ch12_a2
+CH1_NOTE_ENV ch1_a2_1_fadein ENV_1FADEIN ch12_a2
+CH2_NOTE_ENV ch2_a2_1_fadein ENV_1FADEIN ch12_a2
 CH1_NOTE_ENV ch1_a2_1_fade  ENV_1FADE ch12_a2
 CH2_NOTE_ENV ch2_a2_1_fade  ENV_1FADE ch12_a2
 CH1_NOTE_ENV ch1_a2_2_hold  ENV_2HOLD ch12_a2
 CH1_NOTE_ENV ch1_a2_2_fade  ENV_2FADE ch12_a2
 CH2_NOTE_ENV ch2_a2_3_hold  ENV_3HOLD ch12_a2
+CH1_NOTE_ENV ch1_a2_3_fadein ENV_3FADEIN ch12_a2
 CH1_NOTE_ENV ch1_a2_3_fade  ENV_3FADE ch12_a2
 CH2_NOTE_ENV ch2_a2_3_fade  ENV_3FADE ch12_a2
 CH2_NOTE_ENV ch2_a2_4_hold  ENV_4HOLD ch12_a2
 CH12_NOTE    ch12_as2 0xe7 0x86
 CH1_NOTE_ENV ch1_as2_1_hold ENV_1HOLD ch12_as2
 CH2_NOTE_ENV ch2_as2_1_hold ENV_1HOLD ch12_as2
+CH1_NOTE_ENV ch1_as2_1_fadein ENV_1FADEIN ch12_as2
+CH2_NOTE_ENV ch2_as2_1_fadein ENV_1FADEIN ch12_as2
 CH1_NOTE_ENV ch1_as2_1_fade ENV_1FADE ch12_as2
 CH2_NOTE_ENV ch2_as2_1_fade ENV_1FADE ch12_as2
 CH1_NOTE_ENV ch1_as2_2_hold ENV_2HOLD ch12_as2
@@ -1865,6 +1890,7 @@ CH1_NOTE_ENV ch1_as2_2_fade ENV_2FADE ch12_as2
 CH2_NOTE_ENV ch2_as2_3_hold ENV_3HOLD ch12_as2
 CH2_NOTE_ENV ch2_as2_3_fade ENV_3FADE ch12_as2
 CH1_NOTE_ENV ch1_as2_4_hold ENV_4HOLD ch12_as2
+CH1_NOTE_ENV ch1_as2_4_fadein ENV_4FADEIN ch12_as2
 CH1_NOTE_ENV ch1_as2_4_fade ENV_4FADE ch12_as2
 CH12_NOTE    ch12_cs3 0x13 0x87
 CH1_NOTE_ENV ch1_cs3_1_hold ENV_1HOLD ch12_cs3

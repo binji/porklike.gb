@@ -374,7 +374,8 @@ names = [
 
 ch3_pats = [34, 38, 42, 43, 50, 51, 52, 53, 60, 62]
 ch3_vol = [25, 25, 50, 50, 50, 100, 100, 100]
-fade_time = {25: 7, 50: 14, 100: 18}
+fadein_time = {25: 18}
+fadeout_time = {25: 7, 50: 14, 100: 18}
 
 print('-'*80)
 used = set()
@@ -397,7 +398,16 @@ for pat in ch3_pats:
         used.add(note[0])
 
       if note[3] in [2, 4, 5]:  # fade out (TODO fadein)
-        time += fade_time[vol]
+        macro = 'FADE'
+        comment = ''
+        if note[3] == 4:
+          macro = 'FADEIN'
+          time += fadein_time[vol]
+        elif note[3] == 5:
+          time += fadeout_time[vol]
+        elif note[3] == 2:
+          comment = '  ; TODO: vibrato'
+
         # Find how many rests after this note
         delay = speed - time
         i += 1
@@ -405,16 +415,10 @@ for pat in ch3_pats:
           delay += speed
           i += 1
 
-        comment = ''
-        if note[3] == 4:
-          comment = '  ; TODO: fadein'
-        elif note[3] == 2:
-          comment = '  ; TODO: vibrato'
-
         if delay == 0:
-          print(f'  FADE{vol}_NODELAY{comment}')
+          print(f'  {macro}{vol}_NODELAY{comment}')
         else:
-          print(f'  FADE{vol}, {delay}{comment}')
+          print(f'  {macro}{vol}, {delay}{comment}')
       elif note[3] == 0:   # no effect
         # Find how many rests after this note
         delay = speed - time
@@ -457,7 +461,7 @@ def ch12_name(ch, note):
     0: 'hold',
     2: 'fade',
     3: 'fade',
-    4: 'fade',
+    4: 'fadein',
     5: 'fade',
     6: 'fade',
   }[note[3]]
@@ -470,7 +474,7 @@ def env_name(note):
     0: 'HOLD',
     2: 'FADE',
     3: 'FADE',
-    4: 'FADE',
+    4: 'FADEIN',
     5: 'FADE',
     6: 'FADE',
   }[note[3]]
@@ -491,14 +495,14 @@ for ch in range(2):
       time = 0
       # note = [freq, ins, vol, effect]
       if note[2] != 0:
-        # (TODO vibrato, fadein, arpeggio)
+        # (TODO vibrato, arpeggio)
         if note[3] in [0, 2, 3, 4, 5, 6]:  # hold, fade out
           # HACK remap effect number
           effect = {
             0: 0,
             2: 5,
             3: 5,
-            4: 5,
+            4: 4,
             5: 5,
             6: 5,
           }[note[3]]
@@ -519,8 +523,6 @@ for ch in range(2):
             comment = '  ; TODO: vibrato'
           elif note[3] == 3:
             comment = '  ; TODO: drop'
-          elif note[3] == 4:
-            comment = '  ; TODO: fadein'
           elif note[3] == 6:
             comment = '  ; TODO: arpreggio'
 
