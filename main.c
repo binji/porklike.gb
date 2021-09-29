@@ -1861,12 +1861,12 @@ redo:
       if (ptype == PICKUP_TYPE_HEART) {
         if (mob_hp[PLAYER_MOB] < 9) {
           ++mob_hp[PLAYER_MOB];
-          set_vram_byte((u8 *)INV_HP_ADDR, mob_hp[PLAYER_MOB]);
+          set_vram_byte((u8 *)INV_HP_ADDR, TILE_0 + mob_hp[PLAYER_MOB]);
         }
       } else if (ptype == PICKUP_TYPE_KEY) {
         if (num_keys < 9) {
           ++num_keys;
-          set_vram_byte((u8 *)INV_KEYS_ADDR, num_keys);
+          set_vram_byte((u8 *)INV_KEYS_ADDR, TILE_0 + num_keys);
         }
       } else {
         len = pick_type_name_len[ptype];
