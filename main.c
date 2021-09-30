@@ -79,6 +79,7 @@
 #define TILE_MOB_FLASH_DIFF 0x46
 #define TILE_VOID_EXIT_DIFF 0x35
 #define TILE_VOID_OPEN_DIFF 3
+#define TILE_PLAYER_HIT_DMG_DIFF 0x5f
 
 #define FADE_FRAMES 8
 #define INV_ANIM_FRAMES 25
@@ -1236,7 +1237,8 @@ void hitmob(u8 index, u8 dmg) {
 
     sfx(sound);
   } else {
-    addfloat(pos, float_dmg[dmg]);
+    addfloat(pos, float_dmg[dmg] +
+                      (index == PLAYER_MOB ? TILE_PLAYER_HIT_DMG_DIFF : 0));
 
     if (mob_hp[index] <= dmg) {
       adddeadmob(index);
