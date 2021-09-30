@@ -442,7 +442,7 @@ for pat in sfx_pat:
       # (TODO vibrato, arpeggio)
       if note[3] in [0, 2, 3, 4, 5, 6]:  # hold, fade out
         # HACK remap effect number
-        vol = min(vol + 4, 7)  # bump up volume on sfx
+        vol = min(vol + 3, 7)  # bump up volume on sfx
         effect = {0: 0, 2: 5, 3: 5, 4: 4, 5: 5, 6: 5}[effect]
         mynote = (key, ins, vol, effect)
 
