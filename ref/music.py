@@ -434,20 +434,22 @@ for pat in sfx_pat:
     time = 0
     ch = 1
 
-    # note = [freq, ins, vol, effect]
+    key, ins, vol, effect = note
     if note[2] != 0:
       # (TODO vibrato, arpeggio)
       if note[3] in [0, 2, 3, 4, 5, 6]:  # hold, fade out
         # HACK remap effect number
-        effect = {0: 0, 2: 5, 3: 5, 4: 4, 5: 5, 6: 5}[note[3]]
+        vol = min(vol + 4, 7)  # bump up volume on sfx
+        effect = {0: 0, 2: 5, 3: 5, 4: 4, 5: 5, 6: 5}[effect]
+        mynote = (key, ins, vol, effect)
+
         if note[1] == 6:
           ch = 3
-          vol = min(note[2] + 4, 7)  # bump up noise volume
-          used_ch4.add((note[0], 0, vol, effect))
-          name = ch4_name((note[0], note[1], vol, note[3]))
+          used_ch4.add((key, 0, vol, effect))
+          name = ch4_name(mynote)
         else:
-          used.add(((note[0], 0, note[2], effect), ch))
-          name = ch12_name(ch, note)
+          used.add(((key, 0, vol, effect), ch))
+          name = ch12_name(ch, mynote)
 
         # Find how many rests after this note
         delay = speed - time
@@ -516,7 +518,7 @@ for note in sorted(used_ch4):
   if note[0] not in seen_note:
     seen_note.add(note[0])
     generic = f'ch4_{names[note[0]]}'
-    s, r = noise_freq(note[0])
+    s, r = noise_freq(min(note[0] + 24, 63))
     byte = (s << 4) | r
     print(f'CH4_NOTE     {generic:8} 0x{byte:02x}  ; freq={notefreq[note[0]]}')
 
@@ -524,3 +526,5 @@ for note in sorted(used_ch4):
   env = env_name(note)
   generic = f'ch4_{names[note[0]]}'
   print(f'CH4_NOTE_ENV {name:14} {env} {generic}')
+
+# print(noise_freqs)
