@@ -447,9 +447,11 @@ void main(void) NONBANKED {
         }
       }
     } else {
+#if 0
       if (newjoy & J_START) { // XXX cheat
         dofadeout = donextfloor = doloadfloor = 1;
       }
+#endif
 
       if (dofadeout) {
         dofadeout = 0;
