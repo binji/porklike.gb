@@ -219,7 +219,7 @@ for pat in ch3_pats:
   speed = sounds[pat]['speed']
   last_freq = None
 
-  print(f'seq{pat}::')
+  print(f'ch3_seq{pat}::')
   i = 0
   notes = sounds[pat]['notes']
   while i < 32:
@@ -295,8 +295,8 @@ ins_to_duty = {
 }
 
 ch_pats = [
-    [37, 41, 48, 49, 35, 39, 44, 45, 59, 63],
-    [26, 27, 28, 29, 36, 40, 46, 47, 30, 31, 32, 33, 54, 55, 56, 57, 58, 61],
+    [37, 41, 48, 49, 35, 39, 44, 45, 30, 31, 32, 33, 54, 55, 56, 57, 59, 63],
+    [26, 27, 28, 29, 36, 40, 46, 47, 37, 41, 48, 49, 58, 61],
 ]
 
 def ch12_ins(ch, note):
@@ -334,7 +334,7 @@ for ch in range(2):
     speed = sounds[pat]['speed']
     last_ins = None
 
-    print(f'seq{pat}::')
+    print(f'ch{ch+1}_seq{pat}::')
     i = 0
     notes = sounds[pat]['notes']
     while i < 32:
@@ -426,7 +426,7 @@ sfx_pat = list(range(22))
 used_ch4 = set()
 for pat in sfx_pat:
   speed = sounds[pat]['speed']
-  print(f'seq{pat}::')
+  print(f'sfx_seq{pat}::')
   i = 0
   notes = sounds[pat]['notes']
   while i < 32:

@@ -82,28 +82,28 @@ song_win::
   .dw 0
 
 sfx::
-  .dw seq0
-  .dw seq1
-  .dw seq2
-  .dw seq3
-  .dw seq4
-  .dw seq5
-  .dw seq6
-  .dw seq7
-  .dw seq8
-  .dw seq9
-  .dw seq10
-  .dw seq11
-  .dw seq12
-  .dw seq13
-  .dw seq14
-  .dw seq15
-  .dw seq16
-  .dw seq17
-  .dw seq18
-  .dw seq19
-  .dw seq20
-  .dw seq21
+  .dw sfx_seq0
+  .dw sfx_seq1
+  .dw sfx_seq2
+  .dw sfx_seq3
+  .dw sfx_seq4
+  .dw sfx_seq5
+  .dw sfx_seq6
+  .dw sfx_seq7
+  .dw sfx_seq8
+  .dw sfx_seq9
+  .dw sfx_seq10
+  .dw sfx_seq11
+  .dw sfx_seq12
+  .dw sfx_seq13
+  .dw sfx_seq14
+  .dw sfx_seq15
+  .dw sfx_seq16
+  .dw sfx_seq17
+  .dw sfx_seq18
+  .dw sfx_seq19
+  .dw sfx_seq20
+  .dw sfx_seq21
 
 _play_music::
   di
@@ -411,87 +411,87 @@ square_90:
 
 ch1::
   CALL_ seqpause
-  CALL_ seq37
-  CALL_ seq41
-  CALL_ seq48
-  CALL_ seq49
-  CALL_ seq35
-  CALL_ seq39
-  CALL_ seq44
-  CALL_ seq45
-  CALL_ seq37
-  CALL_ seq41
-  CALL_ seq48
-  CALL_ seq49
-  CALL_ seqpause
-  CALL_ seqpause
-  CALL_ seqpause
-  CALL_ seqpause
+  CALL_ ch1_seq37
+  CALL_ ch1_seq41
+  CALL_ ch1_seq48
+  CALL_ ch1_seq49
+  CALL_ ch1_seq35
+  CALL_ ch1_seq39
+  CALL_ ch1_seq44
+  CALL_ ch1_seq45
+  CALL_ ch1_seq30
+  CALL_ ch1_seq31
+  CALL_ ch1_seq32
+  CALL_ ch1_seq33
+  CALL_ ch1_seq54
+  CALL_ ch1_seq55
+  CALL_ ch1_seq56
+  CALL_ ch1_seq57
   JUMP ch1
 
 ch2::
   CALL_ seqpause
-  CALL_ seq26
-  CALL_ seq27
-  CALL_ seq28
-  CALL_ seq29
-  CALL_ seq36
-  CALL_ seq40
-  CALL_ seq46
-  CALL_ seq47
-  CALL_ seq30
-  CALL_ seq31
-  CALL_ seq32
-  CALL_ seq33
-  CALL_ seq54
-  CALL_ seq55
-  CALL_ seq56
-  CALL_ seq57
+  CALL_ ch2_seq26
+  CALL_ ch2_seq27
+  CALL_ ch2_seq28
+  CALL_ ch2_seq29
+  CALL_ ch2_seq36
+  CALL_ ch2_seq40
+  CALL_ ch2_seq46
+  CALL_ ch2_seq47
+  CALL_ ch2_seq37
+  CALL_ ch2_seq41
+  CALL_ ch2_seq48
+  CALL_ ch2_seq49
+  CALL_ seqpause
+  CALL_ seqpause
+  CALL_ seqpause
+  CALL_ seqpause
   JUMP ch2
 
 ch3::
-  CALL_ seq34
-  CALL_ seq34
-  CALL_ seq38
-  CALL_ seq42
-  CALL_ seq43
-  CALL_ seq50
-  CALL_ seq51
-  CALL_ seq52
-  CALL_ seq53
-  CALL_ seq34
-  CALL_ seq38
-  CALL_ seq42
-  CALL_ seq43
-  CALL_ seq34
-  CALL_ seq38
-  CALL_ seq42
-  CALL_ seq53
+  CALL_ ch3_seq34
+  CALL_ ch3_seq34
+  CALL_ ch3_seq38
+  CALL_ ch3_seq42
+  CALL_ ch3_seq43
+  CALL_ ch3_seq50
+  CALL_ ch3_seq51
+  CALL_ ch3_seq52
+  CALL_ ch3_seq53
+  CALL_ ch3_seq34
+  CALL_ ch3_seq38
+  CALL_ ch3_seq42
+  CALL_ ch3_seq43
+  CALL_ ch3_seq34
+  CALL_ ch3_seq38
+  CALL_ ch3_seq42
+  CALL_ ch3_seq53
   JUMP ch3
 
 ch1_dead::
-  CALL_ seq61
+  CALL_ ch1_seq63
   JUMP seqmute
 
 ch2_dead::
-  CALL_ seq62
+  CALL_ ch2_seq61
   JUMP seqmute
 
 ch3_dead::
-  CALL_ seq63
+  CALL_ ch3_seq62
   JUMP seqmute
 
 
 ch1_win::
-  CALL_ seq59
+  CALL_ ch1_seq59
   JUMP seqmute
 
 ch2_win::
-  CALL_ seq58
+  CALL_ ch2_seq58
   JUMP seqmute
 
 ch3_win::
-  CALL_ seq60
+  CALL_ ch3_seq60
   JUMP seqmute
 
 
@@ -646,7 +646,7 @@ ch4_mute::
 
 ;; DATA ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-seq34::
+ch3_seq34::
   NOTE ch3_d0
   FADE100, 26
   FADE25, 37
@@ -661,7 +661,7 @@ seq34::
   FADE50, 74
   FADE50, 74
   RETN
-seq38::
+ch3_seq38::
   NOTE ch3_d0
   FADE100, 26
   FADE25, 37
@@ -676,7 +676,7 @@ seq38::
   FADE50, 74
   FADE50, 74
   RETN
-seq42::
+ch3_seq42::
   NOTE ch3_g0
   FADE100, 26
   FADE25, 37
@@ -691,7 +691,7 @@ seq42::
   FADE50, 74
   FADE100, 70
   RETN
-seq43::
+ch3_seq43::
   NOTE ch3_a0
   FADE100, 26
   FADE25, 37
@@ -709,7 +709,7 @@ seq43::
   NOTE ch3_a0
   FADE50, 30
   RETN
-seq50::
+ch3_seq50::
   NOTE ch3_d0
   FADE100, 4
   NOTE ch3_a0
@@ -751,7 +751,7 @@ seq50::
   FADE50, 8
   FADE25, 37
   RETN
-seq51::
+ch3_seq51::
   NOTE ch3_d0
   FADE100, 4
   NOTE ch3_a0
@@ -793,7 +793,7 @@ seq51::
   FADE50, 8
   FADE25, 37
   RETN
-seq52::
+ch3_seq52::
   NOTE ch3_g0
   FADE100, 4
   NOTE ch3_d1
@@ -835,7 +835,7 @@ seq52::
   FADE50, 8
   FADE25, 37
   RETN
-seq53::
+ch3_seq53::
   NOTE ch3_a0
   FADE100, 4
   NOTE ch3_e1
@@ -882,7 +882,7 @@ seq53::
   NOTE ch3_a0
   WAIT 22
   RETN
-seq60::
+ch3_seq60::
   NOTE ch3_f1
   FADE50, 22
   NOTE ch3_fs1
@@ -913,7 +913,7 @@ seq60::
   FADE100, 18  ; TODO: vibrato
   WAIT 90
   RETN
-seq62::
+ch3_seq62::
   WAIT 152
   NOTE ch3_d1
   WAIT 19
@@ -956,7 +956,7 @@ CH3_NOTE ch3_a1  0xd6 0x86
 CH3_NOTE ch3_as1 0xe7 0x86
 CH3_NOTE ch3_d2  0x21 0x87
 
-seq37::
+ch1_seq37::
   WAIT 44
   NOTE ch1_duty50
   NTWT ch1_a1_1_fade, 22 
@@ -986,7 +986,7 @@ seq37::
   NTWT ch1_gs1_1_fade, 22   ; TODO: vibrato
   NTWT ch1_e1_1_fade, 22 
   RETN
-seq41::
+ch1_seq41::
   WAIT 44
   NOTE ch1_duty50
   NTWT ch1_a1_1_fade, 22 
@@ -1016,7 +1016,7 @@ seq41::
   NTWT ch1_f2_1_hold, 22 
   NOTE ch1_mute
   RETN
-seq48::
+ch1_seq48::
   WAIT 44
   NOTE ch1_duty50
   NTWT ch1_as2_1_fade, 22 
@@ -1045,7 +1045,7 @@ seq48::
   NTWT ch1_a1_2_hold, 22 
   NTWT ch1_g1_1_fade, 22 
   RETN
-seq49::
+ch1_seq49::
   NOTE ch1_duty50
   NTWT ch1_cs2_2_fade, 22 
   NTWT ch1_cs2_1_fade, 22 
@@ -1079,7 +1079,7 @@ seq49::
   NTWT ch1_cs3_1_hold, 22 
   NTWT ch1_cs3_1_fade, 22 
   RETN
-seq35::
+ch1_seq35::
   NOTE ch1_duty50
   NTWT ch1_a2_1_hold, 22 
   NTWT ch1_f2_1_hold, 22 
@@ -1114,7 +1114,7 @@ seq35::
   NTWT ch1_cs1_1_fade, 22 
   NTWT ch1_e1_1_fade, 22 
   RETN
-seq39::
+ch1_seq39::
   NOTE ch1_duty50
   NTWT ch1_a2_1_fadein, 22 
   NTWT ch1_f2_1_hold, 22 
@@ -1149,7 +1149,7 @@ seq39::
   NTWT ch1_e1_2_fade, 22 
   NTWT ch1_f1_1_fade, 22 
   RETN
-seq44::
+ch1_seq44::
   NOTE ch1_duty50
   NTWT ch1_as2_1_fade, 22   ; TODO: vibrato
   NTWT ch1_g2_2_hold, 22 
@@ -1184,7 +1184,7 @@ seq44::
   NTWT ch1_ds1_2_fade, 22 
   NTWT ch1_g1_1_fade, 22 
   RETN
-seq45::
+ch1_seq45::
   NOTE ch1_duty50
   NTWT ch1_a2_1_fadein, 22 
   NTWT ch1_e2_1_hold, 22 
@@ -1219,7 +1219,275 @@ seq45::
   NTWT ch1_e2_2_fade, 22 
   NTWT ch1_cs2_1_fade, 22 
   RETN
-seq59::
+ch1_seq30::
+  NOTE ch1_duty50
+  NTWT ch1_a0_1_fadein, 22 
+  NTWT ch1_d1_2_hold, 22 
+  NTWT ch1_f1_3_hold, 22 
+  NTWT ch1_d1_3_hold, 22 
+  NTWT ch1_a0_2_fade, 22 
+  NTWT ch1_d1_2_fade, 22 
+  NTWT ch1_f1_3_fade, 22 
+  NTWT ch1_d0_3_fade, 22 
+  NTWT ch1_f0_2_fadein, 22 
+  NTWT ch1_d1_2_fade, 22 
+  NTWT ch1_f1_3_fade, 22 
+  NTWT ch1_d1_3_fade, 22 
+  NTWT ch1_a0_4_fade, 22 
+  NTWT ch1_d1_4_hold, 22 
+  NTWT ch1_f1_4_hold, 22 
+  NTWT ch1_d0_4_hold, 22 
+  NTWT ch1_gs0_4_hold, 22 
+  NTWT ch1_cs1_4_hold, 22 
+  NTWT ch1_e1_2_hold, 22 
+  NTWT ch1_cs1_2_hold, 22 
+  NTWT ch1_gs0_3_fade, 22 
+  NTWT ch1_cs1_3_fade, 22 
+  NTWT ch1_e1_2_fade, 22 
+  NTWT ch1_cs0_2_fade, 22 
+  NTWT ch1_e0_2_fadein, 22 
+  NTWT ch1_cs1_2_fade, 22 
+  NTWT ch1_e1_2_fade, 22 
+  NTWT ch1_cs1_2_fade, 22 
+  NTWT ch1_gs0_3_fade, 22 
+  NTWT ch1_cs1_3_hold, 22 
+  NTWT ch1_e1_4_hold, 22 
+  NTWT ch1_cs0_4_hold, 22 
+  NOTE ch1_mute
+  RETN
+ch1_seq31::
+  NOTE ch1_duty50
+  NTWT ch1_a0_2_fadein, 22 
+  NTWT ch1_d1_2_hold, 22 
+  NTWT ch1_f1_3_hold, 22 
+  NTWT ch1_d1_3_hold, 22 
+  NTWT ch1_a0_4_fade, 22 
+  NTWT ch1_d1_4_fade, 22 
+  NTWT ch1_f1_3_fade, 22 
+  NTWT ch1_d1_3_fade, 22 
+  NTWT ch1_f1_2_fadein, 22 
+  NTWT ch1_d1_2_fade, 22 
+  NTWT ch1_f1_3_fade, 22 
+  NTWT ch1_d1_3_fade, 22 
+  NTWT ch1_a0_4_fade, 22 
+  NTWT ch1_d1_4_hold, 22 
+  NTWT ch1_f1_4_hold, 22 
+  NTWT ch1_d1_4_hold, 22 
+  NTWT ch1_gs0_4_hold, 22 
+  NTWT ch1_cs1_4_hold, 22 
+  NTWT ch1_f1_2_hold, 22 
+  NTWT ch1_cs1_2_hold, 22 
+  NTWT ch1_gs0_3_fade, 22 
+  NTWT ch1_cs1_3_fade, 22 
+  NTWT ch1_f1_2_fade, 22 
+  NTWT ch1_cs1_2_fade, 22 
+  NTWT ch1_f1_2_fadein, 22 
+  NTWT ch1_cs1_2_fade, 22 
+  NTWT ch1_f1_2_fade, 22 
+  NTWT ch1_cs1_2_fade, 22 
+  NTWT ch1_gs0_3_fade, 22 
+  NTWT ch1_cs1_3_hold, 22 
+  NTWT ch1_f1_4_hold, 22 
+  NTWT ch1_cs1_4_hold, 22 
+  NOTE ch1_mute
+  RETN
+ch1_seq32::
+  NOTE ch1_duty50
+  NTWT ch1_as0_2_fadein, 22 
+  NTWT ch1_d1_2_hold, 22 
+  NTWT ch1_g1_3_hold, 22 
+  NTWT ch1_d1_3_hold, 22 
+  NTWT ch1_as0_4_fade, 22 
+  NTWT ch1_d1_4_fade, 22 
+  NTWT ch1_g1_3_fade, 22 
+  NTWT ch1_d1_3_fade, 22 
+  NTWT ch1_g1_2_fadein, 22 
+  NTWT ch1_d1_2_fade, 22 
+  NTWT ch1_g1_3_fade, 22 
+  NTWT ch1_d1_3_fade, 22 
+  NTWT ch1_as0_4_fade, 22 
+  NTWT ch1_d1_4_hold, 22 
+  NTWT ch1_g1_4_hold, 22 
+  NTWT ch1_d1_4_hold, 22 
+  NTWT ch1_as0_4_hold, 22 
+  NTWT ch1_ds1_4_hold, 22 
+  NTWT ch1_g1_2_hold, 22 
+  NTWT ch1_ds1_2_hold, 22 
+  NTWT ch1_as0_3_fade, 22 
+  NTWT ch1_ds1_3_fade, 22 
+  NTWT ch1_g1_2_fade, 22 
+  NTWT ch1_ds1_2_fade, 22 
+  NTWT ch1_g1_2_fadein, 22 
+  NTWT ch1_ds1_2_fade, 22 
+  NTWT ch1_g1_2_fade, 22 
+  NTWT ch1_ds1_2_fade, 22 
+  NTWT ch1_as0_3_fade, 22 
+  NTWT ch1_ds1_3_hold, 22 
+  NTWT ch1_g1_4_hold, 22 
+  NTWT ch1_ds1_4_hold, 22 
+  NOTE ch1_mute
+  RETN
+ch1_seq33::
+  NOTE ch1_duty50
+  NTWT ch1_e1_2_fadein, 22 
+  NTWT ch1_a0_2_hold, 22 
+  NTWT ch1_e1_3_hold, 22 
+  NTWT ch1_a0_3_hold, 22 
+  NTWT ch1_e1_4_fade, 22 
+  NTWT ch1_a0_4_fade, 22 
+  NTWT ch1_e1_3_fade, 22 
+  NTWT ch1_a0_3_fade, 22 
+  NTWT ch1_e1_2_fadein, 22 
+  NTWT ch1_a0_2_fade, 22 
+  NTWT ch1_e1_3_fade, 22 
+  NTWT ch1_a0_3_fade, 22 
+  NTWT ch1_e1_4_fade, 22 
+  NTWT ch1_a0_4_hold, 22 
+  NTWT ch1_e1_4_hold, 22 
+  NTWT ch1_a0_4_hold, 22 
+  NTWT ch1_f1_4_hold, 22 
+  NTWT ch1_d1_4_hold, 22 
+  NTWT ch1_f1_2_hold, 22 
+  NTWT ch1_d1_2_hold, 22 
+  NTWT ch1_f1_3_fade, 22 
+  NTWT ch1_d1_3_fade, 22 
+  NTWT ch1_f1_2_fade, 22 
+  NTWT ch1_d1_2_fade, 22 
+  NTWT ch1_f1_2_fadein, 22 
+  NTWT ch1_d1_2_fade, 22 
+  NTWT ch1_f1_2_fade, 22 
+  NTWT ch1_d1_2_fade, 22 
+  NTWT ch1_a0_3_fade, 22 
+  NTWT ch1_cs1_3_hold, 22 
+  NTWT ch1_e1_4_hold, 22 
+  NTWT ch1_cs1_4_hold, 22 
+  NOTE ch1_mute
+  RETN
+ch1_seq54::
+  NOTE ch1_duty25
+  NTWT ch1_d0_1_fade, 22 
+  NOTE ch1_duty50
+  NTWT ch1_d0_4_fade, 154 
+  NOTE ch1_duty50
+  NTWT ch1_d1_1_fade, 22 
+  NTWT ch1_f1_2_fade, 22 
+  NTWT ch1_f1_2_fade, 22 
+  NTWT ch1_d1_2_fade, 22 
+  NOTE ch1_duty50
+  NTWT ch1_d1_3_fade, 22 
+  NTWT ch1_f1_3_fade, 22 
+  NTWT ch1_f1_4_fade, 22 
+  NOTE ch1_duty125
+  NTWT ch1_d1_2_fade, 22 
+  NOTE ch1_duty25
+  NTWT ch1_cs0_1_fade, 22 
+  NOTE ch1_duty50
+  NTWT ch1_cs0_4_fade, 154 
+  NOTE ch1_duty50
+  NTWT ch1_e1_1_fade, 22 
+  NTWT ch1_gs1_2_fade, 22 
+  NTWT ch1_gs1_2_fade, 22 
+  NTWT ch1_e1_2_fade, 22 
+  NOTE ch1_duty50
+  NTWT ch1_e1_3_fade, 22 
+  NTWT ch1_a1_3_fade, 22 
+  NTWT ch1_a1_4_fade, 22 
+  NTWT ch1_gs1_1_fade, 22 
+  RETN
+ch1_seq55::
+  NOTE ch1_duty25
+  NTWT ch1_d0_1_fade, 22 
+  NOTE ch1_duty50
+  NTWT ch1_d0_4_fade, 154 
+  NOTE ch1_duty50
+  NTWT ch1_d1_1_fade, 22 
+  NTWT ch1_f1_2_fade, 22 
+  NTWT ch1_f1_2_fade, 22 
+  NTWT ch1_d1_2_fade, 22 
+  NOTE ch1_duty50
+  NTWT ch1_d1_3_fade, 22 
+  NTWT ch1_f1_3_fade, 22 
+  NTWT ch1_f1_4_fade, 22 
+  NOTE ch1_duty125
+  NTWT ch1_d1_2_fade, 22 
+  NOTE ch1_duty25
+  NTWT ch1_f0_1_fade, 22 
+  NOTE ch1_duty50
+  NTWT ch1_f0_4_fade, 154 
+  NOTE ch1_duty50
+  NTWT ch1_f1_1_fade, 22 
+  NTWT ch1_gs1_2_fade, 22 
+  NTWT ch1_gs1_2_fade, 22 
+  NTWT ch1_f1_2_fade, 22 
+  NOTE ch1_duty50
+  NTWT ch1_f1_3_fade, 22 
+  NTWT ch1_cs2_3_fade, 22 
+  NTWT ch1_cs2_4_fade, 22 
+  NTWT ch1_c2_1_fade, 22 
+  RETN
+ch1_seq56::
+  NOTE ch1_duty25
+  NTWT ch1_g0_1_fade, 22 
+  NOTE ch1_duty50
+  NTWT ch1_g0_4_fade, 154 
+  NOTE ch1_duty50
+  NTWT ch1_g1_1_fade, 22 
+  NTWT ch1_as1_2_fade, 22 
+  NTWT ch1_as1_2_fade, 22 
+  NTWT ch1_g1_2_fade, 22 
+  NOTE ch1_duty50
+  NTWT ch1_g1_3_fade, 22 
+  NTWT ch1_as1_3_fade, 22 
+  NTWT ch1_as1_4_fade, 22 
+  NOTE ch1_duty125
+  NTWT ch1_g1_2_fade, 22 
+  NOTE ch1_duty25
+  NTWT ch1_ds0_1_fade, 22 
+  NOTE ch1_duty50
+  NTWT ch1_ds0_4_fade, 154 
+  NOTE ch1_duty50
+  NTWT ch1_g1_1_fade, 22 
+  NTWT ch1_as1_2_fade, 22 
+  NTWT ch1_as1_2_fade, 22 
+  NTWT ch1_cs1_2_fade, 22 
+  NOTE ch1_duty50
+  NTWT ch1_ds1_3_fade, 22 
+  NTWT ch1_as1_3_fade, 22 
+  NTWT ch1_as1_4_fade, 22 
+  NTWT ch1_g1_1_fade, 22 
+  RETN
+ch1_seq57::
+  NOTE ch1_duty25
+  NTWT ch1_a0_1_fade, 22 
+  NOTE ch1_duty50
+  NTWT ch1_a0_4_fade, 154 
+  NOTE ch1_duty50
+  NTWT ch1_cs1_1_fade, 22 
+  NTWT ch1_a1_2_fade, 22 
+  NTWT ch1_a1_2_fade, 22 
+  NTWT ch1_e1_2_fade, 22 
+  NOTE ch1_duty50
+  NTWT ch1_f1_3_fade, 22 
+  NTWT ch1_as1_3_fade, 22 
+  NTWT ch1_as1_4_fade, 22 
+  NOTE ch1_duty50
+  NTWT ch1_a1_2_fade, 22 
+  NOTE ch1_duty25
+  NTWT ch1_as0_1_fade, 22 
+  NOTE ch1_duty50
+  NTWT ch1_as0_4_fade, 154 
+  NOTE ch1_duty50
+  NTWT ch1_d1_1_fade, 22 
+  NTWT ch1_e1_2_fade, 22 
+  NTWT ch1_f1_2_fade, 22 
+  NTWT ch1_d1_2_fade, 22 
+  NOTE ch1_duty50
+  NTWT ch1_cs1_3_fade, 22 
+  NTWT ch1_d1_3_fade, 22 
+  NTWT ch1_f1_4_fade, 22 
+  NTWT ch1_e1_1_fade, 22 
+  RETN
+ch1_seq59::
   WAIT 36
   NOTE ch1_duty50
   NTWT ch1_a1_3_fadein, 18 
@@ -1249,7 +1517,7 @@ seq59::
   NTWT ch1_fs2_4_fade, 18   ; TODO: vibrato
   NTWT ch1_fs2_4_fade, 90 
   RETN
-seq63::
+ch1_seq63::
   WAIT 152
   NOTE ch1_duty125
   NTWT ch1_as0_4_fade, 57   ; TODO: drop
@@ -1262,7 +1530,7 @@ seq63::
   NTWT ch1_d0_7_fade, 266   ; TODO: vibrato
   RETN
 
-seq26::
+ch2_seq26::
   WAIT 66
   NOTE ch2_duty50
   NTWT ch2_a1_1_fade, 22 
@@ -1292,7 +1560,7 @@ seq26::
   NTWT ch2_gs1_1_hold, 22 
   NOTE ch2_mute
   RETN
-seq27::
+ch2_seq27::
   WAIT 66
   NOTE ch2_duty50
   NTWT ch2_a1_1_fade, 22 
@@ -1320,7 +1588,7 @@ seq27::
   NTWT ch2_cs2_1_hold, 22 
   NOTE ch2_mute
   RETN
-seq28::
+ch2_seq28::
   WAIT 66
   NOTE ch2_duty50
   NTWT ch2_as2_1_fade, 22 
@@ -1348,7 +1616,7 @@ seq28::
   NTWT ch2_a1_1_hold, 22 
   NOTE ch2_mute
   RETN
-seq29::
+ch2_seq29::
   WAIT 22
   NOTE ch2_duty50
   NTWT ch2_cs2_1_fade, 22 
@@ -1380,7 +1648,7 @@ seq29::
   NTWT ch2_e3_1_fade, 22   ; TODO: vibrato
   NTWT ch2_e3_1_fade, 44 
   RETN
-seq36::
+ch2_seq36::
   WAIT 22
   NOTE ch2_duty50
   NTWT ch2_a2_1_hold, 22 
@@ -1415,7 +1683,7 @@ seq36::
   NTWT ch2_gs2_1_fade, 22 
   NTWT ch2_cs1_1_fade, 22 
   RETN
-seq40::
+ch2_seq40::
   WAIT 22
   NOTE ch2_duty50
   NTWT ch2_a2_1_fadein, 22 
@@ -1450,7 +1718,7 @@ seq40::
   NTWT ch2_gs2_1_fade, 22 
   NTWT ch2_e1_1_fade, 22 
   RETN
-seq46::
+ch2_seq46::
   WAIT 22
   NOTE ch2_duty50
   NTWT ch2_as2_1_fade, 22   ; TODO: vibrato
@@ -1485,7 +1753,7 @@ seq46::
   NTWT ch2_g2_1_fade, 22 
   NTWT ch2_ds1_1_fade, 22 
   RETN
-seq47::
+ch2_seq47::
   WAIT 22
   NOTE ch2_duty50
   NTWT ch2_a2_1_fadein, 22 
@@ -1520,275 +1788,130 @@ seq47::
   NTWT ch2_f2_1_fade, 22 
   NTWT ch2_e2_1_fade, 22 
   RETN
-seq30::
+ch2_seq37::
+  WAIT 44
   NOTE ch2_duty50
-  NTWT ch2_a0_1_fadein, 22 
-  NTWT ch2_d1_2_hold, 22 
-  NTWT ch2_f1_3_hold, 22 
-  NTWT ch2_d1_3_hold, 22 
-  NTWT ch2_a0_2_fade, 22 
-  NTWT ch2_d1_2_fade, 22 
-  NTWT ch2_f1_3_fade, 22 
-  NTWT ch2_d0_3_fade, 22 
-  NTWT ch2_f0_2_fadein, 22 
-  NTWT ch2_d1_2_fade, 22 
-  NTWT ch2_f1_3_fade, 22 
-  NTWT ch2_d1_3_fade, 22 
-  NTWT ch2_a0_4_fade, 22 
-  NTWT ch2_d1_4_hold, 22 
-  NTWT ch2_f1_4_hold, 22 
-  NTWT ch2_d0_4_hold, 22 
-  NTWT ch2_gs0_4_hold, 22 
-  NTWT ch2_cs1_4_hold, 22 
-  NTWT ch2_e1_2_hold, 22 
+  NTWT ch2_a1_1_fade, 22 
+  NTWT ch2_a1_1_fade, 22 
+  NTWT ch2_d2_2_fade, 22 
+  NTWT ch2_d2_1_fade, 22 
+  NTWT ch2_f2_1_fade, 22 
+  NTWT ch2_f2_1_fade, 22 
+  NTWT ch2_as2_2_fade, 22 
+  NTWT ch2_as2_1_fade, 22 
+  NTWT ch2_a2_2_fade, 22 
+  NTWT ch2_a2_1_fade, 22 
+  NTWT ch2_f2_2_fade, 22 
+  NTWT ch2_f2_1_fade, 22 
+  NTWT ch2_a1_2_fade, 22 
+  NTWT ch2_a1_1_fade, 22 
+  NTWT ch2_gs1_2_hold, 22 
+  NTWT ch2_gs1_2_fade, 22   ; TODO: vibrato
+  NTWT ch2_gs1_2_fade, 22 
+  NTWT ch2_gs1_1_fade, 110 
+  NTWT ch2_e1_1_fadein, 22 
+  NTWT ch2_c1_1_hold, 22 
   NTWT ch2_cs1_2_hold, 22 
-  NTWT ch2_gs0_3_fade, 22 
-  NTWT ch2_cs1_3_fade, 22 
-  NTWT ch2_e1_2_fade, 22 
-  NTWT ch2_cs0_2_fade, 22 
-  NTWT ch2_e0_2_fadein, 22 
-  NTWT ch2_cs1_2_fade, 22 
-  NTWT ch2_e1_2_fade, 22 
-  NTWT ch2_cs1_2_fade, 22 
-  NTWT ch2_gs0_3_fade, 22 
-  NTWT ch2_cs1_3_hold, 22 
-  NTWT ch2_e1_4_hold, 22 
-  NTWT ch2_cs0_4_hold, 22 
-  NOTE ch2_mute
-  RETN
-seq31::
-  NOTE ch2_duty50
-  NTWT ch2_a0_2_fadein, 22 
-  NTWT ch2_d1_2_hold, 22 
-  NTWT ch2_f1_3_hold, 22 
-  NTWT ch2_d1_3_hold, 22 
-  NTWT ch2_a0_4_fade, 22 
-  NTWT ch2_d1_4_fade, 22 
-  NTWT ch2_f1_3_fade, 22 
-  NTWT ch2_d1_3_fade, 22 
-  NTWT ch2_f1_2_fadein, 22 
-  NTWT ch2_d1_2_fade, 22 
-  NTWT ch2_f1_3_fade, 22 
-  NTWT ch2_d1_3_fade, 22 
-  NTWT ch2_a0_4_fade, 22 
-  NTWT ch2_d1_4_hold, 22 
-  NTWT ch2_f1_4_hold, 22 
-  NTWT ch2_d1_4_hold, 22 
-  NTWT ch2_gs0_4_hold, 22 
-  NTWT ch2_cs1_4_hold, 22 
-  NTWT ch2_f1_2_hold, 22 
-  NTWT ch2_cs1_2_hold, 22 
-  NTWT ch2_gs0_3_fade, 22 
-  NTWT ch2_cs1_3_fade, 22 
-  NTWT ch2_f1_2_fade, 22 
-  NTWT ch2_cs1_2_fade, 22 
-  NTWT ch2_f1_2_fadein, 22 
-  NTWT ch2_cs1_2_fade, 22 
-  NTWT ch2_f1_2_fade, 22 
-  NTWT ch2_cs1_2_fade, 22 
-  NTWT ch2_gs0_3_fade, 22 
-  NTWT ch2_cs1_3_hold, 22 
-  NTWT ch2_f1_4_hold, 22 
-  NTWT ch2_cs1_4_hold, 22 
-  NOTE ch2_mute
-  RETN
-seq32::
-  NOTE ch2_duty50
-  NTWT ch2_as0_2_fadein, 22 
-  NTWT ch2_d1_2_hold, 22 
-  NTWT ch2_g1_3_hold, 22 
-  NTWT ch2_d1_3_hold, 22 
-  NTWT ch2_as0_4_fade, 22 
-  NTWT ch2_d1_4_fade, 22 
-  NTWT ch2_g1_3_fade, 22 
-  NTWT ch2_d1_3_fade, 22 
-  NTWT ch2_g1_2_fadein, 22 
-  NTWT ch2_d1_2_fade, 22 
-  NTWT ch2_g1_3_fade, 22 
-  NTWT ch2_d1_3_fade, 22 
-  NTWT ch2_as0_4_fade, 22 
-  NTWT ch2_d1_4_hold, 22 
-  NTWT ch2_g1_4_hold, 22 
-  NTWT ch2_d1_4_hold, 22 
-  NTWT ch2_as0_4_hold, 22 
-  NTWT ch2_ds1_4_hold, 22 
-  NTWT ch2_g1_2_hold, 22 
-  NTWT ch2_ds1_2_hold, 22 
-  NTWT ch2_as0_3_fade, 22 
-  NTWT ch2_ds1_3_fade, 22 
-  NTWT ch2_g1_2_fade, 22 
-  NTWT ch2_ds1_2_fade, 22 
-  NTWT ch2_g1_2_fadein, 22 
-  NTWT ch2_ds1_2_fade, 22 
-  NTWT ch2_g1_2_fade, 22 
-  NTWT ch2_ds1_2_fade, 22 
-  NTWT ch2_as0_3_fade, 22 
-  NTWT ch2_ds1_3_hold, 22 
-  NTWT ch2_g1_4_hold, 22 
-  NTWT ch2_ds1_4_hold, 22 
-  NOTE ch2_mute
-  RETN
-seq33::
-  NOTE ch2_duty50
-  NTWT ch2_e1_2_fadein, 22 
-  NTWT ch2_a0_2_hold, 22 
   NTWT ch2_e1_3_hold, 22 
-  NTWT ch2_a0_3_hold, 22 
-  NTWT ch2_e1_4_fade, 22 
-  NTWT ch2_a0_4_fade, 22 
-  NTWT ch2_e1_3_fade, 22 
-  NTWT ch2_a0_3_fade, 22 
-  NTWT ch2_e1_2_fadein, 22 
-  NTWT ch2_a0_2_fade, 22 
-  NTWT ch2_e1_3_fade, 22 
-  NTWT ch2_a0_3_fade, 22 
-  NTWT ch2_e1_4_fade, 22 
-  NTWT ch2_a0_4_hold, 22 
-  NTWT ch2_e1_4_hold, 22 
-  NTWT ch2_a0_4_hold, 22 
-  NTWT ch2_f1_4_hold, 22 
-  NTWT ch2_d1_4_hold, 22 
-  NTWT ch2_f1_2_hold, 22 
-  NTWT ch2_d1_2_hold, 22 
-  NTWT ch2_f1_3_fade, 22 
-  NTWT ch2_d1_3_fade, 22 
-  NTWT ch2_f1_2_fade, 22 
-  NTWT ch2_d1_2_fade, 22 
-  NTWT ch2_f1_2_fadein, 22 
-  NTWT ch2_d1_2_fade, 22 
-  NTWT ch2_f1_2_fade, 22 
-  NTWT ch2_d1_2_fade, 22 
-  NTWT ch2_a0_3_fade, 22 
-  NTWT ch2_cs1_3_hold, 22 
-  NTWT ch2_e1_4_hold, 22 
-  NTWT ch2_cs1_4_hold, 22 
+  NTWT ch2_gs1_3_hold, 22 
+  NTWT ch2_a1_2_hold, 22 
+  NTWT ch2_gs1_1_fade, 22   ; TODO: vibrato
+  NTWT ch2_e1_1_fade, 22 
+  RETN
+ch2_seq41::
+  WAIT 44
+  NOTE ch2_duty50
+  NTWT ch2_a1_1_fade, 22 
+  NTWT ch2_a1_1_fade, 22 
+  NTWT ch2_d2_2_fade, 22 
+  NTWT ch2_d2_1_fade, 22 
+  NTWT ch2_f2_2_fade, 22 
+  NTWT ch2_f2_1_fade, 22 
+  NTWT ch2_as2_2_fade, 22 
+  NTWT ch2_as2_1_fade, 22 
+  NTWT ch2_a2_1_fade, 22 
+  NTWT ch2_a2_1_fade, 22 
+  NTWT ch2_f2_2_fade, 22 
+  NTWT ch2_f2_1_fade, 22 
+  NTWT ch2_d3_1_fade, 22 
+  NTWT ch2_d3_1_fade, 22 
+  NTWT ch2_cs3_2_hold, 22 
+  NTWT ch2_cs3_1_fade, 22   ; TODO: vibrato
+  NTWT ch2_cs3_1_fade, 22 
+  NTWT ch2_cs3_1_fade, 132 
+  NTWT ch2_cs1_2_hold, 22 
+  NTWT ch2_f1_3_hold, 22 
+  NTWT ch2_gs1_4_hold, 22 
+  NTWT ch2_a1_5_hold, 22 
+  NTWT ch2_gs1_4_hold, 22 
+  NTWT ch2_cs2_3_hold, 22 
+  NTWT ch2_f2_1_hold, 22 
   NOTE ch2_mute
   RETN
-seq54::
-  NOTE ch2_duty25
-  NTWT ch2_d0_1_fade, 22 
+ch2_seq48::
+  WAIT 44
   NOTE ch2_duty50
-  NTWT ch2_d0_4_fade, 154 
-  NOTE ch2_duty50
-  NTWT ch2_d1_1_fade, 22 
-  NTWT ch2_f1_2_fade, 22 
-  NTWT ch2_f1_2_fade, 22 
-  NTWT ch2_d1_2_fade, 22 
-  NOTE ch2_duty50
-  NTWT ch2_d1_3_fade, 22 
-  NTWT ch2_f1_3_fade, 22 
-  NTWT ch2_f1_4_fade, 22 
-  NOTE ch2_duty125
-  NTWT ch2_d1_2_fade, 22 
-  NOTE ch2_duty25
-  NTWT ch2_cs0_1_fade, 22 
-  NOTE ch2_duty50
-  NTWT ch2_cs0_4_fade, 154 
-  NOTE ch2_duty50
-  NTWT ch2_e1_1_fade, 22 
-  NTWT ch2_gs1_2_fade, 22 
-  NTWT ch2_gs1_2_fade, 22 
-  NTWT ch2_e1_2_fade, 22 
-  NOTE ch2_duty50
-  NTWT ch2_e1_3_fade, 22 
-  NTWT ch2_a1_3_fade, 22 
-  NTWT ch2_a1_4_fade, 22 
-  NTWT ch2_gs1_1_fade, 22 
-  RETN
-seq55::
-  NOTE ch2_duty25
-  NTWT ch2_d0_1_fade, 22 
-  NOTE ch2_duty50
-  NTWT ch2_d0_4_fade, 154 
-  NOTE ch2_duty50
-  NTWT ch2_d1_1_fade, 22 
-  NTWT ch2_f1_2_fade, 22 
-  NTWT ch2_f1_2_fade, 22 
-  NTWT ch2_d1_2_fade, 22 
-  NOTE ch2_duty50
-  NTWT ch2_d1_3_fade, 22 
-  NTWT ch2_f1_3_fade, 22 
-  NTWT ch2_f1_4_fade, 22 
-  NOTE ch2_duty125
-  NTWT ch2_d1_2_fade, 22 
-  NOTE ch2_duty25
-  NTWT ch2_f0_1_fade, 22 
-  NOTE ch2_duty50
-  NTWT ch2_f0_4_fade, 154 
-  NOTE ch2_duty50
-  NTWT ch2_f1_1_fade, 22 
-  NTWT ch2_gs1_2_fade, 22 
-  NTWT ch2_gs1_2_fade, 22 
-  NTWT ch2_f1_2_fade, 22 
-  NOTE ch2_duty50
-  NTWT ch2_f1_3_fade, 22 
-  NTWT ch2_cs2_3_fade, 22 
-  NTWT ch2_cs2_4_fade, 22 
-  NTWT ch2_c2_1_fade, 22 
-  RETN
-seq56::
-  NOTE ch2_duty25
-  NTWT ch2_g0_1_fade, 22 
-  NOTE ch2_duty50
-  NTWT ch2_g0_4_fade, 154 
-  NOTE ch2_duty50
-  NTWT ch2_g1_1_fade, 22 
-  NTWT ch2_as1_2_fade, 22 
-  NTWT ch2_as1_2_fade, 22 
-  NTWT ch2_g1_2_fade, 22 
-  NOTE ch2_duty50
-  NTWT ch2_g1_3_fade, 22 
-  NTWT ch2_as1_3_fade, 22 
-  NTWT ch2_as1_4_fade, 22 
-  NOTE ch2_duty125
-  NTWT ch2_g1_2_fade, 22 
-  NOTE ch2_duty25
-  NTWT ch2_ds0_1_fade, 22 
-  NOTE ch2_duty50
-  NTWT ch2_ds0_4_fade, 154 
-  NOTE ch2_duty50
-  NTWT ch2_g1_1_fade, 22 
-  NTWT ch2_as1_2_fade, 22 
-  NTWT ch2_as1_2_fade, 22 
-  NTWT ch2_cs1_2_fade, 22 
-  NOTE ch2_duty50
-  NTWT ch2_ds1_3_fade, 22 
-  NTWT ch2_as1_3_fade, 22 
-  NTWT ch2_as1_4_fade, 22 
+  NTWT ch2_as2_1_fade, 22 
+  NTWT ch2_as2_1_fade, 22 
+  NTWT ch2_g2_2_fade, 22 
+  NTWT ch2_g2_1_fade, 22 
+  NTWT ch2_d2_1_fade, 22 
+  NTWT ch2_d2_1_fade, 22 
+  NTWT ch2_as2_2_fade, 22 
+  NTWT ch2_as2_1_fade, 22 
+  NTWT ch2_g2_1_fade, 22 
+  NTWT ch2_g2_1_fade, 22 
+  NTWT ch2_cs2_2_hold, 22 
+  NTWT ch2_cs2_2_fade, 22   ; TODO: vibrato
+  NTWT ch2_d2_2_fade, 22 
+  NTWT ch2_d2_1_fade, 22 
+  NTWT ch2_g2_2_hold, 22 
+  NTWT ch2_g2_2_fade, 22   ; TODO: vibrato
+  NTWT ch2_g2_1_fade, 22 
+  NTWT ch2_g2_1_fade, 132 
+  NTWT ch2_ds1_1_hold, 22 
+  NTWT ch2_g1_2_hold, 22 
+  NTWT ch2_as1_3_hold, 22 
+  NTWT ch2_a1_3_hold, 22 
+  NTWT ch2_as1_3_fade, 22   ; TODO: vibrato
+  NTWT ch2_a1_2_hold, 22 
   NTWT ch2_g1_1_fade, 22 
   RETN
-seq57::
-  NOTE ch2_duty25
-  NTWT ch2_a0_1_fade, 22 
+ch2_seq49::
   NOTE ch2_duty50
-  NTWT ch2_a0_4_fade, 154 
-  NOTE ch2_duty50
-  NTWT ch2_cs1_1_fade, 22 
-  NTWT ch2_a1_2_fade, 22 
-  NTWT ch2_a1_2_fade, 22 
-  NTWT ch2_e1_2_fade, 22 
-  NOTE ch2_duty50
-  NTWT ch2_f1_3_fade, 22 
-  NTWT ch2_as1_3_fade, 22 
-  NTWT ch2_as1_4_fade, 22 
-  NOTE ch2_duty50
-  NTWT ch2_a1_2_fade, 22 
-  NOTE ch2_duty25
-  NTWT ch2_as0_1_fade, 22 
-  NOTE ch2_duty50
-  NTWT ch2_as0_4_fade, 154 
-  NOTE ch2_duty50
-  NTWT ch2_d1_1_fade, 22 
-  NTWT ch2_e1_2_fade, 22 
-  NTWT ch2_f1_2_fade, 22 
-  NTWT ch2_d1_2_fade, 22 
-  NOTE ch2_duty50
-  NTWT ch2_cs1_3_fade, 22 
-  NTWT ch2_d1_3_fade, 22 
-  NTWT ch2_f1_4_fade, 22 
-  NTWT ch2_e1_1_fade, 22 
+  NTWT ch2_cs2_2_fade, 22 
+  NTWT ch2_cs2_1_fade, 22 
+  NTWT ch2_as2_2_fade, 22 
+  NTWT ch2_as2_1_fade, 22 
+  NTWT ch2_a2_1_fade, 22 
+  NTWT ch2_a2_1_fade, 22 
+  NTWT ch2_e2_2_fade, 22 
+  NTWT ch2_e2_1_fade, 22 
+  NTWT ch2_as2_2_fade, 22 
+  NTWT ch2_as2_1_fade, 22 
+  NTWT ch2_a2_2_fade, 22 
+  NTWT ch2_a2_1_fade, 22 
+  NTWT ch2_e2_2_fade, 22   ; TODO: vibrato
+  NTWT ch2_e2_1_fade, 22 
+  NTWT ch2_f2_2_fade, 22 
+  NTWT ch2_f2_1_fade, 22 
+  NTWT ch2_gs2_2_hold, 22 
+  NTWT ch2_gs2_2_fade, 22   ; TODO: vibrato
+  NTWT ch2_gs2_1_fade, 22 
+  NTWT ch2_gs2_1_fade, 44 
+  NTWT ch2_d2_1_fade, 22 
+  NTWT ch2_f2_1_fade, 22 
+  NTWT ch2_as2_1_fade, 22 
+  NTWT ch2_d3_1_fade, 22   ; TODO: vibrato
+  NTWT ch2_d3_1_fade, 22   ; TODO: vibrato
+  NTWT ch2_e3_1_hold, 22 
+  NTWT ch2_d3_1_fade, 22   ; TODO: arpreggio
+  NTWT ch2_cs3_1_hold, 22 
+  NTWT ch2_cs3_1_fade, 22   ; TODO: vibrato
+  NTWT ch2_cs3_1_hold, 22 
+  NTWT ch2_cs3_1_fade, 22 
   RETN
-seq58::
+ch2_seq58::
   NOTE ch2_duty50
   NTWT ch2_fs2_2_hold, 18 
   NTWT ch2_fs2_2_hold, 18 
@@ -1819,7 +1942,7 @@ seq58::
   NTWT ch2_d3_2_fade, 18   ; TODO: vibrato
   NTWT ch2_d3_2_fade, 90   ; TODO: vibrato
   RETN
-seq61::
+ch2_seq61::
   NOTE ch2_duty25
   NTWT ch2_cs1_2_hold, 19 
   NTWT ch2_c1_2_hold, 19 
@@ -1839,7 +1962,7 @@ seq61::
   NTWT ch2_d3_3_fade, 266 
   RETN
 
-seq0::
+sfx_seq0::
   NTWT ch2_cs4_7_hold, 2 
   NTWT ch2_cs4_7_hold, 2 
   NTWT ch2_mute, 4
@@ -1860,7 +1983,7 @@ seq0::
   NTWT ch2_cs4_6_hold, 2 
   NTWT ch2_mute, 20
   NOFX
-seq1::
+sfx_seq1::
   NTWT ch2_cs4_5_hold, 1 
   NTWT ch2_cs4_5_hold, 1 
   NTWT ch2_c4_5_hold, 1 
@@ -1889,7 +2012,7 @@ seq1::
   NTWT ch2_g0_5_hold, 1 
   NTWT ch2_mute, 6
   NOFX
-seq2::
+sfx_seq2::
   NTWT ch2_c3_5_hold, 1 
   NTWT ch2_as3_6_hold, 1 
   NTWT ch2_g3_6_hold, 1 
@@ -1899,7 +2022,7 @@ seq2::
   NTWT ch2_d2_5_hold, 1 
   NTWT ch2_mute, 25
   NOFX
-seq3::
+sfx_seq3::
   NTWT ch2_c3_5_hold, 1 
   NOTE ch2_mute
   NTWT ch2_ds4_6_hold, 1 
@@ -1910,7 +2033,7 @@ seq3::
   NTWT ch2_as4_5_hold, 1 
   NTWT ch2_mute, 25
   NOFX
-seq4::
+sfx_seq4::
   NTWT ch4_a0_6_hold, 3 
   NTWT ch4_f1_7_hold, 3 
   NTWT ch4_f0_6_hold, 3 
@@ -1923,12 +2046,12 @@ seq4::
   NTWT ch4_d0_5_hold, 3 
   NTWT ch4_d0_5_fade, 21 
   NOFX
-seq5::
+sfx_seq5::
   NTWT ch2_gs1_6_hold, 1 
   NTWT ch2_d2_6_hold, 1 
   NTWT ch2_mute, 30
   NOFX
-seq6::
+sfx_seq6::
   NTWT ch2_a2_5_hold, 1 
   NTWT ch2_a2_7_hold, 1 
   NTWT ch2_a1_7_hold, 1 
@@ -1945,7 +2068,7 @@ seq6::
   NTWT ch4_c1_5_hold, 1 
   NTWT ch4_mute, 19
   NOFX
-seq7::
+sfx_seq7::
   NTWT ch4_ds2_5_hold, 1 
   NOTE ch4_mute
   NTWT ch2_fs0_7_hold, 1 
@@ -1960,7 +2083,7 @@ seq7::
   NTWT ch4_gs0_5_hold, 1 
   NTWT ch4_mute, 22
   NOFX
-seq8::
+sfx_seq8::
   NTWT ch2_g2_7_hold, 1 
   NTWT ch2_g3_7_hold, 1 
   NTWT ch2_as3_7_hold, 1 
@@ -1982,7 +2105,7 @@ seq8::
   NTWT ch2_f3_5_hold, 1 
   NTWT ch2_mute, 6
   NOFX
-seq9::
+sfx_seq9::
   NTWT ch2_g1_6_hold, 1 
   NTWT ch2_g1_6_hold, 1 
   NTWT ch2_g1_7_hold, 1 
@@ -2015,7 +2138,7 @@ seq9::
   NTWT ch2_as0_5_hold, 1 
   NTWT ch2_mute, 2
   NOFX
-seq10::
+sfx_seq10::
   NTWT ch2_e1_7_hold, 1 
   NTWT ch2_e1_7_hold, 1 
   NTWT ch2_e2_7_hold, 1 
@@ -2030,7 +2153,7 @@ seq10::
   NTWT ch2_c5_7_hold, 1 
   NTWT ch2_mute, 20
   NOFX
-seq11::
+sfx_seq11::
   NTWT ch2_f4_7_hold, 1 
   NTWT ch2_b3_7_hold, 1 
   NTWT ch2_gs3_7_hold, 1 
@@ -2052,13 +2175,13 @@ seq11::
   NTWT ch2_c2_5_hold, 1 
   NTWT ch2_mute, 13
   NOFX
-seq12::
+sfx_seq12::
   NTWT ch2_cs1_6_hold, 1 
   NTWT ch2_g1_6_hold, 1 
   NTWT ch2_cs1_5_hold, 1 
   NTWT ch2_mute, 29
   NOFX
-seq13::
+sfx_seq13::
   NTWT ch2_a2_7_hold, 1 
   NTWT ch2_ds3_7_hold, 1 
   NTWT ch2_cs3_7_hold, 1 
@@ -2067,7 +2190,7 @@ seq13::
   NTWT ch2_cs1_5_hold, 1 
   NTWT ch2_mute, 26
   NOFX
-seq14::
+sfx_seq14::
   NTWT ch4_b2_7_hold, 3 
   NTWT ch4_gs3_7_hold, 3 
   NTWT ch4_gs2_7_hold, 3 
@@ -2088,7 +2211,7 @@ seq14::
   NTWT ch4_d0_5_hold, 3 
   NTWT ch4_mute, 42
   NOFX
-seq15::
+sfx_seq15::
   NTWT ch2_a1_6_hold, 16 
   NTWT ch2_d2_6_hold, 16 
   NTWT ch2_f2_7_hold, 16 
@@ -2100,7 +2223,7 @@ seq15::
   NTWT ch2_gs1_6_hold, 16 
   NTWT ch2_mute, 368
   NOFX
-seq16::
+sfx_seq16::
   NTWT ch4_gs2_7_hold, 2 
   NTWT ch4_f2_7_hold, 2 
   NTWT ch4_f2_6_hold, 2 
@@ -2118,7 +2241,7 @@ seq16::
   NTWT ch4_cs2_5_hold, 2 
   NTWT ch4_mute, 22
   NOFX
-seq17::
+sfx_seq17::
   NTWT ch4_ds4_7_hold, 2 
   NTWT ch4_gs4_7_hold, 2 
   NTWT ch4_c5_6_hold, 2 
@@ -2127,7 +2250,7 @@ seq17::
   NTWT ch4_d5_5_fade, 2 
   NTWT ch4_d5_5_fade, 52 
   NOFX
-seq18::
+sfx_seq18::
   NTWT ch2_as2_5_hold, 2 
   NTWT ch2_d3_5_hold, 2 
   NOTE ch2_mute
@@ -2138,7 +2261,7 @@ seq18::
   NTWT ch4_d1_5_hold, 2 
   NTWT ch4_mute, 46
   NOFX
-seq19::
+sfx_seq19::
   NTWT ch4_ds0_7_hold, 2 
   NTWT ch4_mute, 2
   NTWT ch4_fs0_6_hold, 2 
@@ -2154,7 +2277,7 @@ seq19::
   NTWT ch4_d0_5_hold, 2 
   NTWT ch4_mute, 40
   NOFX
-seq20::
+sfx_seq20::
   NTWT ch2_e2_7_hold, 2 
   NTWT ch2_e2_7_hold, 2 
   NTWT ch2_mute, 4
@@ -2182,7 +2305,7 @@ seq20::
   NTWT ch2_a4_5_hold, 2 
   NTWT ch2_mute, 2
   NOFX
-seq21::
+sfx_seq21::
   NTWT ch2_c3_5_hold, 1 
   NOTE ch2_mute
   NTWT ch2_ds4_6_hold, 1 
@@ -2218,56 +2341,55 @@ seq21::
   NOFX
 
 CH12_NOTE    ch12_cs0 0x94 0x80
-CH2_NOTE_ENV ch2_cs0_1_fade ENV_1FADE ch12_cs0
-CH2_NOTE_ENV ch2_cs0_2_fade ENV_2FADE ch12_cs0
-CH2_NOTE_ENV ch2_cs0_4_hold ENV_4HOLD ch12_cs0
-CH2_NOTE_ENV ch2_cs0_4_fade ENV_4FADE ch12_cs0
+CH1_NOTE_ENV ch1_cs0_1_fade ENV_1FADE ch12_cs0
+CH1_NOTE_ENV ch1_cs0_2_fade ENV_2FADE ch12_cs0
+CH1_NOTE_ENV ch1_cs0_4_hold ENV_4HOLD ch12_cs0
+CH1_NOTE_ENV ch1_cs0_4_fade ENV_4FADE ch12_cs0
 CH2_NOTE_ENV ch2_cs0_5_hold ENV_5HOLD ch12_cs0
 CH12_NOTE    ch12_d0  0x05 0x81
-CH2_NOTE_ENV ch2_d0_1_fade  ENV_1FADE ch12_d0
-CH2_NOTE_ENV ch2_d0_3_fade  ENV_3FADE ch12_d0
-CH2_NOTE_ENV ch2_d0_4_hold  ENV_4HOLD ch12_d0
-CH2_NOTE_ENV ch2_d0_4_fade  ENV_4FADE ch12_d0
+CH1_NOTE_ENV ch1_d0_1_fade  ENV_1FADE ch12_d0
+CH1_NOTE_ENV ch1_d0_3_fade  ENV_3FADE ch12_d0
+CH1_NOTE_ENV ch1_d0_4_hold  ENV_4HOLD ch12_d0
+CH1_NOTE_ENV ch1_d0_4_fade  ENV_4FADE ch12_d0
 CH1_NOTE_ENV ch1_d0_7_fade  ENV_7FADE ch12_d0
 CH12_NOTE    ch12_ds0 0x6a 0x81
-CH2_NOTE_ENV ch2_ds0_1_fade ENV_1FADE ch12_ds0
-CH2_NOTE_ENV ch2_ds0_4_fade ENV_4FADE ch12_ds0
+CH1_NOTE_ENV ch1_ds0_1_fade ENV_1FADE ch12_ds0
+CH1_NOTE_ENV ch1_ds0_4_fade ENV_4FADE ch12_ds0
 CH2_NOTE_ENV ch2_ds0_5_hold ENV_5HOLD ch12_ds0
 CH12_NOTE    ch12_e0  0xc3 0x81
-CH2_NOTE_ENV ch2_e0_2_fadein ENV_2FADEIN ch12_e0
+CH1_NOTE_ENV ch1_e0_2_fadein ENV_2FADEIN ch12_e0
 CH12_NOTE    ch12_f0  0x20 0x82
-CH2_NOTE_ENV ch2_f0_1_fade  ENV_1FADE ch12_f0
-CH2_NOTE_ENV ch2_f0_2_fadein ENV_2FADEIN ch12_f0
-CH2_NOTE_ENV ch2_f0_4_fade  ENV_4FADE ch12_f0
+CH1_NOTE_ENV ch1_f0_1_fade  ENV_1FADE ch12_f0
+CH1_NOTE_ENV ch1_f0_2_fadein ENV_2FADEIN ch12_f0
+CH1_NOTE_ENV ch1_f0_4_fade  ENV_4FADE ch12_f0
 CH12_NOTE    ch12_fs0 0x72 0x82
 CH2_NOTE_ENV ch2_fs0_5_hold ENV_5HOLD ch12_fs0
 CH2_NOTE_ENV ch2_fs0_7_hold ENV_7HOLD ch12_fs0
 CH12_NOTE    ch12_g0  0xc5 0x82
-CH2_NOTE_ENV ch2_g0_1_fade  ENV_1FADE ch12_g0
-CH2_NOTE_ENV ch2_g0_4_fade  ENV_4FADE ch12_g0
+CH1_NOTE_ENV ch1_g0_1_fade  ENV_1FADE ch12_g0
+CH1_NOTE_ENV ch1_g0_4_fade  ENV_4FADE ch12_g0
 CH2_NOTE_ENV ch2_g0_5_hold  ENV_5HOLD ch12_g0
 CH12_NOTE    ch12_gs0 0x0f 0x83
-CH2_NOTE_ENV ch2_gs0_3_fade ENV_3FADE ch12_gs0
-CH2_NOTE_ENV ch2_gs0_4_hold ENV_4HOLD ch12_gs0
+CH1_NOTE_ENV ch1_gs0_3_fade ENV_3FADE ch12_gs0
+CH1_NOTE_ENV ch1_gs0_4_hold ENV_4HOLD ch12_gs0
 CH12_NOTE    ch12_a0  0x55 0x83
-CH2_NOTE_ENV ch2_a0_1_fadein ENV_1FADEIN ch12_a0
-CH2_NOTE_ENV ch2_a0_1_fade  ENV_1FADE ch12_a0
-CH2_NOTE_ENV ch2_a0_2_hold  ENV_2HOLD ch12_a0
-CH2_NOTE_ENV ch2_a0_2_fadein ENV_2FADEIN ch12_a0
-CH2_NOTE_ENV ch2_a0_2_fade  ENV_2FADE ch12_a0
-CH2_NOTE_ENV ch2_a0_3_hold  ENV_3HOLD ch12_a0
-CH2_NOTE_ENV ch2_a0_3_fade  ENV_3FADE ch12_a0
-CH2_NOTE_ENV ch2_a0_4_hold  ENV_4HOLD ch12_a0
-CH2_NOTE_ENV ch2_a0_4_fade  ENV_4FADE ch12_a0
+CH1_NOTE_ENV ch1_a0_1_fadein ENV_1FADEIN ch12_a0
+CH1_NOTE_ENV ch1_a0_1_fade  ENV_1FADE ch12_a0
+CH1_NOTE_ENV ch1_a0_2_hold  ENV_2HOLD ch12_a0
+CH1_NOTE_ENV ch1_a0_2_fadein ENV_2FADEIN ch12_a0
+CH1_NOTE_ENV ch1_a0_2_fade  ENV_2FADE ch12_a0
+CH1_NOTE_ENV ch1_a0_3_hold  ENV_3HOLD ch12_a0
+CH1_NOTE_ENV ch1_a0_3_fade  ENV_3FADE ch12_a0
+CH1_NOTE_ENV ch1_a0_4_hold  ENV_4HOLD ch12_a0
+CH1_NOTE_ENV ch1_a0_4_fade  ENV_4FADE ch12_a0
 CH2_NOTE_ENV ch2_a0_5_hold  ENV_5HOLD ch12_a0
 CH1_NOTE_ENV ch1_a0_6_hold  ENV_6HOLD ch12_a0
 CH12_NOTE    ch12_as0 0x9a 0x83
-CH2_NOTE_ENV ch2_as0_1_fade ENV_1FADE ch12_as0
-CH2_NOTE_ENV ch2_as0_2_fadein ENV_2FADEIN ch12_as0
-CH2_NOTE_ENV ch2_as0_3_fade ENV_3FADE ch12_as0
-CH2_NOTE_ENV ch2_as0_4_hold ENV_4HOLD ch12_as0
+CH1_NOTE_ENV ch1_as0_1_fade ENV_1FADE ch12_as0
+CH1_NOTE_ENV ch1_as0_2_fadein ENV_2FADEIN ch12_as0
+CH1_NOTE_ENV ch1_as0_3_fade ENV_3FADE ch12_as0
+CH1_NOTE_ENV ch1_as0_4_hold ENV_4HOLD ch12_as0
 CH1_NOTE_ENV ch1_as0_4_fade ENV_4FADE ch12_as0
-CH2_NOTE_ENV ch2_as0_4_fade ENV_4FADE ch12_as0
 CH2_NOTE_ENV ch2_as0_5_hold ENV_5HOLD ch12_as0
 CH1_NOTE_ENV ch1_as0_6_hold ENV_6HOLD ch12_as0
 CH12_NOTE    ch12_b0  0xd5 0x83
@@ -2285,62 +2407,59 @@ CH2_NOTE_ENV ch2_cs1_1_fade ENV_1FADE ch12_cs1
 CH1_NOTE_ENV ch1_cs1_2_hold ENV_2HOLD ch12_cs1
 CH2_NOTE_ENV ch2_cs1_2_hold ENV_2HOLD ch12_cs1
 CH1_NOTE_ENV ch1_cs1_2_fade ENV_2FADE ch12_cs1
-CH2_NOTE_ENV ch2_cs1_2_fade ENV_2FADE ch12_cs1
-CH2_NOTE_ENV ch2_cs1_3_hold ENV_3HOLD ch12_cs1
-CH2_NOTE_ENV ch2_cs1_3_fade ENV_3FADE ch12_cs1
-CH2_NOTE_ENV ch2_cs1_4_hold ENV_4HOLD ch12_cs1
+CH1_NOTE_ENV ch1_cs1_3_hold ENV_3HOLD ch12_cs1
+CH1_NOTE_ENV ch1_cs1_3_fade ENV_3FADE ch12_cs1
+CH1_NOTE_ENV ch1_cs1_4_hold ENV_4HOLD ch12_cs1
 CH2_NOTE_ENV ch2_cs1_5_hold ENV_5HOLD ch12_cs1
 CH2_NOTE_ENV ch2_cs1_6_hold ENV_6HOLD ch12_cs1
 CH12_NOTE    ch12_d1  0x82 0x84
 CH1_NOTE_ENV ch1_d1_1_fade  ENV_1FADE ch12_d1
 CH2_NOTE_ENV ch2_d1_1_fade  ENV_1FADE ch12_d1
-CH2_NOTE_ENV ch2_d1_2_hold  ENV_2HOLD ch12_d1
+CH1_NOTE_ENV ch1_d1_2_hold  ENV_2HOLD ch12_d1
 CH1_NOTE_ENV ch1_d1_2_fade  ENV_2FADE ch12_d1
-CH2_NOTE_ENV ch2_d1_2_fade  ENV_2FADE ch12_d1
-CH2_NOTE_ENV ch2_d1_3_hold  ENV_3HOLD ch12_d1
-CH2_NOTE_ENV ch2_d1_3_fade  ENV_3FADE ch12_d1
-CH2_NOTE_ENV ch2_d1_4_hold  ENV_4HOLD ch12_d1
-CH2_NOTE_ENV ch2_d1_4_fade  ENV_4FADE ch12_d1
+CH1_NOTE_ENV ch1_d1_3_hold  ENV_3HOLD ch12_d1
+CH1_NOTE_ENV ch1_d1_3_fade  ENV_3FADE ch12_d1
+CH1_NOTE_ENV ch1_d1_4_hold  ENV_4HOLD ch12_d1
+CH1_NOTE_ENV ch1_d1_4_fade  ENV_4FADE ch12_d1
 CH2_NOTE_ENV ch2_d1_5_hold  ENV_5HOLD ch12_d1
 CH12_NOTE    ch12_ds1 0xb5 0x84
 CH1_NOTE_ENV ch1_ds1_1_hold ENV_1HOLD ch12_ds1
 CH2_NOTE_ENV ch2_ds1_1_hold ENV_1HOLD ch12_ds1
 CH2_NOTE_ENV ch2_ds1_1_fade ENV_1FADE ch12_ds1
-CH2_NOTE_ENV ch2_ds1_2_hold ENV_2HOLD ch12_ds1
+CH1_NOTE_ENV ch1_ds1_2_hold ENV_2HOLD ch12_ds1
 CH1_NOTE_ENV ch1_ds1_2_fade ENV_2FADE ch12_ds1
-CH2_NOTE_ENV ch2_ds1_2_fade ENV_2FADE ch12_ds1
-CH2_NOTE_ENV ch2_ds1_3_hold ENV_3HOLD ch12_ds1
-CH2_NOTE_ENV ch2_ds1_3_fade ENV_3FADE ch12_ds1
-CH2_NOTE_ENV ch2_ds1_4_hold ENV_4HOLD ch12_ds1
+CH1_NOTE_ENV ch1_ds1_3_hold ENV_3HOLD ch12_ds1
+CH1_NOTE_ENV ch1_ds1_3_fade ENV_3FADE ch12_ds1
+CH1_NOTE_ENV ch1_ds1_4_hold ENV_4HOLD ch12_ds1
 CH2_NOTE_ENV ch2_ds1_5_hold ENV_5HOLD ch12_ds1
 CH12_NOTE    ch12_e1  0xe3 0x84
 CH2_NOTE_ENV ch2_e1_1_hold  ENV_1HOLD ch12_e1
 CH1_NOTE_ENV ch1_e1_1_fadein ENV_1FADEIN ch12_e1
+CH2_NOTE_ENV ch2_e1_1_fadein ENV_1FADEIN ch12_e1
 CH1_NOTE_ENV ch1_e1_1_fade  ENV_1FADE ch12_e1
 CH2_NOTE_ENV ch2_e1_1_fade  ENV_1FADE ch12_e1
-CH2_NOTE_ENV ch2_e1_2_hold  ENV_2HOLD ch12_e1
-CH2_NOTE_ENV ch2_e1_2_fadein ENV_2FADEIN ch12_e1
+CH1_NOTE_ENV ch1_e1_2_hold  ENV_2HOLD ch12_e1
+CH1_NOTE_ENV ch1_e1_2_fadein ENV_2FADEIN ch12_e1
 CH1_NOTE_ENV ch1_e1_2_fade  ENV_2FADE ch12_e1
-CH2_NOTE_ENV ch2_e1_2_fade  ENV_2FADE ch12_e1
 CH1_NOTE_ENV ch1_e1_3_hold  ENV_3HOLD ch12_e1
 CH2_NOTE_ENV ch2_e1_3_hold  ENV_3HOLD ch12_e1
-CH2_NOTE_ENV ch2_e1_3_fade  ENV_3FADE ch12_e1
-CH2_NOTE_ENV ch2_e1_4_hold  ENV_4HOLD ch12_e1
-CH2_NOTE_ENV ch2_e1_4_fade  ENV_4FADE ch12_e1
+CH1_NOTE_ENV ch1_e1_3_fade  ENV_3FADE ch12_e1
+CH1_NOTE_ENV ch1_e1_4_hold  ENV_4HOLD ch12_e1
+CH1_NOTE_ENV ch1_e1_4_fade  ENV_4FADE ch12_e1
 CH2_NOTE_ENV ch2_e1_5_hold  ENV_5HOLD ch12_e1
 CH2_NOTE_ENV ch2_e1_7_hold  ENV_7HOLD ch12_e1
 CH12_NOTE    ch12_f1  0x10 0x85
 CH2_NOTE_ENV ch2_f1_1_hold  ENV_1HOLD ch12_f1
 CH1_NOTE_ENV ch1_f1_1_fade  ENV_1FADE ch12_f1
 CH2_NOTE_ENV ch2_f1_1_fade  ENV_1FADE ch12_f1
-CH2_NOTE_ENV ch2_f1_2_hold  ENV_2HOLD ch12_f1
-CH2_NOTE_ENV ch2_f1_2_fadein ENV_2FADEIN ch12_f1
-CH2_NOTE_ENV ch2_f1_2_fade  ENV_2FADE ch12_f1
+CH1_NOTE_ENV ch1_f1_2_hold  ENV_2HOLD ch12_f1
+CH1_NOTE_ENV ch1_f1_2_fadein ENV_2FADEIN ch12_f1
+CH1_NOTE_ENV ch1_f1_2_fade  ENV_2FADE ch12_f1
 CH1_NOTE_ENV ch1_f1_3_hold  ENV_3HOLD ch12_f1
 CH2_NOTE_ENV ch2_f1_3_hold  ENV_3HOLD ch12_f1
-CH2_NOTE_ENV ch2_f1_3_fade  ENV_3FADE ch12_f1
-CH2_NOTE_ENV ch2_f1_4_hold  ENV_4HOLD ch12_f1
-CH2_NOTE_ENV ch2_f1_4_fade  ENV_4FADE ch12_f1
+CH1_NOTE_ENV ch1_f1_3_fade  ENV_3FADE ch12_f1
+CH1_NOTE_ENV ch1_f1_4_hold  ENV_4HOLD ch12_f1
+CH1_NOTE_ENV ch1_f1_4_fade  ENV_4FADE ch12_f1
 CH2_NOTE_ENV ch2_f1_5_hold  ENV_5HOLD ch12_f1
 CH2_NOTE_ENV ch2_f1_7_hold  ENV_7HOLD ch12_f1
 CH12_NOTE    ch12_fs1 0x3a 0x85
@@ -2351,11 +2470,11 @@ CH1_NOTE_ENV ch1_g1_1_fade  ENV_1FADE ch12_g1
 CH2_NOTE_ENV ch2_g1_1_fade  ENV_1FADE ch12_g1
 CH1_NOTE_ENV ch1_g1_2_hold  ENV_2HOLD ch12_g1
 CH2_NOTE_ENV ch2_g1_2_hold  ENV_2HOLD ch12_g1
-CH2_NOTE_ENV ch2_g1_2_fadein ENV_2FADEIN ch12_g1
-CH2_NOTE_ENV ch2_g1_2_fade  ENV_2FADE ch12_g1
-CH2_NOTE_ENV ch2_g1_3_hold  ENV_3HOLD ch12_g1
-CH2_NOTE_ENV ch2_g1_3_fade  ENV_3FADE ch12_g1
-CH2_NOTE_ENV ch2_g1_4_hold  ENV_4HOLD ch12_g1
+CH1_NOTE_ENV ch1_g1_2_fadein ENV_2FADEIN ch12_g1
+CH1_NOTE_ENV ch1_g1_2_fade  ENV_2FADE ch12_g1
+CH1_NOTE_ENV ch1_g1_3_hold  ENV_3HOLD ch12_g1
+CH1_NOTE_ENV ch1_g1_3_fade  ENV_3FADE ch12_g1
+CH1_NOTE_ENV ch1_g1_4_hold  ENV_4HOLD ch12_g1
 CH2_NOTE_ENV ch2_g1_6_hold  ENV_6HOLD ch12_g1
 CH2_NOTE_ENV ch2_g1_7_hold  ENV_7HOLD ch12_g1
 CH12_NOTE    ch12_gs1 0x89 0x85
@@ -2363,10 +2482,13 @@ CH2_NOTE_ENV ch2_gs1_1_hold ENV_1HOLD ch12_gs1
 CH1_NOTE_ENV ch1_gs1_1_fade ENV_1FADE ch12_gs1
 CH2_NOTE_ENV ch2_gs1_1_fade ENV_1FADE ch12_gs1
 CH1_NOTE_ENV ch1_gs1_2_hold ENV_2HOLD ch12_gs1
+CH2_NOTE_ENV ch2_gs1_2_hold ENV_2HOLD ch12_gs1
 CH1_NOTE_ENV ch1_gs1_2_fade ENV_2FADE ch12_gs1
 CH2_NOTE_ENV ch2_gs1_2_fade ENV_2FADE ch12_gs1
 CH1_NOTE_ENV ch1_gs1_3_hold ENV_3HOLD ch12_gs1
+CH2_NOTE_ENV ch2_gs1_3_hold ENV_3HOLD ch12_gs1
 CH1_NOTE_ENV ch1_gs1_4_hold ENV_4HOLD ch12_gs1
+CH2_NOTE_ENV ch2_gs1_4_hold ENV_4HOLD ch12_gs1
 CH2_NOTE_ENV ch2_gs1_6_hold ENV_6HOLD ch12_gs1
 CH2_NOTE_ENV ch2_gs1_7_hold ENV_7HOLD ch12_gs1
 CH12_NOTE    ch12_a1  0xab 0x85
@@ -2374,26 +2496,29 @@ CH2_NOTE_ENV ch2_a1_1_hold  ENV_1HOLD ch12_a1
 CH1_NOTE_ENV ch1_a1_1_fade  ENV_1FADE ch12_a1
 CH2_NOTE_ENV ch2_a1_1_fade  ENV_1FADE ch12_a1
 CH1_NOTE_ENV ch1_a1_2_hold  ENV_2HOLD ch12_a1
+CH2_NOTE_ENV ch2_a1_2_hold  ENV_2HOLD ch12_a1
 CH1_NOTE_ENV ch1_a1_2_fade  ENV_2FADE ch12_a1
 CH2_NOTE_ENV ch2_a1_2_fade  ENV_2FADE ch12_a1
 CH1_NOTE_ENV ch1_a1_3_hold  ENV_3HOLD ch12_a1
+CH2_NOTE_ENV ch2_a1_3_hold  ENV_3HOLD ch12_a1
 CH1_NOTE_ENV ch1_a1_3_fadein ENV_3FADEIN ch12_a1
-CH2_NOTE_ENV ch2_a1_3_fade  ENV_3FADE ch12_a1
+CH1_NOTE_ENV ch1_a1_3_fade  ENV_3FADE ch12_a1
 CH1_NOTE_ENV ch1_a1_4_hold  ENV_4HOLD ch12_a1
 CH1_NOTE_ENV ch1_a1_4_fade  ENV_4FADE ch12_a1
-CH2_NOTE_ENV ch2_a1_4_fade  ENV_4FADE ch12_a1
 CH1_NOTE_ENV ch1_a1_5_hold  ENV_5HOLD ch12_a1
+CH2_NOTE_ENV ch2_a1_5_hold  ENV_5HOLD ch12_a1
 CH2_NOTE_ENV ch2_a1_6_hold  ENV_6HOLD ch12_a1
 CH2_NOTE_ENV ch2_a1_7_hold  ENV_7HOLD ch12_a1
 CH12_NOTE    ch12_as1 0xcd 0x85
 CH2_NOTE_ENV ch2_as1_1_hold ENV_1HOLD ch12_as1
 CH1_NOTE_ENV ch1_as1_1_fade ENV_1FADE ch12_as1
 CH2_NOTE_ENV ch2_as1_1_fade ENV_1FADE ch12_as1
-CH2_NOTE_ENV ch2_as1_2_fade ENV_2FADE ch12_as1
+CH1_NOTE_ENV ch1_as1_2_fade ENV_2FADE ch12_as1
 CH1_NOTE_ENV ch1_as1_3_hold ENV_3HOLD ch12_as1
+CH2_NOTE_ENV ch2_as1_3_hold ENV_3HOLD ch12_as1
 CH1_NOTE_ENV ch1_as1_3_fade ENV_3FADE ch12_as1
 CH2_NOTE_ENV ch2_as1_3_fade ENV_3FADE ch12_as1
-CH2_NOTE_ENV ch2_as1_4_fade ENV_4FADE ch12_as1
+CH1_NOTE_ENV ch1_as1_4_fade ENV_4FADE ch12_as1
 CH2_NOTE_ENV ch2_as1_7_hold ENV_7HOLD ch12_as1
 CH12_NOTE    ch12_b1  0xeb 0x85
 CH2_NOTE_ENV ch2_b1_7_hold  ENV_7HOLD ch12_b1
@@ -2408,15 +2533,19 @@ CH2_NOTE_ENV ch2_cs2_1_hold ENV_1HOLD ch12_cs2
 CH1_NOTE_ENV ch1_cs2_1_fade ENV_1FADE ch12_cs2
 CH2_NOTE_ENV ch2_cs2_1_fade ENV_1FADE ch12_cs2
 CH1_NOTE_ENV ch1_cs2_2_hold ENV_2HOLD ch12_cs2
+CH2_NOTE_ENV ch2_cs2_2_hold ENV_2HOLD ch12_cs2
 CH1_NOTE_ENV ch1_cs2_2_fade ENV_2FADE ch12_cs2
+CH2_NOTE_ENV ch2_cs2_2_fade ENV_2FADE ch12_cs2
 CH1_NOTE_ENV ch1_cs2_3_hold ENV_3HOLD ch12_cs2
-CH2_NOTE_ENV ch2_cs2_3_fade ENV_3FADE ch12_cs2
-CH2_NOTE_ENV ch2_cs2_4_fade ENV_4FADE ch12_cs2
+CH2_NOTE_ENV ch2_cs2_3_hold ENV_3HOLD ch12_cs2
+CH1_NOTE_ENV ch1_cs2_3_fade ENV_3FADE ch12_cs2
+CH1_NOTE_ENV ch1_cs2_4_fade ENV_4FADE ch12_cs2
 CH2_NOTE_ENV ch2_cs2_5_hold ENV_5HOLD ch12_cs2
 CH12_NOTE    ch12_d2  0x41 0x86
 CH1_NOTE_ENV ch1_d2_1_fade  ENV_1FADE ch12_d2
 CH2_NOTE_ENV ch2_d2_1_fade  ENV_1FADE ch12_d2
 CH1_NOTE_ENV ch1_d2_2_fade  ENV_2FADE ch12_d2
+CH2_NOTE_ENV ch2_d2_2_fade  ENV_2FADE ch12_d2
 CH1_NOTE_ENV ch1_d2_3_hold  ENV_3HOLD ch12_d2
 CH1_NOTE_ENV ch1_d2_3_fade  ENV_3FADE ch12_d2
 CH1_NOTE_ENV ch1_d2_4_hold  ENV_4HOLD ch12_d2
@@ -2437,6 +2566,7 @@ CH1_NOTE_ENV ch1_e2_1_fade  ENV_1FADE ch12_e2
 CH2_NOTE_ENV ch2_e2_1_fade  ENV_1FADE ch12_e2
 CH1_NOTE_ENV ch1_e2_2_hold  ENV_2HOLD ch12_e2
 CH1_NOTE_ENV ch1_e2_2_fade  ENV_2FADE ch12_e2
+CH2_NOTE_ENV ch2_e2_2_fade  ENV_2FADE ch12_e2
 CH1_NOTE_ENV ch1_e2_3_fade  ENV_3FADE ch12_e2
 CH1_NOTE_ENV ch1_e2_4_hold  ENV_4HOLD ch12_e2
 CH1_NOTE_ENV ch1_e2_4_fade  ENV_4FADE ch12_e2
@@ -2449,6 +2579,7 @@ CH1_NOTE_ENV ch1_f2_1_fade  ENV_1FADE ch12_f2
 CH2_NOTE_ENV ch2_f2_1_fade  ENV_1FADE ch12_f2
 CH1_NOTE_ENV ch1_f2_2_hold  ENV_2HOLD ch12_f2
 CH1_NOTE_ENV ch1_f2_2_fade  ENV_2FADE ch12_f2
+CH2_NOTE_ENV ch2_f2_2_fade  ENV_2FADE ch12_f2
 CH2_NOTE_ENV ch2_f2_5_hold  ENV_5HOLD ch12_f2
 CH2_NOTE_ENV ch2_f2_7_hold  ENV_7HOLD ch12_f2
 CH12_NOTE    ch12_fs2 0x9e 0x86
@@ -2468,6 +2599,7 @@ CH2_NOTE_ENV ch2_g2_1_fade  ENV_1FADE ch12_g2
 CH1_NOTE_ENV ch1_g2_2_hold  ENV_2HOLD ch12_g2
 CH2_NOTE_ENV ch2_g2_2_hold  ENV_2HOLD ch12_g2
 CH1_NOTE_ENV ch1_g2_2_fade  ENV_2FADE ch12_g2
+CH2_NOTE_ENV ch2_g2_2_fade  ENV_2FADE ch12_g2
 CH1_NOTE_ENV ch1_g2_3_hold  ENV_3HOLD ch12_g2
 CH2_NOTE_ENV ch2_g2_3_hold  ENV_3HOLD ch12_g2
 CH2_NOTE_ENV ch2_g2_3_fade  ENV_3FADE ch12_g2
@@ -2481,7 +2613,9 @@ CH2_NOTE_ENV ch2_gs2_1_fadein ENV_1FADEIN ch12_gs2
 CH1_NOTE_ENV ch1_gs2_1_fade ENV_1FADE ch12_gs2
 CH2_NOTE_ENV ch2_gs2_1_fade ENV_1FADE ch12_gs2
 CH1_NOTE_ENV ch1_gs2_2_hold ENV_2HOLD ch12_gs2
+CH2_NOTE_ENV ch2_gs2_2_hold ENV_2HOLD ch12_gs2
 CH1_NOTE_ENV ch1_gs2_2_fade ENV_2FADE ch12_gs2
+CH2_NOTE_ENV ch2_gs2_2_fade ENV_2FADE ch12_gs2
 CH1_NOTE_ENV ch1_gs2_3_fade ENV_3FADE ch12_gs2
 CH2_NOTE_ENV ch2_gs2_6_hold ENV_6HOLD ch12_gs2
 CH12_NOTE    ch12_a2  0xd6 0x86
@@ -2493,6 +2627,7 @@ CH1_NOTE_ENV ch1_a2_1_fade  ENV_1FADE ch12_a2
 CH2_NOTE_ENV ch2_a2_1_fade  ENV_1FADE ch12_a2
 CH1_NOTE_ENV ch1_a2_2_hold  ENV_2HOLD ch12_a2
 CH1_NOTE_ENV ch1_a2_2_fade  ENV_2FADE ch12_a2
+CH2_NOTE_ENV ch2_a2_2_fade  ENV_2FADE ch12_a2
 CH2_NOTE_ENV ch2_a2_3_hold  ENV_3HOLD ch12_a2
 CH1_NOTE_ENV ch1_a2_3_fadein ENV_3FADEIN ch12_a2
 CH1_NOTE_ENV ch1_a2_3_fade  ENV_3FADE ch12_a2
@@ -2509,6 +2644,7 @@ CH1_NOTE_ENV ch1_as2_1_fade ENV_1FADE ch12_as2
 CH2_NOTE_ENV ch2_as2_1_fade ENV_1FADE ch12_as2
 CH1_NOTE_ENV ch1_as2_2_hold ENV_2HOLD ch12_as2
 CH1_NOTE_ENV ch1_as2_2_fade ENV_2FADE ch12_as2
+CH2_NOTE_ENV ch2_as2_2_fade ENV_2FADE ch12_as2
 CH2_NOTE_ENV ch2_as2_3_hold ENV_3HOLD ch12_as2
 CH2_NOTE_ENV ch2_as2_3_fade ENV_3FADE ch12_as2
 CH1_NOTE_ENV ch1_as2_4_hold ENV_4HOLD ch12_as2
@@ -2526,7 +2662,9 @@ CH12_NOTE    ch12_cs3 0x13 0x87
 CH1_NOTE_ENV ch1_cs3_1_hold ENV_1HOLD ch12_cs3
 CH2_NOTE_ENV ch2_cs3_1_hold ENV_1HOLD ch12_cs3
 CH1_NOTE_ENV ch1_cs3_1_fade ENV_1FADE ch12_cs3
+CH2_NOTE_ENV ch2_cs3_1_fade ENV_1FADE ch12_cs3
 CH1_NOTE_ENV ch1_cs3_2_hold ENV_2HOLD ch12_cs3
+CH2_NOTE_ENV ch2_cs3_2_hold ENV_2HOLD ch12_cs3
 CH2_NOTE_ENV ch2_cs3_7_hold ENV_7HOLD ch12_cs3
 CH12_NOTE    ch12_d3  0x21 0x87
 CH2_NOTE_ENV ch2_d3_1_hold  ENV_1HOLD ch12_d3
@@ -2601,73 +2739,73 @@ CH2_NOTE_ENV ch2_b4_7_hold  ENV_7HOLD ch12_b4
 CH12_NOTE    ch12_c5  0xc1 0x87
 CH2_NOTE_ENV ch2_c5_5_hold  ENV_5HOLD ch12_c5
 CH2_NOTE_ENV ch2_c5_7_hold  ENV_7HOLD ch12_c5
-CH4_NOTE     ch4_c0   0x74  ; freq=65.27
+CH4_NOTE     ch4_c0   0x84  ; freq=65.27
 CH4_NOTE_ENV ch4_c0_6_hold  ENV_6HOLD ch4_c0
-CH4_NOTE     ch4_cs0  0x67  ; freq=68.97
+CH4_NOTE     ch4_cs0  0x77  ; freq=68.97
 CH4_NOTE_ENV ch4_cs0_6_hold ENV_6HOLD ch4_cs0
-CH4_NOTE     ch4_d0   0x67  ; freq=73.35
+CH4_NOTE     ch4_d0   0x77  ; freq=73.35
 CH4_NOTE_ENV ch4_d0_5_hold  ENV_5HOLD ch4_d0
 CH4_NOTE_ENV ch4_d0_5_fade  ENV_5FADE ch4_d0
 CH4_NOTE_ENV ch4_d0_6_hold  ENV_6HOLD ch4_d0
-CH4_NOTE     ch4_ds0  0x67  ; freq=77.72
+CH4_NOTE     ch4_ds0  0x77  ; freq=77.72
 CH4_NOTE_ENV ch4_ds0_5_hold ENV_5HOLD ch4_ds0
 CH4_NOTE_ENV ch4_ds0_7_hold ENV_7HOLD ch4_ds0
-CH4_NOTE     ch4_f0   0x66  ; freq=87.14
+CH4_NOTE     ch4_f0   0x76  ; freq=87.14
 CH4_NOTE_ENV ch4_f0_5_hold  ENV_5HOLD ch4_f0
 CH4_NOTE_ENV ch4_f0_5_fade  ENV_5FADE ch4_f0
 CH4_NOTE_ENV ch4_f0_6_hold  ENV_6HOLD ch4_f0
-CH4_NOTE     ch4_fs0  0x66  ; freq=92.19
+CH4_NOTE     ch4_fs0  0x76  ; freq=92.19
 CH4_NOTE_ENV ch4_fs0_5_hold ENV_5HOLD ch4_fs0
 CH4_NOTE_ENV ch4_fs0_6_hold ENV_6HOLD ch4_fs0
-CH4_NOTE     ch4_gs0  0x65  ; freq=103.63
+CH4_NOTE     ch4_gs0  0x75  ; freq=103.63
 CH4_NOTE_ENV ch4_gs0_5_hold ENV_5HOLD ch4_gs0
-CH4_NOTE     ch4_a0   0x65  ; freq=109.68
+CH4_NOTE     ch4_a0   0x75  ; freq=109.68
 CH4_NOTE_ENV ch4_a0_5_hold  ENV_5HOLD ch4_a0
 CH4_NOTE_ENV ch4_a0_6_hold  ENV_6HOLD ch4_a0
-CH4_NOTE     ch4_as0  0x64  ; freq=116.42
+CH4_NOTE     ch4_as0  0x74  ; freq=116.42
 CH4_NOTE_ENV ch4_as0_5_hold ENV_5HOLD ch4_as0
-CH4_NOTE     ch4_c1   0x64  ; freq=130.55
+CH4_NOTE     ch4_c1   0x74  ; freq=130.55
 CH4_NOTE_ENV ch4_c1_5_hold  ENV_5HOLD ch4_c1
-CH4_NOTE     ch4_cs1  0x57  ; freq=138.28
+CH4_NOTE     ch4_cs1  0x67  ; freq=138.28
 CH4_NOTE_ENV ch4_cs1_7_hold ENV_7HOLD ch4_cs1
-CH4_NOTE     ch4_d1   0x57  ; freq=146.69
+CH4_NOTE     ch4_d1   0x67  ; freq=146.69
 CH4_NOTE_ENV ch4_d1_5_hold  ENV_5HOLD ch4_d1
-CH4_NOTE     ch4_ds1  0x57  ; freq=155.45
+CH4_NOTE     ch4_ds1  0x67  ; freq=155.45
 CH4_NOTE_ENV ch4_ds1_5_hold ENV_5HOLD ch4_ds1
 CH4_NOTE_ENV ch4_ds1_7_hold ENV_7HOLD ch4_ds1
-CH4_NOTE     ch4_f1   0x56  ; freq=174.29
+CH4_NOTE     ch4_f1   0x66  ; freq=174.29
 CH4_NOTE_ENV ch4_f1_5_hold  ENV_5HOLD ch4_f1
 CH4_NOTE_ENV ch4_f1_7_hold  ENV_7HOLD ch4_f1
-CH4_NOTE     ch4_gs1  0x55  ; freq=207.59
+CH4_NOTE     ch4_gs1  0x65  ; freq=207.59
 CH4_NOTE_ENV ch4_gs1_7_hold ENV_7HOLD ch4_gs1
-CH4_NOTE     ch4_a1   0x55  ; freq=219.71
+CH4_NOTE     ch4_a1   0x65  ; freq=219.71
 CH4_NOTE_ENV ch4_a1_5_hold  ENV_5HOLD ch4_a1
 CH4_NOTE_ENV ch4_a1_6_hold  ENV_6HOLD ch4_a1
-CH4_NOTE     ch4_b1   0x54  ; freq=245.95
+CH4_NOTE     ch4_b1   0x64  ; freq=245.95
 CH4_NOTE_ENV ch4_b1_5_hold  ENV_5HOLD ch4_b1
-CH4_NOTE     ch4_c2   0x54  ; freq=261.43
+CH4_NOTE     ch4_c2   0x64  ; freq=261.43
 CH4_NOTE_ENV ch4_c2_7_hold  ENV_7HOLD ch4_c2
-CH4_NOTE     ch4_cs2  0x47  ; freq=276.9
+CH4_NOTE     ch4_cs2  0x57  ; freq=276.9
 CH4_NOTE_ENV ch4_cs2_5_hold ENV_5HOLD ch4_cs2
 CH4_NOTE_ENV ch4_cs2_7_hold ENV_7HOLD ch4_cs2
-CH4_NOTE     ch4_d2   0x47  ; freq=293.38
+CH4_NOTE     ch4_d2   0x57  ; freq=293.38
 CH4_NOTE_ENV ch4_d2_6_hold  ENV_6HOLD ch4_d2
 CH4_NOTE_ENV ch4_d2_7_hold  ENV_7HOLD ch4_d2
-CH4_NOTE     ch4_ds2  0x47  ; freq=310.89
+CH4_NOTE     ch4_ds2  0x57  ; freq=310.89
 CH4_NOTE_ENV ch4_ds2_5_hold ENV_5HOLD ch4_ds2
 CH4_NOTE_ENV ch4_ds2_6_hold ENV_6HOLD ch4_ds2
 CH4_NOTE_ENV ch4_ds2_7_hold ENV_7HOLD ch4_ds2
-CH4_NOTE     ch4_e2   0x47  ; freq=329.39
+CH4_NOTE     ch4_e2   0x56  ; freq=329.39
 CH4_NOTE_ENV ch4_e2_5_hold  ENV_5HOLD ch4_e2
 CH4_NOTE_ENV ch4_e2_6_hold  ENV_6HOLD ch4_e2
 CH4_NOTE_ENV ch4_e2_7_hold  ENV_7HOLD ch4_e2
-CH4_NOTE     ch4_f2   0x47  ; freq=348.91
+CH4_NOTE     ch4_f2   0x56  ; freq=348.91
 CH4_NOTE_ENV ch4_f2_5_hold  ENV_5HOLD ch4_f2
 CH4_NOTE_ENV ch4_f2_6_hold  ENV_6HOLD ch4_f2
 CH4_NOTE_ENV ch4_f2_7_hold  ENV_7HOLD ch4_f2
-CH4_NOTE     ch4_gs2  0x47  ; freq=415.18
+CH4_NOTE     ch4_gs2  0x55  ; freq=415.18
 CH4_NOTE_ENV ch4_gs2_7_hold ENV_7HOLD ch4_gs2
-CH4_NOTE     ch4_b2   0x47  ; freq=491.91
+CH4_NOTE     ch4_b2   0x54  ; freq=491.91
 CH4_NOTE_ENV ch4_b2_7_hold  ENV_7HOLD ch4_b2
 CH4_NOTE     ch4_cs3  0x47  ; freq=553.81
 CH4_NOTE_ENV ch4_cs3_7_hold ENV_7HOLD ch4_cs3
