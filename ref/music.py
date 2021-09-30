@@ -427,6 +427,9 @@ used_ch4 = set()
 for pat in sfx_pat:
   speed = sounds[pat]['speed']
   print(f'sfx_seq{pat}::')
+  print(f'  NOTE ch2_mute')
+  print(f'  NOTE ch4_mute')
+
   i = 0
   notes = sounds[pat]['notes']
   while i < 32:

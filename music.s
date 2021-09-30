@@ -462,6 +462,7 @@ square_90:
 .endm
 
 ch1::
+  NOTE ch1_mute
   CALL_ seqpause
   CALL_ ch1_seq37
   CALL_ ch1_seq41
@@ -482,6 +483,7 @@ ch1::
   JUMP ch1
 
 ch2::
+  NOTE ch2_mute
   CALL_ seqpause
   CALL_ ch2_seq26
   CALL_ ch2_seq27
@@ -502,6 +504,7 @@ ch2::
   JUMP ch2
 
 ch3::
+  NOTE ch3_mute
   CALL_ ch3_seq34
   CALL_ ch3_seq34
   CALL_ ch3_seq38
@@ -522,27 +525,33 @@ ch3::
   JUMP ch3
 
 ch1_dead::
+  NOTE ch1_mute
   CALL_ ch1_seq63
   JUMP seqmute
 
 ch2_dead::
+  NOTE ch2_mute
   CALL_ ch2_seq61
   JUMP seqmute
 
 ch3_dead::
+  NOTE ch3_mute
   CALL_ ch3_seq62
   JUMP seqmute
 
 
 ch1_win::
+  NOTE ch1_mute
   CALL_ ch1_seq59
   JUMP seqmute
 
 ch2_win::
+  NOTE ch2_mute
   CALL_ ch2_seq58
   JUMP seqmute
 
 ch3_win::
+  NOTE ch3_mute
   CALL_ ch3_seq60
   JUMP seqmute
 
@@ -2015,6 +2024,8 @@ ch2_seq61::
   RETN
 
 sfx_seq0::
+  NOTE ch2_mute
+  NOTE ch4_mute
   NTWT ch2_cs4_7_hold, 2 
   NTWT ch2_cs4_7_hold, 2 
   NTWT ch2_mute, 4
@@ -2036,6 +2047,8 @@ sfx_seq0::
   NTWT ch2_mute, 20
   NOFX
 sfx_seq1::
+  NOTE ch2_mute
+  NOTE ch4_mute
   NTWT ch2_cs4_5_hold, 1 
   NTWT ch2_cs4_5_hold, 1 
   NTWT ch2_c4_5_hold, 1 
@@ -2065,6 +2078,8 @@ sfx_seq1::
   NTWT ch2_mute, 6
   NOFX
 sfx_seq2::
+  NOTE ch2_mute
+  NOTE ch4_mute
   NTWT ch2_c3_5_hold, 1 
   NTWT ch2_as3_6_hold, 1 
   NTWT ch2_g3_6_hold, 1 
@@ -2075,6 +2090,8 @@ sfx_seq2::
   NTWT ch2_mute, 25
   NOFX
 sfx_seq3::
+  NOTE ch2_mute
+  NOTE ch4_mute
   NTWT ch2_c3_5_hold, 1 
   NOTE ch2_mute
   NTWT ch2_ds4_6_hold, 1 
@@ -2086,6 +2103,8 @@ sfx_seq3::
   NTWT ch2_mute, 25
   NOFX
 sfx_seq4::
+  NOTE ch2_mute
+  NOTE ch4_mute
   NTWT ch4_a0_6_hold, 3 
   NTWT ch4_f1_7_hold, 3 
   NTWT ch4_f0_6_hold, 3 
@@ -2099,11 +2118,15 @@ sfx_seq4::
   NTWT ch4_d0_5_fade, 21 
   NOFX
 sfx_seq5::
+  NOTE ch2_mute
+  NOTE ch4_mute
   NTWT ch2_gs1_6_hold, 1 
   NTWT ch2_d2_6_hold, 1 
   NTWT ch2_mute, 30
   NOFX
 sfx_seq6::
+  NOTE ch2_mute
+  NOTE ch4_mute
   NTWT ch2_a2_5_hold, 1 
   NTWT ch2_a2_7_hold, 1 
   NTWT ch2_a1_7_hold, 1 
@@ -2121,6 +2144,8 @@ sfx_seq6::
   NTWT ch4_mute, 19
   NOFX
 sfx_seq7::
+  NOTE ch2_mute
+  NOTE ch4_mute
   NTWT ch4_ds2_5_hold, 1 
   NOTE ch4_mute
   NTWT ch2_fs0_7_hold, 1 
@@ -2136,6 +2161,8 @@ sfx_seq7::
   NTWT ch4_mute, 22
   NOFX
 sfx_seq8::
+  NOTE ch2_mute
+  NOTE ch4_mute
   NTWT ch2_g2_7_hold, 1 
   NTWT ch2_g3_7_hold, 1 
   NTWT ch2_as3_7_hold, 1 
@@ -2158,6 +2185,8 @@ sfx_seq8::
   NTWT ch2_mute, 6
   NOFX
 sfx_seq9::
+  NOTE ch2_mute
+  NOTE ch4_mute
   NTWT ch2_g1_6_hold, 1 
   NTWT ch2_g1_6_hold, 1 
   NTWT ch2_g1_7_hold, 1 
@@ -2191,6 +2220,8 @@ sfx_seq9::
   NTWT ch2_mute, 2
   NOFX
 sfx_seq10::
+  NOTE ch2_mute
+  NOTE ch4_mute
   NTWT ch2_e1_7_hold, 1 
   NTWT ch2_e1_7_hold, 1 
   NTWT ch2_e2_7_hold, 1 
@@ -2206,6 +2237,8 @@ sfx_seq10::
   NTWT ch2_mute, 20
   NOFX
 sfx_seq11::
+  NOTE ch2_mute
+  NOTE ch4_mute
   NTWT ch2_f4_7_hold, 1 
   NTWT ch2_b3_7_hold, 1 
   NTWT ch2_gs3_7_hold, 1 
@@ -2228,12 +2261,16 @@ sfx_seq11::
   NTWT ch2_mute, 13
   NOFX
 sfx_seq12::
+  NOTE ch2_mute
+  NOTE ch4_mute
   NTWT ch2_cs1_6_hold, 1 
   NTWT ch2_g1_6_hold, 1 
   NTWT ch2_cs1_5_hold, 1 
   NTWT ch2_mute, 29
   NOFX
 sfx_seq13::
+  NOTE ch2_mute
+  NOTE ch4_mute
   NTWT ch2_a2_7_hold, 1 
   NTWT ch2_ds3_7_hold, 1 
   NTWT ch2_cs3_7_hold, 1 
@@ -2243,6 +2280,8 @@ sfx_seq13::
   NTWT ch2_mute, 26
   NOFX
 sfx_seq14::
+  NOTE ch2_mute
+  NOTE ch4_mute
   NTWT ch4_b2_7_hold, 3 
   NTWT ch4_gs3_7_hold, 3 
   NTWT ch4_gs2_7_hold, 3 
@@ -2264,6 +2303,8 @@ sfx_seq14::
   NTWT ch4_mute, 42
   NOFX
 sfx_seq15::
+  NOTE ch2_mute
+  NOTE ch4_mute
   NTWT ch2_a1_6_hold, 16 
   NTWT ch2_d2_6_hold, 16 
   NTWT ch2_f2_7_hold, 16 
@@ -2276,6 +2317,8 @@ sfx_seq15::
   NTWT ch2_mute, 368
   NOFX
 sfx_seq16::
+  NOTE ch2_mute
+  NOTE ch4_mute
   NTWT ch4_gs2_7_hold, 2 
   NTWT ch4_f2_7_hold, 2 
   NTWT ch4_f2_6_hold, 2 
@@ -2294,6 +2337,8 @@ sfx_seq16::
   NTWT ch4_mute, 22
   NOFX
 sfx_seq17::
+  NOTE ch2_mute
+  NOTE ch4_mute
   NTWT ch4_ds4_7_hold, 2 
   NTWT ch4_gs4_7_hold, 2 
   NTWT ch4_c5_6_hold, 2 
@@ -2303,6 +2348,8 @@ sfx_seq17::
   NTWT ch4_d5_5_fade, 52 
   NOFX
 sfx_seq18::
+  NOTE ch2_mute
+  NOTE ch4_mute
   NTWT ch2_as2_5_hold, 2 
   NTWT ch2_d3_5_hold, 2 
   NOTE ch2_mute
@@ -2314,6 +2361,8 @@ sfx_seq18::
   NTWT ch4_mute, 46
   NOFX
 sfx_seq19::
+  NOTE ch2_mute
+  NOTE ch4_mute
   NTWT ch4_ds0_7_hold, 2 
   NTWT ch4_mute, 2
   NTWT ch4_fs0_6_hold, 2 
@@ -2330,6 +2379,8 @@ sfx_seq19::
   NTWT ch4_mute, 40
   NOFX
 sfx_seq20::
+  NOTE ch2_mute
+  NOTE ch4_mute
   NTWT ch2_e2_7_hold, 2 
   NTWT ch2_e2_7_hold, 2 
   NTWT ch2_mute, 4
@@ -2358,6 +2409,8 @@ sfx_seq20::
   NTWT ch2_mute, 2
   NOFX
 sfx_seq21::
+  NOTE ch2_mute
+  NOTE ch4_mute
   NTWT ch2_c3_5_hold, 1 
   NOTE ch2_mute
   NTWT ch2_ds4_6_hold, 1 
