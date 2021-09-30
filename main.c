@@ -239,6 +239,9 @@ u8 addspr(u8 speed, u16 x, u16 y, u16 dx, u16 dy, u8 drag, u8 timer, u8 prop);
 
 void nop_saw_anim(u8 pos);
 
+u8 padding[96]; // XXX gotta be a better way to align this...
+OAM_item_t shadow_OAM2[40];
+
 Map tmap;        // Tile map (everything unfogged)
 Map dtmap;       // Display tile map (w/ fogged tiles) (used for bulk updates)
 Map dirtymap;    // Which display tiles need to be updated
@@ -545,8 +548,9 @@ void gameinit(void) {
 
 void begin_animate(void) {
   dirty_ptr = dirty;
-  // Start mob sprites after floats
-  next_sprite = (u8*)shadow_OAM;
+  // Start mob sprites after floats. Double buffer the shadow_OAM so we don't
+  // get partial updates when writing to it.
+  next_sprite = (u8*)((_shadow_OAM_base << 8) ^ 0x100);
 }
 
 void end_animate(void) {
@@ -556,6 +560,9 @@ void end_animate(void) {
     next_sprite += 3;
   }
   last_next_sprite = next_sprite;
+
+  // Flip the shadow_OAM buffer
+  _shadow_OAM_base ^= 1;
 
   // Process dirty tiles
   u8* ptr = dirty;
