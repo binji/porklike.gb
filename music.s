@@ -21,7 +21,7 @@ ch4_song_ptr   = ch4_wait_timer + 1
 ch4_stack      = ch4_song_ptr   + 2
 snddata_end    = ch4_stack      + 2
 
-playing_sfx = snddata_end + 1
+current_sfx_priority = snddata_end + 1
 
 .area _CODE
 
@@ -105,6 +105,30 @@ sfx::
   .dw sfx_seq20
   .dw sfx_seq21
 
+sfx_priority::
+  .db 15 ; SFX_BLIND
+  .db  7 ; SFX_TELEPORT
+  .db  5 ; SFX_BACK
+  .db  4 ; SFX_OK
+  .db 17 ; SFX_STAIRS
+  .db  3 ; SFX_SELECT
+  .db 14 ; SFX_HIT_PLAYER
+  .db 13 ; SFX_HIT_MOB
+  .db  8 ; SFX_OPEN_OBJECT
+  .db  9 ; SFX_OOPS
+  .db  6 ; SFX_PICKUP
+  .db 10 ; SFX_USE_EQUIP
+  .db  1 ; SFX_PLAYER_STEP
+  .db  2 ; SFX_MOB_PUSH
+  .db 16 ; SFX_BOOM
+  .db 12 ; SFX_REAPER
+  .db 10 ; SFX_SPIN
+  .db 10 ; SFX_SPEAR
+  .db 10 ; SFX_DESTROY_WALL
+  .db  7 ; SFX_BUMP_TILE
+  .db 11 ; SFX_HEART
+  .db  9 ; SFX_FAIL
+
 _play_music::
   di
   ld hl, #snddata_end - #ch1_wait_timer
@@ -133,10 +157,40 @@ _music_win::
   ret
 
 _sfx::
-  ldhl sp, #2
-  ld a, (hl)    ; a = sfx#
+  di
 
-  rla
+  ldhl sp, #2
+  ld a, (hl)
+  ld d, a       ; d = a = sfx to play
+
+  ld hl, #sfx_priority
+  ld a, l
+  add d
+  ld l, a
+  ld a, h
+  adc #0
+  ld h, a       ; hl = &sfx_priority[n]
+  ld a, (hl)
+  ld c, a       ; c = sfx priority
+
+  ; check whether any sfx is playing
+  ld a, (#current_sfx_priority)
+  ld e, a       ; e = current_sfx_priority
+  or a
+  jr z, sfxok
+
+  ; skip this sfx if the current one has higher priority
+  ld a, c
+  cp e
+  jr c, sfxskip
+
+sfxok:
+  ; write current priority
+  ld a, c
+  ldh (#current_sfx_priority), a
+
+  ld a, d
+  rlca
   ld hl, #sfx
   add l
   ld l, a
@@ -149,7 +203,6 @@ _sfx::
   ld a, (hl)
   ld d, a       ; de = sfx[n]
 
-  di
   ld hl, #ch4_wait_timer
   xor a
   ld (hl+), a   ; wait_timer = 0
@@ -158,8 +211,7 @@ _sfx::
   ld a, d
   ld (hl), a   ; song_ptr hi
 
-  ld a, #1
-  ldh (#playing_sfx), a
+sfxskip:
   ei
   ret
 
@@ -258,7 +310,7 @@ note:
   ld l, e
 
   ; are we playing sfx?
-  ldh a, (#playing_sfx)
+  ldh a, (#current_sfx_priority)
   or a
   jr z, noteok
   ; is this channel 2? (used for many sfx)
@@ -276,7 +328,7 @@ notedone:
 
 nofx:
   xor a
-  ldh (#playing_sfx), a
+  ldh (#current_sfx_priority), a
   ; jump to silence on this channel (should be channel 4)
   ld hl, #seqmute
   jr read_command
