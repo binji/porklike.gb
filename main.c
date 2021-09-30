@@ -647,18 +647,18 @@ void do_turn(void) {
         inv_selected_pick = equip_type[inv_select];
         sfx(SFX_SELECT);
       }
-      if (newjoy & (J_B | J_A)) {
+      if (newjoy & J_B) {
         inv_anim_timer = INV_ANIM_FRAMES;
-        inv_anim_up ^= 1;
-        is_targeting = 0;
-        if (newjoy & J_B) {
-          sfx(SFX_BACK);
-        } else if (inv_selected_pick == PICKUP_TYPE_NONE) {
+        inv_anim_up = 0;
+        sfx(SFX_BACK);
+      } else if (newjoy & J_A) {
+        if (inv_selected_pick == PICKUP_TYPE_NONE) {
           sfx(SFX_OOPS);
-          is_targeting = 0;
         } else {
-          sfx(SFX_OK);
+          inv_anim_timer = INV_ANIM_FRAMES;
+          inv_anim_up = 0;
           is_targeting = 1;
+          sfx(SFX_OK);
         }
       }
     }
@@ -826,17 +826,23 @@ void move_player(void) {
       done:
         turn = TURN_PLAYER_MOVED;
       }
-    } else if (is_targeting && (newjoy & J_A)) {
-      use_pickup();
-      turn = TURN_PLAYER_MOVED;
-      sfx(SFX_OK);
-    } else if (is_targeting && (newjoy & J_B) || (newjoy & J_A)) {
-      sfx(SFX_BACK);
-
-      // Open inventory (or back out of targeting)
+    } else if (is_targeting) {
+      if (newjoy & J_B) {
+        // Back out of targeting
+        inv_anim_timer = INV_ANIM_FRAMES;
+        inv_anim_up = 1;
+        is_targeting = 0;
+        sfx(SFX_BACK);
+      } else if (newjoy & J_A) {
+        use_pickup();
+        turn = TURN_PLAYER_MOVED;
+        sfx(SFX_OK);
+      }
+    } else if (newjoy & J_A) {
+      // Open inventory
       inv_anim_timer = INV_ANIM_FRAMES;
-      inv_anim_up ^= 1;
-      is_targeting = 0;
+      inv_anim_up = 1;
+      sfx(SFX_OK);
     }
   }
 }
