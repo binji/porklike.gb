@@ -114,9 +114,9 @@ sfx_priority::
   .db  3 ; SFX_SELECT
   .db 14 ; SFX_HIT_PLAYER
   .db 13 ; SFX_HIT_MOB
-  .db  8 ; SFX_OPEN_OBJECT
-  .db  9 ; SFX_OOPS
-  .db  6 ; SFX_PICKUP
+  .db  7 ; SFX_OPEN_OBJECT
+  .db  7 ; SFX_OOPS
+  .db  8 ; SFX_PICKUP
   .db 10 ; SFX_USE_EQUIP
   .db  1 ; SFX_PLAYER_STEP
   .db  2 ; SFX_MOB_PUSH
@@ -217,6 +217,9 @@ sfxskip:
 
 
 _snd_init::
+  xor a
+  ldh (#current_sfx_priority), a
+
   ld de, #song_silence
   call _play_music
 
