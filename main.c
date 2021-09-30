@@ -47,6 +47,10 @@
 #define INV_ROW_LEN 14
 #define INV_BLANK_ROW_OFFSET 49 /* offset into inventory_map */
 
+// Hide sprites under this y position, so they aren't displayed on top of the
+// inventory
+#define INV_TOP_Y() (WY_REG + 9)
+
 #define GAMEOVER_FRAMES 70
 
 #define GAMEOVER_X_OFFSET 3
@@ -1735,7 +1739,7 @@ void animate(void) {
     // required by the hardware), so the actual position is pick_y[i] - 8.
     // Since the pickups bounce by 1 pixel up and down, we also display them at
     // WY_REG + 7 so they don't disappear while bouncing.
-    if (sprite && pick_y[i] <= WY_REG + 9) {
+    if (sprite && pick_y[i] <= INV_TOP_Y()) {
       *next_sprite++ = pick_y[i];
       *next_sprite++ = pick_x[i];
       *next_sprite++ = sprite;
@@ -1746,7 +1750,7 @@ void animate(void) {
       pick_tile[i] = frame = pick_type_anim_frames[pick_anim_frame[i]];
       if (pick_move_timer[i]) {
         animdone = 0;
-        if (pick_y[i] <= WY_REG + 9) {
+        if (pick_y[i] <= INV_TOP_Y()) {
           *next_sprite++ = pick_y[i];
           *next_sprite++ = pick_x[i];
           *next_sprite++ = frame;
@@ -1791,7 +1795,7 @@ void animate(void) {
     if (dotile || dosprite) {
       frame = mob_type_anim_frames[mob_anim_frame[i]];
 
-      if (dosprite && mob_y[i] <= WY_REG + 9) {
+      if (dosprite && mob_y[i] <= INV_TOP_Y()) {
         prop = mob_flip[i] ? S_FLIPX : 0;
         *next_sprite++ = mob_y[i];
         *next_sprite++ = mob_x[i];
@@ -1878,7 +1882,7 @@ void animate(void) {
         dmob_prop[i] = dmob_prop[num_dead_mobs];
         dmob_timer[i] = dmob_timer[num_dead_mobs];
       }
-    } else if (dmob_y[i] <= WY_REG + 9) {
+    } else if (dmob_y[i] <= INV_TOP_Y()) {
       *next_sprite++ = dmob_y[i];
       *next_sprite++ = dmob_x[i];
       *next_sprite++ = dmob_tile[i];
@@ -2089,7 +2093,7 @@ void update_sprites(void) {
   u8 i;
   // Display message sprites, if any
   if (msg_timer) {
-    if (--msg_timer != 0) {
+    if (--msg_timer != 0 && MSG_REAPER_Y <= INV_TOP_Y()) {
       memcpy(next_sprite, (void*)msg_sprites, MAX_MSG_SPRITES * 4);
       next_sprite += MAX_MSG_SPRITES * 4;
     }
@@ -2111,12 +2115,17 @@ void update_sprites(void) {
       // Update Y coordinate based on float time
       spr[0] -= float_diff_y[spr[3]];
     }
+
     // Copy float sprite
-    *next_sprite++ = *spr++;
-    *next_sprite++ = *spr++;
-    *next_sprite++ = *spr++;
-    *next_sprite++ = 0; // Stuff 0 in for prop
-    spr++;              // And increment past the float timer
+    if (*spr <= INV_TOP_Y()) {
+      *next_sprite++ = *spr++;
+      *next_sprite++ = *spr++;
+      *next_sprite++ = *spr++;
+      *next_sprite++ = 0; // Stuff 0 in for prop
+      spr++;              // And increment past the float timer
+    } else {
+      spr += 4;
+    }
   }
 
   // Draw sprs
@@ -2192,10 +2201,14 @@ void update_sprites(void) {
         spr_dx[i] = drag(spr_dx[i]);
         spr_dy[i] = drag(spr_dy[i]);
       }
-      *next_sprite++ = spr_y[i] >> 8;
-      *next_sprite++ = spr_x[i] >> 8;
-      *next_sprite++ = spr_anim_frame[i];
-      *next_sprite++ = spr_prop[i];
+
+      u8 y = spr_y[i] >> 8;
+      if (y <= INV_TOP_Y()) {
+        *next_sprite++ = y;
+        *next_sprite++ = spr_x[i] >> 8;
+        *next_sprite++ = spr_anim_frame[i];
+        *next_sprite++ = spr_prop[i];
+      }
       ++i;
     }
   }
@@ -2229,10 +2242,12 @@ void update_sprites(void) {
           y += delta;
         }
 
-        *next_sprite++ = y;
-        *next_sprite++ = x;
-        *next_sprite++ = TILE_ARROW_L + dir;
-        *next_sprite++ = 0;
+        if (y <= INV_TOP_Y()) {
+          *next_sprite++ = y;
+          *next_sprite++ = x;
+          *next_sprite++ = TILE_ARROW_L + dir;
+          *next_sprite++ = 0;
+        }
       }
     }
   }
