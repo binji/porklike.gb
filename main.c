@@ -1166,7 +1166,11 @@ void hitmob(u8 index, u8 dmg) {
       sound = SFX_BOOM;
     } else {
       percent = 20;
-      tile = dirt_tiles[xrnd() & 3];
+      if (!(validmap[pos] & VALID_U) || IS_BREAKABLE_WALL(tmap[POS_U(pos)])) {
+        tile = TILE_WALL_FACE_RUBBLE;
+      } else {
+        tile = dirt_tiles[xrnd() & 3];
+      }
       slime = 1;
     }
 
