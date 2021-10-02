@@ -1,7 +1,16 @@
 #ifndef MAIN_H_
 #define MAIN_H_
 
+#ifdef __SDCC
 #include <gb/gb.h>
+#endif
+#include <stdint.h>
+
+#ifdef __SDCC
+#define PRESERVES_REGS(...) __preserves_regs(__VA_ARGS__)
+#else
+#define PRESERVES_REGS(...)
+#endif
 
 #define MAP_WIDTH 16
 #define MAP_HEIGHT 16
@@ -261,12 +270,12 @@ void music_dead(void);
 void sfx(u8 id);
 
 void titlescreen(void);
-void clear_wram(void) __preserves_regs(b, c);
+void clear_wram(void) PRESERVES_REGS(b, c);
 u16 drag(u16 x);
-u8 xrnd(void) __preserves_regs(b, c);
-void xrnd_init(u16) __preserves_regs(b, c);
-void counter_zero(Counter* c) __preserves_regs(b, c);
-void counter_thirty(Counter* c) __preserves_regs(b, c);
+u8 xrnd(void) PRESERVES_REGS(b, c);
+void xrnd_init(u16) PRESERVES_REGS(b, c);
+void counter_zero(Counter* c) PRESERVES_REGS(b, c);
+void counter_thirty(Counter* c) PRESERVES_REGS(b, c);
 void counter_inc(Counter* c);
 void counter_dec(Counter* c);
 void counter_out(Counter* c, u16 vram);

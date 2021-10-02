@@ -1,4 +1,6 @@
+#ifdef __SDCC
 #include <gb/gb.h>
+#endif
 #include <string.h>
 
 #include "main.h"
@@ -144,7 +146,7 @@ void update_carve1(u8 pos);
 u8 nexttoroom4(u8 pos, u8 valid);
 u8 nexttoroom8(u8 pos, u8 valid);
 void digworm(u8 pos);
-void carvedoors(void);
+u8 carvedoors(void);
 void update_door1(u8 pos);
 void carvecuts(void);
 u8 is_valid_cut(u8 from, u8 to);
@@ -163,9 +165,10 @@ void mapset(u8* pos, u8 w, u8 h, u8 val);
 void sigrect_empty(u8 pos, u8 w, u8 h);
 void sigempty(u8 pos);
 void sigwall(u8 pos);
-u8 sigmatch(u16 pos, u8* sig, u8* mask);
+u8 sigmatch(u16 pos, const u8* sig, const u8* mask);
 u8 ds_union(u8 x, u8 y);
 u8 ds_find(u8 id);
+u8 ds_find_pos(u8 pos);
 u8 getpos(u8 cand);
 
 
@@ -185,6 +188,7 @@ u8 num_voids;
 
 void mapgen(void) {
   u8 fog;
+redo:
   anim_tile_ptr = anim_tiles;
   num_picks = 0;
   num_mobs = 1;
@@ -202,7 +206,7 @@ void mapgen(void) {
     fog = 1;
     roomgen();
     mazeworms();
-    carvedoors();
+    if (!carvedoors()) { goto redo; }
     carvecuts();
     startend();
     fillends();
@@ -429,6 +433,7 @@ void copymap(u8 index) {
 
         // Update disjoint set for the gate area
         ++ds_nextid;
+        ++ds_num_sets;
         ds_sets[pos] = ds_nextid;
         ds_parents[ds_nextid] = ds_nextid;
         ds_sizes[ds_nextid] = 1;
@@ -563,7 +568,7 @@ void digworm(u8 pos) {
   } while(1);
 }
 
-void carvedoors(void) {
+u8 carvedoors(void) {
   u8 pos, match, diff;
 
   memset(tempmap, 0, sizeof(tempmap));
@@ -601,8 +606,16 @@ void carvedoors(void) {
     tempmap[pos] = 0;
   } while (num_cands);
 
-  // TODO: its possible to generate a map that is not fully-connected; in that
-  // case we need to start over.
+  // Make sure all rooms are connected, as well as the gate region, if any. If
+  // not, we'll need to regenerate.
+  u8 id = ds_find_pos(room_pos[0]);
+  for (u8 i = 1; i < num_rooms; ++i) {
+    if (ds_find_pos(room_pos[i]) != id) {
+      return 0;
+    }
+  }
+
+  return dogate ? id == ds_find_pos(gatepos) : 1;
 }
 
 void update_door1(u8 pos) {
@@ -903,9 +916,9 @@ void prettywalls(void) {
 }
 
 void voids(void) {
-  u8 pos, head, oldtail, newtail, valid, newpos, num_walls, id, exit;
+  u8 spos, pos, head, oldtail, newtail, valid, newpos, num_walls, id, exit;
 
-  pos = 0;
+  spos = 0;
   num_voids = 0;
 
   memset(void_num_tiles, 0, sizeof(void_num_tiles));
@@ -913,10 +926,10 @@ void voids(void) {
   memset(tempmap, 0, sizeof(tempmap));
 
   do {
-    if (!tmap[pos]) {
+    if (!tmap[spos]) {
       // flood fill this region
       num_walls = 0;
-      cands[head = 0] = pos;
+      cands[head = 0] = spos;
       newtail = 1;
       id = num_rooms + num_voids + 1;
 
@@ -981,7 +994,7 @@ void voids(void) {
       }
       ++num_voids;
     }
-  } while(++pos);
+  } while(++spos);
 }
 
 void chests(void) {
@@ -1244,7 +1257,7 @@ void sigwall(u8 pos) {
   if (valid & VALID_DR) { sigmap[POS_DR(pos)] |= VALID_UL; }
 }
 
-u8 sigmatch(u16 pos, u8* sig, u8* mask) {
+u8 sigmatch(u16 pos, const u8* sig, const u8* mask) {
   u8 result = 0;
   u8 val = sigmap[pos];
   while (1) {
@@ -1285,6 +1298,10 @@ u8 ds_find(u8 x) {
     x = ds_parents[x] = ds_parents[ds_parents[x]];
   }
   return x;
+}
+
+u8 ds_find_pos(u8 pos) {
+  return ds_find(ds_sets[pos]);
 }
 
 u8 getpos(u8 cand) {

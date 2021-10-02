@@ -74,7 +74,7 @@ const u8 map_bin[] = {
 const uint16_t map_start[] = {0,   99,  176, 196, 231, 255, 279, 327,
                               339, 374, 394, 410, 434, 488, 544, 600};
 
-const uint8_t map_pos[] = {0x33, 0x24, 0x0b, 0x46, 0x50, 0x5c, 0x04, 0xb6,
+const uint8_t map_pos[] = {0x33, 0x24, 0x0b, 0x46, 0x50, 0x5c, 0x04, 0xd6,
                            0x04, 0x00, 0xcc, 0xa0, 0xa4, 0x98, 0x40, 0x59};
 
 const uint8_t map_w[] = {9, 7, 5, 5, 4, 4, 8, 4, 7, 4, 4, 4, 9, 8, 7, 7};
