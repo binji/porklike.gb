@@ -540,6 +540,7 @@ void gameinit(void) {
   move_win(23, 128);
   inv_select_timer = INV_SELECT_FRAMES;
   inv_target_timer = INV_TARGET_FRAMES;
+  inv_selected_pick = PICKUP_TYPE_NONE;
   inv_msg_update = 1;
   memset(equip_type, PICKUP_TYPE_NONE, sizeof(equip_type));
   set_win_tiles(0, 0, INV_WIDTH, INV_HEIGHT, inventory_map);
@@ -1018,6 +1019,7 @@ void use_pickup(void) {
   u16 equip_addr = INV_EQUIP_ADDR - 2 + (inv_select << 5);
   if (--equip_charge[inv_select] == 0) {
     equip_type[inv_select] = PICKUP_TYPE_NONE;
+    inv_selected_pick = PICKUP_TYPE_NONE;
     inv_msg_update = 1;
 
     // Clear equip display
