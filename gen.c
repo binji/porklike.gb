@@ -186,7 +186,11 @@ u8 void_num_tiles[MAX_VOIDS]; // Number of tiles in a void region
 u8 void_exit[MAX_VOIDS];      // Exit tile for a given void region
 u8 num_voids;
 
+u16 floor_seed;
+extern u16 xrnd_seed;
+
 void mapgen(void) {
+  floor_seed = xrnd_seed;
   u8 fog;
 redo:
   anim_tile_ptr = anim_tiles;

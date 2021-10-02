@@ -89,13 +89,14 @@ _is_valid::
 
 .area _DATA
 
-xrnd_seed: .ds 2
+.globl _xrnd_seed
+_xrnd_seed: .ds 2
 
 .area _CODE
 
 _xrnd::
   ;; read seed
-  ld hl, #xrnd_seed
+  ld hl, #_xrnd_seed
   ld a, (hl+)
   ld e, a
   ld a, (hl)
@@ -125,9 +126,9 @@ _xrnd::
 _xrnd_init::
   ldhl sp, #2
   ld a, (hl+)
-  ld (#xrnd_seed), a
+  ld (#_xrnd_seed), a
   ld a, (hl)
-  ld (#xrnd_seed + 1), a
+  ld (#_xrnd_seed + 1), a
   ret
 
 

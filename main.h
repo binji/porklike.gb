@@ -340,4 +340,8 @@ extern u8 mob_anim_speed[];
 extern u8 mob_move_timer[];
 extern u8 mob_flip[];
 
+// Info used for debugging generated levels
+extern u16 floor_seed;
+extern u8 dogate;
+
 #endif // MAIN_H_

@@ -463,11 +463,9 @@ void main(void) NONBANKED {
         counter_inc(&st_floor);
 
         // Set back to FLOOR #
-        if (recover != 0) {
-          vram_copy(INV_FLOOR_ADDR, inventory_map + INV_FLOOR_OFFSET,
-                    INV_FLOOR_3_SPACES_LEN);
-          recover = 0;
-        }
+        vram_copy(INV_FLOOR_ADDR, inventory_map + INV_FLOOR_OFFSET,
+                  INV_FLOOR_3_SPACES_LEN);
+        recover = 0;
       }
       if (doloadfloor) {
         doloadfloor = 0;
@@ -674,6 +672,24 @@ void do_turn(void) {
           is_targeting = 1;
           sfx(SFX_OK);
         }
+      } else if (joy == (J_LEFT | J_START)) {
+        // Display level seed instead of the floor
+        static const u8 hextile[] = {
+            0xe5, 0xe6, 0xe7, 0xe8, 0xe9, 0xea, 0xeb, 0xec,
+            0xed, 0xee, 0xcb, 0xcc, 0xcd, 0xce, 0xcf, 0xd0,
+        };
+
+        set_vram_byte((u8 *)(INV_FLOOR_ADDR),
+                      hextile[(floor_seed >> 12) & 0xf]);
+        set_vram_byte((u8 *)(INV_FLOOR_ADDR + 1),
+                      hextile[(floor_seed >> 8) & 0xf]);
+        set_vram_byte((u8 *)(INV_FLOOR_ADDR + 2),
+                      hextile[(floor_seed >> 4) & 0xf]);
+        set_vram_byte((u8 *)(INV_FLOOR_ADDR + 3), hextile[floor_seed & 0xf]);
+        set_vram_byte((u8 *)(INV_FLOOR_ADDR + 4), TILE_0 + dogate);
+        set_vram_byte((u8 *)(INV_FLOOR_ADDR + 5), 0);
+        set_vram_byte((u8 *)(INV_FLOOR_ADDR + 6), 0);
+        set_vram_byte((u8 *)(INV_FLOOR_ADDR + 7), 0);
       }
     }
   } else if (turn == TURN_PLAYER) {
