@@ -1688,31 +1688,41 @@ void blind(void) {
 }
 
 void calcdist_ai(u8 from, u8 to) {
-  u8 pos, head, oldtail, newtail, valid, dist, newpos, maxdist, dir;
-  cands[head = 0] = pos = to;
+  u8 pos, head, oldtail, newtail, valid, dist, newpos, maxdist;
+  cands[head = 0] = to;
   newtail = 1;
 
   memset(distmap, 0, sizeof(distmap));
-  dist = 0;
+  dist = 1;
   maxdist = 255;
 
   do {
     oldtail = newtail;
-    ++dist;
     do {
-      pos = cands[head++];
-      if (pos == from) { maxdist = dist + 1; }
+      pos = cands[head];
+      if (pos == from) { maxdist = dist + 2; }
       if (!distmap[pos]) {
         distmap[pos] = dist;
         valid = validmap[pos];
-        for (dir = 0; dir < 4; ++dir) {
-          if ((valid & dirvalid[dir]) && !distmap[newpos = POS_DIR(pos, dir)]) {
-            if (!IS_MOB_AI(tmap[newpos], newpos)) { cands[newtail++] = newpos; }
-          }
+        if ((valid & VALID_U) && !distmap[newpos = POS_U(pos)] &&
+            !IS_MOB_AI(tmap[newpos], newpos)) {
+          cands[newtail++] = newpos;
+        }
+        if ((valid & VALID_D) && !distmap[newpos = POS_D(pos)] &&
+            !IS_MOB_AI(tmap[newpos], newpos)) {
+          cands[newtail++] = newpos;
+        }
+        if ((valid & VALID_L) && !distmap[newpos = POS_L(pos)] &&
+            !IS_MOB_AI(tmap[newpos], newpos)) {
+          cands[newtail++] = newpos;
+        }
+        if ((valid & VALID_R) && !distmap[newpos = POS_R(pos)] &&
+            !IS_MOB_AI(tmap[newpos], newpos)) {
+          cands[newtail++] = newpos;
         }
       }
-    } while (head != oldtail);
-  } while (oldtail != newtail && dist != maxdist);
+    } while (++head != oldtail);
+  } while (++dist != maxdist && oldtail != newtail);
 }
 
 void animate(void) {
