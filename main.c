@@ -243,7 +243,6 @@ u8 addspr(u8 speed, u16 x, u16 y, u16 dx, u16 dy, u8 drag, u8 timer, u8 prop);
 
 void nop_saw_anim(u8 pos);
 
-u8 padding[96]; // XXX gotta be a better way to align this...
 OAM_item_t shadow_OAM2[40];
 
 Map tmap;        // Tile map (everything unfogged)

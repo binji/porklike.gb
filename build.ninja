@@ -23,7 +23,7 @@ rule asm
   description = lcc $out
 
 rule link
-  command = ../gbdk/bin/lcc -Wl-j -Wl-m -Wl-w -Wl-yo4 -Wl-yt1 -Wm-ynPORKLIKE -Wm-yS $in -o $out
+  command = ../gbdk/bin/lcc -Wl-j -Wl-m -Wl-w -Wl-yo4 -Wl-yt1 -Wm-ynPORKLIKE -Wm-yS -Wl-b_DATA=0xC100 $in -o $out
   description = link $out
 
 build out/bg.bin: rgbgfx bg.png
