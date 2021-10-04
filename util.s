@@ -18,8 +18,7 @@ _drag::
   ld a, (hl+)
   ld c, a
   ld e, a
-  ld a, (hl)
-  ld b, a
+  ld b, (hl)
   ld d, b
   ; bc >>= 3  (signed)
   sra b
@@ -98,9 +97,9 @@ _xrnd::
   ;; read seed
   ld hl, #_xrnd_seed
   ld a, (hl+)
+  ld d, (hl)
   ld e, a
-  ld a, (hl)
-  ld d, a
+  ld a, d
 
   ;; xorshift
   rra
@@ -119,8 +118,7 @@ _xrnd::
 
   ; write back seed
   ld (hl-), a
-  ld a, e
-  ld (hl), a
+  ld (hl), e
   ret
 
 _xrnd_init::
@@ -135,10 +133,8 @@ _xrnd_init::
 _counter_zero::
   ldhl sp, #2
   ld a, (hl+)
-  ld e, a
-  ld a, (hl)
-  ld h, a
-  ld l, e
+  ld h, (hl)
+  ld l, a
 
   ld a, #4
   ld (hl+), a  ; start=4
@@ -153,10 +149,8 @@ _counter_zero::
 _counter_thirty::
   ldhl sp, #2
   ld a, (hl+)
-  ld e, a
-  ld a, (hl)
-  ld h, a
-  ld l, e
+  ld h, (hl)
+  ld l, a
 
   ld a, #3
   ld (hl+), a  ; start=3
@@ -173,10 +167,9 @@ _counter_thirty::
 _counter_inc::
   ldhl sp, #2
   ld a, (hl+)
+  ld d, (hl)
   ld e, a
-  ld a, (hl)
-  ld d, a
-  ld h, a
+  ld h, d
   ld l, e   ; hl = de = [sp+2]
 
   inc hl
@@ -221,10 +214,9 @@ _counter_inc::
 _counter_dec::
   ldhl sp, #2
   ld a, (hl+)
+  ld d, (hl)
   ld e, a
-  ld a, (hl)
-  ld d, a
-  ld h, a
+  ld h, d
   ld l, e   ; hl = de = [sp+2]
 
   inc hl
@@ -269,10 +261,8 @@ _counter_dec::
 _counter_out::
   ldhl sp, #2
   ld a, (hl+)
-  ld e, a
-  ld a, (hl)
-  ld h, a
-  ld l, e
+  ld h, (hl)
+  ld l, a
 
   ld a, (hl+)  ; read start value
   ld b, a      ; copy it to b
@@ -292,10 +282,8 @@ _counter_out::
 
   ldhl sp, #4
   ld a, (hl+)
-  ld b, a
-  ld a, (hl)
-  ld h, a
-  ld l, b      ; hl = dest
+  ld h, (hl)
+  ld l, a      ; hl = dest
 
 1$:
   ldh a, (#0x41) ; wait until VRAM is unlocked
@@ -313,21 +301,17 @@ _counter_out::
 ; void vram_copy(u16 dst, void* src, u8 len);
 _vram_copy::
   ldhl sp, #6
-  ld a, (hl)
-  ld c, a
+  ld c, (hl)
 
   ldhl sp, #4
   ld a, (hl+)
-  ld e, a
-  ld a, (hl)
-  ld d, a  ; de = src
+  ld d, (hl)
+  ld e, a  ; de = src
 
   ldhl sp, #2
   ld a, (hl+)
-  ld b, a
-  ld a, (hl)
-  ld h, a
-  ld l, b  ; hl = dst
+  ld h, (hl)
+  ld l, a  ; hl = dst
 
 1$:
   ldh a, (#0x41) ; wait until VRAM is unlocked
