@@ -88,8 +88,7 @@ _is_valid::
 
 .area _DATA
 
-.globl _xrnd_seed
-_xrnd_seed: .ds 2
+_xrnd_seed:: .ds 2
 
 .area _CODE
 
@@ -324,4 +323,299 @@ _vram_copy::
 
   dec c
   jr nz, 1$
+  ret
+
+; zero page vars
+HEAD=0x93
+TAIL=0x94
+NEWTAIL=0x95
+OLDTAIL=0x96
+MAXDIST=0x97
+DIST=0x98
+
+; void calcdist_ai(u8 from, u8 to);
+;   [sp+2] = from
+;   [sp+3] = to
+_calcdist_ai::
+;main.c:1691: cands[head = 0] = to;
+  xor a
+  ldh (HEAD), a
+  ldhl sp,  #3
+  ld a, (hl)
+  ld hl, #_cands
+  ld (hl), a
+;main.c:1692: newtail = 1;
+  ld a, #1
+  ldh (NEWTAIL), a
+;main.c:1694: memset(distmap, 0, sizeof(distmap));
+  ld hl, #_distmap
+  ld d, #32
+  xor a
+016$:
+  ld (hl+), a
+  ld (hl+), a
+  ld (hl+), a
+  ld (hl+), a
+  ld (hl+), a
+  ld (hl+), a
+  ld (hl+), a
+  ld (hl+), a
+  dec d
+  jr nz, 016$
+;main.c:1696: maxdist = 255;
+  ld a, #255
+  ldh (MAXDIST), a
+;main.c:1698: dist = 1;
+  ld a, #1
+  ldh (DIST), a
+00133$:
+;main.c:1699: oldtail = newtail;
+  ldh a, (NEWTAIL)
+  ldh (OLDTAIL), a
+00129$:
+;main.c:1701: pos = cands[head];
+  ldh a, (HEAD)
+  ld e, a
+  ld d, #>_cands
+  ld a, (de)
+  ld e, a           ; e => pos
+;main.c:1702: if (pos == from) { maxdist = dist + 2; }
+  ldhl sp, #2
+  ld b, (hl)
+  ld a, e
+  sub b
+  jr nz, 00102$
+  ldh a, (DIST)
+  add #2
+  ldh (MAXDIST), a
+00102$:
+;main.c:1703: if (!distmap[pos]) {
+  ld d, #>_distmap
+  ld a, (de)
+  or a
+  jp nz, 00130$
+;main.c:1704: distmap[pos] = dist;
+  ldh a, (DIST)
+  ld (de), a
+;main.c:1705: valid = validmap[pos];
+  ld d, #>_validmap
+  ld a, (de)
+  ld b, a     ; b => valid
+  ld c, e     ; c => pos
+
+;main.c:1706: if ((valid & VALID_U) && !distmap[newpos = POS_U(pos)] &&
+  bit 5, b
+  jr z, 00104$
+  ld a, c
+  add #0xf0
+  ld e, a     ; e => newpos
+  ld d, #>_distmap
+  ld a, (de)
+  or a
+  jr nz, 00104$
+;main.c:1707: !IS_MOB_AI(tmap[newpos], newpos)) {
+  ; first get the tile (tmap is aligned)
+  ld d, #>_tmap
+  ld a, (de)
+  ; now read the flags for this tile (flags_bin is not aligned)
+  add #<_flags_bin
+  ld l, a
+  ld a, #0
+  adc #>_flags_bin
+  ld h, a
+  ld a, (hl)
+  and #3
+  jr nz, 00104$
+  ; now get mobmap[newpos] and check if it is non-zero
+  ld d, #>_mobmap
+  ld a, (de)
+  or a
+  jr z, 00103$
+  ; there's a mob here, but maybe it's active
+  dec a
+  add #<_mob_active
+  ld l, a
+  ld a, #0
+  adc #>_mob_active
+  ld h, a
+  ld a, (hl)
+  or a
+  jr z, 00104$
+00103$:
+;main.c:1708: cands[newtail++] = newpos;
+  ld hl, #0xff00 + NEWTAIL
+  ld a, (hl)
+  inc (hl)
+  ld l, a
+  ld h, #>_cands
+  ld (hl), e
+00104$:
+
+;main.c:1710: if ((valid & VALID_D) && !distmap[newpos = POS_D(pos)] &&
+  bit 4, b
+  jr z, 00110$
+  ld a, c
+  add #0x10
+  ld e, a     ; e => newpos
+  ld d, #>_distmap
+  ld a, (de)
+  or a
+  jr nz, 00110$
+;main.c:1707: !IS_MOB_AI(tmap[newpos], newpos)) {
+  ; first get the tile (tmap is aligned)
+  ld d, #>_tmap
+  ld a, (de)
+  ; now read the flags for this tile (flags_bin is not aligned)
+  add #<_flags_bin
+  ld l, a
+  ld a, #0
+  adc #>_flags_bin
+  ld h, a
+  ld a, (hl)
+  and #3
+  jr nz, 00110$
+  ; now get mobmap[newpos] and check if it is non-zero
+  ld d, #>_mobmap
+  ld a, (de)
+  or a
+  jr z, 00109$
+  ; there's a mob here, but maybe it's active
+  dec a
+  add #<_mob_active
+  ld l, a
+  ld a, #0
+  adc #>_mob_active
+  ld h, a
+  ld a, (hl)
+  or a
+  jr z, 00110$
+00109$:
+;main.c:1708: cands[newtail++] = newpos;
+  ld hl, #0xff00 + NEWTAIL
+  ld a, (hl)
+  inc (hl)
+  ld l, a
+  ld h, #>_cands
+  ld (hl), e
+00110$:
+
+;main.c:1714: if ((valid & VALID_L) && !distmap[newpos = POS_L(pos)] &&
+  bit 7, b
+  jr z, 00116$
+  ld a, c
+  dec a
+  ld e, a     ; e => newpos
+  ld d, #>_distmap
+  ld a, (de)
+  or a
+  jr nz, 00116$
+;main.c:1707: !IS_MOB_AI(tmap[newpos], newpos)) {
+  ; first get the tile (tmap is aligned)
+  ld d, #>_tmap
+  ld a, (de)
+  ; now read the flags for this tile (flags_bin is not aligned)
+  add #<_flags_bin
+  ld l, a
+  ld a, #0
+  adc #>_flags_bin
+  ld h, a
+  ld a, (hl)
+  and #3
+  jr nz, 00116$
+  ; now get mobmap[newpos] and check if it is non-zero
+  ld d, #>_mobmap
+  ld a, (de)
+  or a
+  jr z, 00115$
+  ; there's a mob here, but maybe it's active
+  dec a
+  add #<_mob_active
+  ld l, a
+  ld a, #0
+  adc #>_mob_active
+  ld h, a
+  ld a, (hl)
+  or a
+  jr z, 00116$
+00115$:
+;main.c:1708: cands[newtail++] = newpos;
+  ld hl, #0xff00 + NEWTAIL
+  ld a, (hl)
+  inc (hl)
+  ld l, a
+  ld h, #>_cands
+  ld (hl), e
+00116$:
+
+;main.c:1718: if ((valid & VALID_R) && !distmap[newpos = POS_R(pos)] &&
+  bit 6, b
+  jr z, 00130$
+  ld a, c
+  inc a
+  ld e, a     ; e => newpos
+  ld d, #>_distmap
+  ld a, (de)
+  or a
+  jr nz, 00130$
+;main.c:1707: !IS_MOB_AI(tmap[newpos], newpos)) {
+  ; first get the tile (tmap is aligned)
+  ld d, #>_tmap
+  ld a, (de)
+  ; now read the flags for this tile (flags_bin is not aligned)
+  add #<_flags_bin
+  ld l, a
+  ld a, #0
+  adc #>_flags_bin
+  ld h, a
+  ld a, (hl)
+  and #3
+  jr nz, 00130$
+  ; now get mobmap[newpos] and check if it is non-zero
+  ld d, #>_mobmap
+  ld a, (de)
+  or a
+  jr z, 00121$
+  ; there's a mob here, but maybe it's active
+  dec a
+  add #<_mob_active
+  ld l, a
+  ld a, #0
+  adc #>_mob_active
+  ld h, a
+  ld a, (hl)
+  or a
+  jr z, 00130$
+00121$:
+;main.c:1708: cands[newtail++] = newpos;
+  ld hl, #0xff00 + NEWTAIL
+  ld a, (hl)
+  inc (hl)
+  ld l, a
+  ld h, #>_cands
+  ld (hl), e
+00130$:
+
+;main.c:1723: } while (++head != oldtail);
+  ld hl, #0xff00 + HEAD
+  inc (hl)
+  ld e, (hl)
+  ldh a, (OLDTAIL)
+  sub e
+  jp  nz, 00129$
+
+;main.c:1724: } while (++dist != maxdist && oldtail != newtail);
+  ld hl, #0xff00 + DIST
+  inc (hl)
+  ld e, (hl)
+  ldh a, (MAXDIST)
+  sub e
+  jr z, 00136$
+
+  ldh a, (OLDTAIL)
+  ld e, a
+  ldh a, (NEWTAIL)
+  sub e
+  jp nz, 00133$
+00136$:
+;main.c:1725: }
   ret

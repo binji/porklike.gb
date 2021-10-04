@@ -10,7 +10,6 @@
 #include "out/tilesprites.h"
 #include "out/tiledead.h"
 
-#define MAX_CANDS 256
 #define MAX_DEAD_MOBS 4
 #define MAX_MOBS 32    /* XXX Figure out what this should be */
 #define MAX_PICKUPS 16 /* XXX Figure out what this should be */
@@ -243,20 +242,8 @@ u8 addspr(u8 speed, u16 x, u16 y, u16 dx, u16 dy, u8 drag, u8 timer, u8 prop);
 
 void nop_saw_anim(u8 pos);
 
-OAM_item_t __at(0xc100) shadow_OAM2[40];
-
-Map tmap;        // Tile map (everything unfogged)
-Map dtmap;       // Display tile map (w/ fogged tiles) (used for bulk updates)
-Map dirtymap;    // Which display tiles need to be updated
-Map roommap;     // Room/void map
-Map distmap;     // Distance map
-Map mobmap;      // Mob map
-Map pickmap;     // Pickup map
-Map sigmap;      // Signature map (tracks neighbors) **only used during mapgen
-Map tempmap;     // Temp map (used for carving)      **only used during mapgen
-Map mobsightmap; // Always checks 4 steps from player
-Map fogmap;      // Tiles player hasn't seen
-Map sawmap;      // Map from saw to its animation code addr in tile_code
+extern OAM_item_t shadow_OAM2[40];
+extern u8 mobsightmap[256];
 
 u8 room_pos[MAX_ROOMS];
 u8 room_w[MAX_ROOMS];
@@ -268,7 +255,6 @@ u8 start_room;
 u8 floor;
 u8 startpos;
 
-u8 cands[MAX_CANDS];
 u8 num_cands;
 
 MobType mob_type[MAX_MOBS];
@@ -1684,44 +1670,6 @@ void blind(void) {
     doblind = 1;
     sfx(SFX_BLIND);
   }
-}
-
-void calcdist_ai(u8 from, u8 to) {
-  u8 pos, head, oldtail, newtail, valid, dist, newpos, maxdist;
-  cands[head = 0] = to;
-  newtail = 1;
-
-  memset(distmap, 0, sizeof(distmap));
-  dist = 1;
-  maxdist = 255;
-
-  do {
-    oldtail = newtail;
-    do {
-      pos = cands[head];
-      if (pos == from) { maxdist = dist + 2; }
-      if (!distmap[pos]) {
-        distmap[pos] = dist;
-        valid = validmap[pos];
-        if ((valid & VALID_U) && !distmap[newpos = POS_U(pos)] &&
-            !IS_MOB_AI(tmap[newpos], newpos)) {
-          cands[newtail++] = newpos;
-        }
-        if ((valid & VALID_D) && !distmap[newpos = POS_D(pos)] &&
-            !IS_MOB_AI(tmap[newpos], newpos)) {
-          cands[newtail++] = newpos;
-        }
-        if ((valid & VALID_L) && !distmap[newpos = POS_L(pos)] &&
-            !IS_MOB_AI(tmap[newpos], newpos)) {
-          cands[newtail++] = newpos;
-        }
-        if ((valid & VALID_R) && !distmap[newpos = POS_R(pos)] &&
-            !IS_MOB_AI(tmap[newpos], newpos)) {
-          cands[newtail++] = newpos;
-        }
-      }
-    } while (++head != oldtail);
-  } while (++dist != maxdist && oldtail != newtail);
 }
 
 void animate(void) {
