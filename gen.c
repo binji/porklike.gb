@@ -139,6 +139,7 @@ const u8 mob_type_key[] = {
 
 void mapgeninit(void);
 void initdtmap(void);
+void initflagmap(void);
 void copymap(u8 index);
 void roomgen(void);
 void mazeworms(void);
@@ -221,6 +222,7 @@ redo:
     spawnmobs();
   }
   memset(fogmap, fog, sizeof(fogmap));
+  initflagmap();
   sight();
   initdtmap();
 }
@@ -1082,7 +1084,7 @@ void decoration(void) {
         switch (kind) {
           case ROOM_KIND_VASE:
             mob = vase_mobs[randint(sizeof(vase_mobs))];
-            if (mob && !IS_SMARTMOB(tile, pos) && IS_FREESTANDING(pos) &&
+            if (mob && !IS_SMARTMOB_TILE(tile, pos) && IS_FREESTANDING(pos) &&
                 (h == room_h[room] || h == 1 || w == room_w[room] || w == 1)) {
               addmob(mob, pos);
             }
@@ -1119,7 +1121,7 @@ void decoration(void) {
               tmap[pos] = TILE_WALL_FACE_PLANT;
             }
 
-            if (!IS_SMARTMOB(tile, pos) && room + 1 != start_room &&
+            if (!IS_SMARTMOB_TILE(tile, pos) && room + 1 != start_room &&
                 XRND_25_PERCENT() && no_mob_neighbors(pos) &&
                 IS_FREESTANDING(pos)) {
               mob = plant_mobs[randint(sizeof(plant_mobs))];
@@ -1157,7 +1159,7 @@ void spawnmobs(void) {
   do {
     room = roommap[pos];
     if (room && room != start_room && room <= num_rooms &&
-        !IS_SMARTMOB(tmap[pos], pos) && !room_avoid[room - 1]) {
+        !IS_SMARTMOB_TILE(tmap[pos], pos) && !room_avoid[room - 1]) {
       tempmap[pos] = 1;
       ++num_cands;
     } else {
@@ -1200,6 +1202,13 @@ void initdtmap(void) {
   u8 pos = 0;
   do {
     dtmap[pos] = fogmap[pos] ? 0 : tmap[pos];
+  } while(++pos);
+}
+
+void initflagmap(void) {
+  u8 pos = 0;
+  do {
+    flagmap[pos] = flags_bin[tmap[pos]];
   } while(++pos);
 }
 

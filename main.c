@@ -118,9 +118,7 @@
 #define PICKUP_CHARGES 2
 
 #define IS_MOB(pos) (mobmap[pos])
-#define IS_WALL_OR_MOB(tile, pos) (IS_WALL_TILE(tile) || mobmap[pos])
-#define IS_MOB_AI(tile, pos)                                                   \
-  ((flags_bin[tile] & 3) || (mobmap[pos] && !mob_active[mobmap[pos] - 1]))
+#define IS_WALL_OR_MOB(pos) (IS_WALL_POS(pos) || mobmap[pos])
 #define IS_UNSPECIAL_WALL_TILE(tile)                                           \
   ((flags_bin[tile] & 0b00000011) == 0b00000001)
 
@@ -880,7 +878,7 @@ void use_pickup(void) {
       land = hit;
       hit = POS_DIR(hit, target_dir);
     }
-  } while(valid && !IS_WALL_OR_MOB(tmap[hit], hit));
+  } while(valid && !IS_WALL_OR_MOB(hit));
 
   u8 mob1 = mobmap[pos1];
   u8 mob2 = mobmap[pos2];
@@ -889,7 +887,7 @@ void use_pickup(void) {
   u8 spr;
   switch (inv_selected_pick) {
     case PICKUP_TYPE_JUMP:
-      if (valid2 && !IS_WALL_OR_MOB(tmap[pos2], pos2)) {
+      if (valid2 && !IS_WALL_OR_MOB(pos2)) {
         if (mob1) {
           mob_stun[mob1 - 1] = 1;
         }
@@ -940,7 +938,7 @@ void use_pickup(void) {
       mobbump(PLAYER_MOB, target_dir);
       if (valid1) {
         hitpos(pos1, 2, 0);
-        if (IS_BREAKABLE_WALL(tmap[pos1])) {
+        if (IS_BREAKABLE_WALL_POS(pos1)) {
           update_tile(pos1, dirt_tiles[xrnd() & 3]);
           update_wall_face(pos1);
           sfx(SFX_DESTROY_WALL);
@@ -975,7 +973,7 @@ void use_pickup(void) {
     }
 
     case PICKUP_TYPE_SUPLEX:
-      if (valid1 && validb && mob1 && !IS_WALL_OR_MOB(tmap[posb], posb)) {
+      if (valid1 && validb && mob1 && !IS_WALL_OR_MOB(posb)) {
         mobhop(mob1 - 1, posb);
         mob_stun[mob1 - 1] = 1;
         mob_trigger[mob1 - 1] = 1;
@@ -988,7 +986,7 @@ void use_pickup(void) {
 
     case PICKUP_TYPE_SLAP:
       if (validb) {
-        if (IS_WALL_OR_MOB(tmap[posb], posb)) {
+        if (IS_WALL_OR_MOB(posb)) {
           mobbump(PLAYER_MOB, invdir[target_dir]);
         } else {
           mobhop(PLAYER_MOB, posb);
@@ -1189,7 +1187,7 @@ void hitmob(u8 index, u8 dmg) {
       sound = SFX_BOOM;
     } else {
       percent = 20;
-      if (!(validmap[pos] & VALID_U) || IS_BREAKABLE_WALL(tmap[POS_U(pos)])) {
+      if (!(validmap[pos] & VALID_U) || IS_BREAKABLE_WALL_POS(POS_U(pos))) {
         tile = TILE_WALL_FACE_RUBBLE;
       } else {
         tile = dirt_tiles[xrnd() & 3];
@@ -1198,7 +1196,7 @@ void hitmob(u8 index, u8 dmg) {
     }
 
     delmob(index);
-    if (!IS_SPECIAL_TILE(tmap[pos])) {
+    if (!IS_SPECIAL_POS(pos)) {
       update_tile(pos, tile);
     }
 
@@ -1469,10 +1467,9 @@ u8 ai_run_mob_task(u8 index) {
 
             // Check whether we can jump all the way to the target
             u8 spos = pos;
-            u8 tile;
-            while (spos != tpos && !IS_WALL_TILE(tile = tmap[spos])) {
+            while (spos != tpos && !IS_WALL_POS(spos)) {
               spos = POS_DIR(spos, sdir);
-              if (distmap[spos] == 2 && !IS_SMARTMOB(tile, spos)) {
+              if (distmap[spos] == 2 && !IS_SMARTMOB_POS(spos)) {
                 // found it, jump here
                 mobdir(index, sdir);
                 mobhop(index, spos);
@@ -1551,7 +1548,7 @@ u8 ai_getnextstep(u8 index) {
   for (i = 0; i < 4; ++i) {
     u8 dir = *dir_perm++;
     newpos = POS_DIR(pos, dir);
-    if ((valid & dirvalid[dir]) && !IS_SMARTMOB(tmap[newpos], newpos) &&
+    if ((valid & dirvalid[dir]) && !IS_SMARTMOB_POS(newpos) &&
         (dist = distmap[newpos]) && dist < bestval) {
       bestval = dist;
       bestdir = dir;
@@ -1573,7 +1570,7 @@ u8 ai_getnextstep_rev(u8 index) {
   for (i = 0; i < 4; ++i) {
     u8 dir = *dir_perm++;
     newpos = POS_DIR(pos, dir);
-    if ((valid & dirvalid[dir]) && !IS_SMARTMOB(tmap[newpos], newpos) &&
+    if ((valid & dirvalid[dir]) && !IS_SMARTMOB_POS(newpos) &&
         (dist = distmap[newpos]) && dist > bestval) {
       bestval = dist;
       bestdir = dir;
@@ -1616,7 +1613,7 @@ void sight(void) NONBANKED {
         unfog_tile(pos);
 
         // Potentially start animating this tile
-        if (IS_ANIMATED_TILE(tmap[pos])) {
+        if (IS_ANIMATED_POS(pos)) {
           *anim_tile_ptr++ = pos;
 
           // Store the offset into anim_tiles for this animated saw
@@ -1626,7 +1623,7 @@ void sight(void) NONBANKED {
         }
       }
 
-      if (first || !IS_OPAQUE_TILE(tmap[pos])) {
+      if (first || !IS_OPAQUE_POS(pos)) {
         first = 0;
         valid = validmap[pos];
 
@@ -1634,7 +1631,7 @@ void sight(void) NONBANKED {
         if (dist < maxdist) {
           for (dir = 0; dir < 4; ++dir) {
             if ((valid & dirvalid[dir]) && fogmap[adjpos = POS_DIR(pos, dir)] &&
-                IS_WALL_TILE(tmap[adjpos])) {
+                IS_WALL_POS(adjpos)) {
               unfog_tile(adjpos);
             }
           }
@@ -1882,6 +1879,7 @@ void dirty_tile(u8 pos) NONBANKED {
 
 void update_tile(u8 pos, u8 tile) {
   tmap[pos] = tile;
+  flagmap[pos] = flags_bin[tile];
   dirty_tile(pos);
 }
 
@@ -2136,7 +2134,7 @@ void update_sprites(void) {
             u8 pos = mob_pos[mob - 1];
             if (validmap[pos] & dirvalid[dir]) {
               u8 newpos = POS_DIR(pos, dir);
-              if (!IS_WALL_OR_MOB(tmap[newpos], newpos)) {
+              if (!IS_WALL_OR_MOB(newpos)) {
                 mobwalk(mob - 1, dir);
               } else {
                 mobbump(mob - 1, dir);
@@ -2395,7 +2393,7 @@ u8 dropspot(u8 pos) {
   u8 i = 0, newpos;
   do {
     if ((newpos = is_valid(pos, drop_diff[i])) &&
-        !(IS_SMARTMOB(tmap[newpos], newpos) || pickmap[newpos])) {
+        !(IS_SMARTMOB_POS(newpos) || pickmap[newpos])) {
       return newpos;
     }
   } while (++i);

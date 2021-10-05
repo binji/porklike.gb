@@ -38,7 +38,9 @@ _mobmap::      .ds 256
 ; Pickup map
 _pickmap::     .ds 256
 ; Signature map (tracks neighbors) **only used during mapgen
-_sigmap::      .ds 256
+; Flag map (flags for tmap)
+_sigmap::
+_flagmap::     .ds 256
 ; Temp map (used for carving)      **only used during mapgen
 _tempmap::     .ds 256
 ; Always checks 4 steps from player

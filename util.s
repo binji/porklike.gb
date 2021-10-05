@@ -326,12 +326,11 @@ _vram_copy::
   ret
 
 ; zero page vars
-HEAD=0x93
-TAIL=0x94
-NEWTAIL=0x95
+DIST=0x93
+MAXDIST=0x94
+HEAD=0x95
 OLDTAIL=0x96
-MAXDIST=0x97
-DIST=0x98
+NEWTAIL=0x97
 
 ; void calcdist_ai(u8 from, u8 to);
 ;   [sp+2] = from
@@ -379,6 +378,15 @@ _calcdist_ai::
   ld d, #>_cands
   ld a, (de)
   ld e, a           ; e => pos
+;main.c:1703: if (!(distmap[pos] == 0 || distmap[pos] == 255)) {
+  ld d, #>_distmap
+  ld a, (de)
+  or a
+  jr z, 00101$
+  inc a
+  jr z, 00101$
+  jp 00131$
+00101$:
 ;main.c:1702: if (pos == from) { maxdist = dist + 2; }
   ldhl sp, #2
   ld b, (hl)
@@ -389,11 +397,6 @@ _calcdist_ai::
   add #2
   ldh (MAXDIST), a
 00102$:
-;main.c:1703: if (!distmap[pos]) {
-  ld d, #>_distmap
-  ld a, (de)
-  or a
-  jp nz, 00130$
 ;main.c:1704: distmap[pos] = dist;
   ldh a, (DIST)
   ld (de), a
@@ -405,25 +408,22 @@ _calcdist_ai::
 
 ;main.c:1706: if ((valid & VALID_U) && !distmap[newpos = POS_U(pos)] &&
   bit 5, b
-  jr z, 00104$
+  jr z, 00105$
   ld a, c
   add #0xf0
   ld e, a     ; e => newpos
   ld d, #>_distmap
   ld a, (de)
   or a
-  jr nz, 00104$
+  jr nz, 00105$
+  ; mark as pending
+  ld a, #255
+  ld d, #>_distmap
+  ld (de), a
 ;main.c:1707: !IS_MOB_AI(tmap[newpos], newpos)) {
-  ; first get the tile (tmap is aligned)
-  ld d, #>_tmap
+  ; get the flag bits
+  ld d, #>_flagmap
   ld a, (de)
-  ; now read the flags for this tile (flags_bin is not aligned)
-  add #<_flags_bin
-  ld l, a
-  ld a, #0
-  adc #>_flags_bin
-  ld h, a
-  ld a, (hl)
   and #3
   jr nz, 00104$
   ; now get mobmap[newpos] and check if it is non-zero
@@ -443,35 +443,38 @@ _calcdist_ai::
   jr z, 00104$
 00103$:
 ;main.c:1708: cands[newtail++] = newpos;
-  ld hl, #0xff00 + NEWTAIL
-  ld a, (hl)
-  inc (hl)
+  ldh a, (NEWTAIL)
   ld l, a
   ld h, #>_cands
   ld (hl), e
+  inc a
+  ldh (NEWTAIL), a
+  jr 00105$
 00104$:
+  ; failed to add this pos, mark it as visited
+  ld a, #254
+  ld d, #>_distmap
+  ld (de), a
+00105$:
 
 ;main.c:1710: if ((valid & VALID_D) && !distmap[newpos = POS_D(pos)] &&
   bit 4, b
-  jr z, 00110$
+  jr z, 00111$
   ld a, c
   add #0x10
   ld e, a     ; e => newpos
   ld d, #>_distmap
   ld a, (de)
   or a
-  jr nz, 00110$
+  jr nz, 00111$
+  ; mark as pending
+  ld a, #255
+  ld d, #>_distmap
+  ld (de), a
 ;main.c:1707: !IS_MOB_AI(tmap[newpos], newpos)) {
-  ; first get the tile (tmap is aligned)
-  ld d, #>_tmap
+  ; get the flag bits
+  ld d, #>_flagmap
   ld a, (de)
-  ; now read the flags for this tile (flags_bin is not aligned)
-  add #<_flags_bin
-  ld l, a
-  ld a, #0
-  adc #>_flags_bin
-  ld h, a
-  ld a, (hl)
   and #3
   jr nz, 00110$
   ; now get mobmap[newpos] and check if it is non-zero
@@ -491,35 +494,38 @@ _calcdist_ai::
   jr z, 00110$
 00109$:
 ;main.c:1708: cands[newtail++] = newpos;
-  ld hl, #0xff00 + NEWTAIL
-  ld a, (hl)
-  inc (hl)
+  ldh a, (NEWTAIL)
   ld l, a
   ld h, #>_cands
   ld (hl), e
+  inc a
+  ldh (NEWTAIL), a
+  jr 00111$
 00110$:
+  ; failed to add this pos, mark it as visited
+  ld a, #254
+  ld d, #>_distmap
+  ld (de), a
+00111$:
 
 ;main.c:1714: if ((valid & VALID_L) && !distmap[newpos = POS_L(pos)] &&
   bit 7, b
-  jr z, 00116$
+  jr z, 00117$
   ld a, c
   dec a
   ld e, a     ; e => newpos
   ld d, #>_distmap
   ld a, (de)
   or a
-  jr nz, 00116$
+  jr nz, 00117$
+  ; mark as pending
+  ld a, #255
+  ld d, #>_distmap
+  ld (de), a
 ;main.c:1707: !IS_MOB_AI(tmap[newpos], newpos)) {
-  ; first get the tile (tmap is aligned)
-  ld d, #>_tmap
+  ; get the flag bits
+  ld d, #>_flagmap
   ld a, (de)
-  ; now read the flags for this tile (flags_bin is not aligned)
-  add #<_flags_bin
-  ld l, a
-  ld a, #0
-  adc #>_flags_bin
-  ld h, a
-  ld a, (hl)
   and #3
   jr nz, 00116$
   ; now get mobmap[newpos] and check if it is non-zero
@@ -539,35 +545,38 @@ _calcdist_ai::
   jr z, 00116$
 00115$:
 ;main.c:1708: cands[newtail++] = newpos;
-  ld hl, #0xff00 + NEWTAIL
-  ld a, (hl)
-  inc (hl)
+  ldh a, (NEWTAIL)
   ld l, a
   ld h, #>_cands
   ld (hl), e
+  inc a
+  ldh (NEWTAIL), a
+  jr 00117$
 00116$:
+  ; failed to add this pos, mark it as visited
+  ld a, #254
+  ld d, #>_distmap
+  ld (de), a
+00117$:
 
 ;main.c:1718: if ((valid & VALID_R) && !distmap[newpos = POS_R(pos)] &&
   bit 6, b
-  jr z, 00130$
+  jr z, 00131$
   ld a, c
   inc a
   ld e, a     ; e => newpos
   ld d, #>_distmap
   ld a, (de)
   or a
-  jr nz, 00130$
+  jr nz, 00131$
+  ; mark as pending
+  ld a, #255
+  ld d, #>_distmap
+  ld (de), a
 ;main.c:1707: !IS_MOB_AI(tmap[newpos], newpos)) {
-  ; first get the tile (tmap is aligned)
-  ld d, #>_tmap
+  ; get the flag bits
+  ld d, #>_flagmap
   ld a, (de)
-  ; now read the flags for this tile (flags_bin is not aligned)
-  add #<_flags_bin
-  ld l, a
-  ld a, #0
-  adc #>_flags_bin
-  ld h, a
-  ld a, (hl)
   and #3
   jr nz, 00130$
   ; now get mobmap[newpos] and check if it is non-zero
@@ -587,34 +596,37 @@ _calcdist_ai::
   jr z, 00130$
 00121$:
 ;main.c:1708: cands[newtail++] = newpos;
-  ld hl, #0xff00 + NEWTAIL
-  ld a, (hl)
-  inc (hl)
+  ldh a, (NEWTAIL)
   ld l, a
   ld h, #>_cands
   ld (hl), e
+  inc a
+  ldh (NEWTAIL), a
+  jr 00131$
 00130$:
+  ; failed to add this pos, mark it as visited
+  ld a, #254
+  ld d, #>_distmap
+  ld (de), a
+00131$:
 
 ;main.c:1723: } while (++head != oldtail);
   ld hl, #0xff00 + HEAD
   inc (hl)
-  ld e, (hl)
-  ldh a, (OLDTAIL)
-  sub e
+  ld a, (hl+)
+  sub (hl)      ; OLDTAIL
   jp  nz, 00129$
 
 ;main.c:1724: } while (++dist != maxdist && oldtail != newtail);
   ld hl, #0xff00 + DIST
   inc (hl)
-  ld e, (hl)
-  ldh a, (MAXDIST)
-  sub e
+  ld a, (hl+)
+  sub (hl)      ; MAXDIST
   jr z, 00136$
 
-  ldh a, (OLDTAIL)
-  ld e, a
-  ldh a, (NEWTAIL)
-  sub e
+  ld hl, #0xff00 + OLDTAIL
+  ld a, (hl+)
+  sub (hl)      ; NEWTAIL
   jp nz, 00133$
 00136$:
 ;main.c:1725: }

@@ -50,17 +50,39 @@
 #define XRND_33_PERCENT() (xrnd() < 85)
 #define XRND_50_PERCENT() (xrnd() & 1)
 
-#define IS_WALL_TILE(tile)             (flags_bin[tile] & 0b00000001)
-#define IS_SPECIAL_TILE(tile)          (flags_bin[tile] & 0b00000010)
-#define IS_WALL_OR_SPECIAL_TILE(tile)  (flags_bin[tile] & 0b00000011)
-#define IS_OPAQUE_TILE(tile)           (flags_bin[tile] & 0b00000100)
-#define IS_CRACKED_WALL_TILE(tile)     (flags_bin[tile] & 0b00001000)
-#define IS_ANIMATED_TILE(tile)         (flags_bin[tile] & 0b00010000)
-#define IS_WALL_FACE_TILE(tile)        (flags_bin[tile] & 0b00100000)
-#define TILE_HAS_CRACKED_VARIANT(tile) (flags_bin[tile] & 0b01000000)
-#define IS_BREAKABLE_WALL(tile)        (flags_bin[tile] & 0b10000000)
+#define IS_WALL_FLAG(flag)             ((flag) & 0b00000001)
+#define IS_SPECIAL_FLAG(flag)          ((flag) & 0b00000010)
+#define IS_WALL_OR_SPECIAL_FLAG(flag)  ((flag) & 0b00000011)
+#define IS_OPAQUE_FLAG(flag)           ((flag) & 0b00000100)
+#define IS_CRACKED_WALL_FLAG(flag)     ((flag) & 0b00001000)
+#define IS_ANIMATED_FLAG(flag)         ((flag) & 0b00010000)
+#define IS_WALL_FACE_FLAG(flag)        ((flag) & 0b00100000)
+#define FLAG_HAS_CRACKED_VARIANT(flag) ((flag) & 0b01000000)
+#define IS_BREAKABLE_WALL_FLAG(flag)   ((flag) & 0b10000000)
 
-#define IS_SMARTMOB(tile, pos) (IS_WALL_OR_SPECIAL_TILE(tile) || mobmap[pos])
+#define IS_WALL_TILE(tile)             IS_WALL_FLAG(flags_bin[tile])
+#define IS_SPECIAL_TILE(tile)          IS_SPECIAL_FLAG(flags_bin[tile])
+#define IS_WALL_OR_SPECIAL_TILE(tile)  IS_WALL_OR_SPECIAL_FLAG(flags_bin[tile])
+#define IS_OPAQUE_TILE(tile)           IS_OPAQUE_FLAG(flags_bin[tile])
+#define IS_CRACKED_WALL_TILE(tile)     IS_CRACKED_WALL_FLAG(flags_bin[tile])
+#define IS_ANIMATED_TILE(tile)         IS_ANIMATED_FLAG(flags_bin[tile])
+#define IS_WALL_FACE_TILE(tile)        IS_WALL_FACE_FLAG(flags_bin[tile])
+#define TILE_HAS_CRACKED_VARIANT(tile) FLAG_HAS_CRACKED_VARIANT(flags_bin[tile])
+#define IS_BREAKABLE_WALL_TILE(tile)   IS_BREAKABLE_WALL_FLAG(flags_bin[tile])
+#define IS_SMARTMOB_TILE(tile, pos) (IS_WALL_OR_SPECIAL_TILE(tile) || mobmap[pos])
+
+// Optimizations for fetching tile flags;
+// NOTE: cannot be used during level generation! The flagmap is not initialized
+// and overlaps with the sigmap
+#define IS_WALL_POS(pos)             IS_WALL_FLAG(flagmap[pos])
+#define IS_SPECIAL_POS(pos)          IS_SPECIAL_FLAG(flagmap[pos])
+#define IS_OPAQUE_POS(pos)           IS_OPAQUE_FLAG(flagmap[pos])
+#define IS_CRACKED_WALL_POS(pos)     IS_CRACKED_WALL_FLAG(flagmap[pos])
+#define IS_ANIMATED_POS(pos)         IS_ANIMATED_FLAG(flagmap[pos])
+#define IS_WALL_FACE_POS(pos)        IS_WALL_FACE_FLAG(flagmap[pos])
+#define POS_HAS_CRACKED_VARIANT(pos) FLAG_HAS_CRACKED_VARIANT(flagmap[pos])
+#define IS_BREAKABLE_WALL_POS(pos)   IS_BREAKABLE_WALL_FLAG(flagmap[pos])
+#define IS_SMARTMOB_POS(pos) (IS_WALL_OR_SPECIAL_FLAG(flagmap[pos]) || mobmap[pos])
 
 // BG tiles
 #define TILE_NONE 0
@@ -301,6 +323,7 @@ extern Map roommap;
 extern Map distmap;
 extern Map mobmap;
 extern Map pickmap;
+extern Map flagmap;
 extern Map sigmap;
 extern Map tempmap;
 extern Map fogmap;
