@@ -332,6 +332,58 @@ HEAD=0x95
 OLDTAIL=0x96
 NEWTAIL=0x97
 
+.macro CHECKDIR DIRBIT DIRADD, ?exit, ?visited, ?newcand
+  bit DIRBIT, b
+  jr z, exit
+  ld a, c
+  add #DIRADD
+  ld e, a     ; e => newpos
+  ld d, #>_distmap
+  ld a, (de)
+  or a
+  jr nz, exit
+  ; mark as pending
+  ld a, #255
+  ld d, #>_distmap
+  ld (de), a
+;main.c:1707: !IS_MOB_AI(tmap[newpos], newpos)) {
+  ; get the flag bits
+  ld d, #>_flagmap
+  ld a, (de)
+  and #3
+  jr nz, visited
+  ; now get mobmap[newpos] and check if it is non-zero
+  ld d, #>_mobmap
+  ld a, (de)
+  or a
+  jr z, newcand
+  ; there's a mob here, but maybe it's active
+  dec a
+  add #<_mob_active
+  ld l, a
+  ld a, #0
+  adc #>_mob_active
+  ld h, a
+  ld a, (hl)
+  or a
+  jr z, visited
+newcand:
+;main.c:1708: cands[newtail++] = newpos;
+  ldh a, (NEWTAIL)
+  ld l, a
+  ld h, #>_cands
+  ld (hl), e
+  inc a
+  ldh (NEWTAIL), a
+  jr exit
+visited:
+  ; failed to add this pos, mark it as visited
+  ld a, #254
+  ld d, #>_distmap
+  ld (de), a
+exit:
+.endm
+
 ; void calcdist_ai(u8 from, u8 to);
 ;   [sp+2] = from
 ;   [sp+3] = to
@@ -406,210 +458,12 @@ _calcdist_ai::
   ld b, a     ; b => valid
   ld c, e     ; c => pos
 
-;main.c:1706: if ((valid & VALID_U) && !distmap[newpos = POS_U(pos)] &&
-  bit 5, b
-  jr z, 00105$
-  ld a, c
-  add #0xf0
-  ld e, a     ; e => newpos
-  ld d, #>_distmap
-  ld a, (de)
-  or a
-  jr nz, 00105$
-  ; mark as pending
-  ld a, #255
-  ld d, #>_distmap
-  ld (de), a
-;main.c:1707: !IS_MOB_AI(tmap[newpos], newpos)) {
-  ; get the flag bits
-  ld d, #>_flagmap
-  ld a, (de)
-  and #3
-  jr nz, 00104$
-  ; now get mobmap[newpos] and check if it is non-zero
-  ld d, #>_mobmap
-  ld a, (de)
-  or a
-  jr z, 00103$
-  ; there's a mob here, but maybe it's active
-  dec a
-  add #<_mob_active
-  ld l, a
-  ld a, #0
-  adc #>_mob_active
-  ld h, a
-  ld a, (hl)
-  or a
-  jr z, 00104$
-00103$:
-;main.c:1708: cands[newtail++] = newpos;
-  ldh a, (NEWTAIL)
-  ld l, a
-  ld h, #>_cands
-  ld (hl), e
-  inc a
-  ldh (NEWTAIL), a
-  jr 00105$
-00104$:
-  ; failed to add this pos, mark it as visited
-  ld a, #254
-  ld d, #>_distmap
-  ld (de), a
-00105$:
+  CHECKDIR 5 #0xf0  ; up
+  CHECKDIR 4 #0x10  ; down
+  CHECKDIR 7 #0xff  ; left
+  CHECKDIR 6 #0x01  ; right
 
-;main.c:1710: if ((valid & VALID_D) && !distmap[newpos = POS_D(pos)] &&
-  bit 4, b
-  jr z, 00111$
-  ld a, c
-  add #0x10
-  ld e, a     ; e => newpos
-  ld d, #>_distmap
-  ld a, (de)
-  or a
-  jr nz, 00111$
-  ; mark as pending
-  ld a, #255
-  ld d, #>_distmap
-  ld (de), a
-;main.c:1707: !IS_MOB_AI(tmap[newpos], newpos)) {
-  ; get the flag bits
-  ld d, #>_flagmap
-  ld a, (de)
-  and #3
-  jr nz, 00110$
-  ; now get mobmap[newpos] and check if it is non-zero
-  ld d, #>_mobmap
-  ld a, (de)
-  or a
-  jr z, 00109$
-  ; there's a mob here, but maybe it's active
-  dec a
-  add #<_mob_active
-  ld l, a
-  ld a, #0
-  adc #>_mob_active
-  ld h, a
-  ld a, (hl)
-  or a
-  jr z, 00110$
-00109$:
-;main.c:1708: cands[newtail++] = newpos;
-  ldh a, (NEWTAIL)
-  ld l, a
-  ld h, #>_cands
-  ld (hl), e
-  inc a
-  ldh (NEWTAIL), a
-  jr 00111$
-00110$:
-  ; failed to add this pos, mark it as visited
-  ld a, #254
-  ld d, #>_distmap
-  ld (de), a
-00111$:
-
-;main.c:1714: if ((valid & VALID_L) && !distmap[newpos = POS_L(pos)] &&
-  bit 7, b
-  jr z, 00117$
-  ld a, c
-  dec a
-  ld e, a     ; e => newpos
-  ld d, #>_distmap
-  ld a, (de)
-  or a
-  jr nz, 00117$
-  ; mark as pending
-  ld a, #255
-  ld d, #>_distmap
-  ld (de), a
-;main.c:1707: !IS_MOB_AI(tmap[newpos], newpos)) {
-  ; get the flag bits
-  ld d, #>_flagmap
-  ld a, (de)
-  and #3
-  jr nz, 00116$
-  ; now get mobmap[newpos] and check if it is non-zero
-  ld d, #>_mobmap
-  ld a, (de)
-  or a
-  jr z, 00115$
-  ; there's a mob here, but maybe it's active
-  dec a
-  add #<_mob_active
-  ld l, a
-  ld a, #0
-  adc #>_mob_active
-  ld h, a
-  ld a, (hl)
-  or a
-  jr z, 00116$
-00115$:
-;main.c:1708: cands[newtail++] = newpos;
-  ldh a, (NEWTAIL)
-  ld l, a
-  ld h, #>_cands
-  ld (hl), e
-  inc a
-  ldh (NEWTAIL), a
-  jr 00117$
-00116$:
-  ; failed to add this pos, mark it as visited
-  ld a, #254
-  ld d, #>_distmap
-  ld (de), a
-00117$:
-
-;main.c:1718: if ((valid & VALID_R) && !distmap[newpos = POS_R(pos)] &&
-  bit 6, b
-  jr z, 00131$
-  ld a, c
-  inc a
-  ld e, a     ; e => newpos
-  ld d, #>_distmap
-  ld a, (de)
-  or a
-  jr nz, 00131$
-  ; mark as pending
-  ld a, #255
-  ld d, #>_distmap
-  ld (de), a
-;main.c:1707: !IS_MOB_AI(tmap[newpos], newpos)) {
-  ; get the flag bits
-  ld d, #>_flagmap
-  ld a, (de)
-  and #3
-  jr nz, 00130$
-  ; now get mobmap[newpos] and check if it is non-zero
-  ld d, #>_mobmap
-  ld a, (de)
-  or a
-  jr z, 00121$
-  ; there's a mob here, but maybe it's active
-  dec a
-  add #<_mob_active
-  ld l, a
-  ld a, #0
-  adc #>_mob_active
-  ld h, a
-  ld a, (hl)
-  or a
-  jr z, 00130$
-00121$:
-;main.c:1708: cands[newtail++] = newpos;
-  ldh a, (NEWTAIL)
-  ld l, a
-  ld h, #>_cands
-  ld (hl), e
-  inc a
-  ldh (NEWTAIL), a
-  jr 00131$
-00130$:
-  ; failed to add this pos, mark it as visited
-  ld a, #254
-  ld d, #>_distmap
-  ld (de), a
 00131$:
-
 ;main.c:1723: } while (++head != oldtail);
   ld hl, #0xff00 + HEAD
   inc (hl)
