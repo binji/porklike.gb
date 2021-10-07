@@ -1,9 +1,12 @@
 _clear_wram::
-  ld hl, #l__DATA
+  ; TODO: no idea how to get the linker to calculate this for me...
+  ld hl, #l__DALIGNED
+  ld de, #l__DATA
+  add hl, de
   push hl
   ld hl, #0
   push hl
-  ld hl, #s__DATA
+  ld hl, #s__DALIGNED
   push hl
   call _memset
   add sp, #6
