@@ -880,8 +880,8 @@ void use_pickup(void) {
   land = hit = pos;
   do {
     valid = validmap[hit] & dirvalid[target_dir];
+    land = hit;
     if (valid) {
-      land = hit;
       hit = POS_DIR(hit, target_dir);
     }
   } while(valid && !IS_WALL_OR_MOB(hit));
