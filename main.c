@@ -12,7 +12,7 @@
 
 #define MAX_DEAD_MOBS 4
 #define MAX_MOBS 32    /* XXX Figure out what this should be */
-#define MAX_PICKUPS 16 /* XXX Figure out what this should be */
+#define MAX_PICKS 16   /* XXX Figure out what this should be */
 #define MAX_FLOATS 8   /* For now; we'll probably want more */
 #define MAX_MSG_SPRITES 18
 #define MAX_EQUIPS 4
@@ -255,14 +255,17 @@ u8 startpos;
 
 u8 num_cands;
 
+#define MOB_FIELDS 23
 MobType mob_type[MAX_MOBS];
 u8 mob_tile[MAX_MOBS];       // Actual tile index
 u8 mob_anim_frame[MAX_MOBS]; // Index into mob_type_anim_frames
 u8 mob_anim_timer[MAX_MOBS]; // 0..mob_anim_speed[type], how long between frames
 u8 mob_anim_speed[MAX_MOBS]; // current anim speed (changes when moving)
 u8 mob_pos[MAX_MOBS];
-u8 mob_x[MAX_MOBS], mob_y[MAX_MOBS];   // x,y location of sprite
-u8 mob_dx[MAX_MOBS], mob_dy[MAX_MOBS]; // dx,dy moving sprite
+u8 mob_x[MAX_MOBS];                    // x location of sprite
+u8 mob_y[MAX_MOBS];                    // y location of sprite
+u8 mob_dx[MAX_MOBS];                   // dx moving sprite
+u8 mob_dy[MAX_MOBS];                   // dy moving sprite
 u8 mob_move_timer[MAX_MOBS];           // timer for sprite animation
 MobAnimState mob_anim_state[MAX_MOBS]; // sprite animation state
 u8 mob_flip[MAX_MOBS];                 // 0=facing right 1=facing left
@@ -286,14 +289,17 @@ u8 dmob_prop[MAX_DEAD_MOBS];
 u8 dmob_timer[MAX_DEAD_MOBS];
 u8 num_dead_mobs;
 
-PickupType pick_type[MAX_PICKUPS];
-u8 pick_tile[MAX_MOBS];                      // Actual tile index
-u8 pick_pos[MAX_PICKUPS];
-u8 pick_anim_frame[MAX_PICKUPS];             // Index into pick_type_anim_frames
-u8 pick_anim_timer[MAX_PICKUPS];             // 0..pick_type_anim_speed[type]
-u8 pick_x[MAX_PICKUPS], pick_y[MAX_PICKUPS]; // x,y location of sprite
-u8 pick_dx[MAX_PICKUPS], pick_dy[MAX_PICKUPS]; // dx,dy moving sprite
-u8 pick_move_timer[MAX_PICKUPS];               // timer for sprite animation
+#define PICK_FIELDS 10
+PickupType pick_type[MAX_PICKS];
+u8 pick_tile[MAX_PICKS]; // Actual tile index
+u8 pick_pos[MAX_PICKS];
+u8 pick_anim_frame[MAX_PICKS]; // Index into pick_type_anim_frames
+u8 pick_anim_timer[MAX_PICKS]; // 0..pick_type_anim_speed[type]
+u8 pick_x[MAX_PICKS];          // x location of sprite
+u8 pick_y[MAX_PICKS];          // y location of sprite
+u8 pick_dx[MAX_PICKS];         // dx moving sprite
+u8 pick_dy[MAX_PICKS];         // dy moving sprite
+u8 pick_move_timer[MAX_PICKS]; // timer for sprite animation
 u8 num_picks;
 
 SprType spr_type[MAX_SPRS];
@@ -2333,35 +2339,21 @@ void delmob(u8 index) NONBANKED {  // XXX: only used in bank 1
   if (index != PLAYER_MOB) {
     --num_mobs;
     if (index != num_mobs) {
-      mob_type[index] = mob_type[num_mobs];
-      mob_anim_frame[index] = mob_anim_frame[num_mobs];
-      mob_anim_timer[index] = mob_anim_timer[num_mobs];
-      mob_anim_speed[index] = mob_anim_speed[num_mobs];
-      mob_pos[index] = mob_pos[num_mobs];
-      mob_x[index] = mob_x[num_mobs];
-      mob_y[index] = mob_y[num_mobs];
-      mob_dx[index] = mob_dx[num_mobs];
-      mob_dy[index] = mob_dy[num_mobs];
-      mob_move_timer[index] = mob_move_timer[num_mobs];
-      mob_anim_state[index] = mob_anim_state[num_mobs];
-      mob_flip[index] = mob_flip[num_mobs];
-      mob_task[index] = mob_task[num_mobs];
-      mob_target_pos[index] = mob_target_pos[num_mobs];
-      mob_ai_cool[index] = mob_ai_cool[num_mobs];
-      mob_active[index] = mob_active[num_mobs];
-      mob_charge[index] = mob_charge[num_mobs];
-      mob_hp[index] = mob_hp[num_mobs];
-      mob_flash[index] = mob_flash[num_mobs];
-      mob_stun[index] = mob_stun[num_mobs];
-      mob_trigger[index] = mob_trigger[num_mobs];
-      mob_vis[index] = mob_vis[num_mobs];
+      // Copy all fields (in SoA) from num_mobs => index.
+      u8* dst = (u8*)mob_type + index;
+      u8* src = (u8*)mob_type + num_mobs;
+      for (u8 i = 0; i < MOB_FIELDS; ++i) {
+        *dst = *src;
+        src += MAX_MOBS;
+        dst += MAX_MOBS;
+      }
       mobmap[mob_pos[index]] = index + 1;
     }
   }
 }
 
 void addpick(PickupType type, u8 pos) NONBANKED {
-  if (num_picks != MAX_PICKUPS) {
+  if (num_picks != MAX_PICKS) {
     pick_type[num_picks] = type;
     pick_anim_frame[num_picks] = pick_type_anim_start[type];
     pick_anim_timer[num_picks] = 1;
@@ -2376,15 +2368,14 @@ void delpick(u8 index) NONBANKED {  // XXX: only used in bank 1
   pickmap[pick_pos[index]] = 0;
   --num_picks;
   if (index != num_picks) {
-    pick_type[index] = pick_type[num_picks];
-    pick_anim_frame[index] = pick_anim_frame[num_picks];
-    pick_anim_timer[index] = pick_anim_timer[num_picks];
-    pick_pos[index] = pick_pos[num_picks];
-    pick_x[index] = pick_x[num_picks];
-    pick_y[index] = pick_y[num_picks];
-    pick_dx[index] = pick_dx[num_picks];
-    pick_dy[index] = pick_dy[num_picks];
-    pick_move_timer[index] = pick_move_timer[num_picks];
+    // Copy all fields (in SoA) from num_picks => index.
+    u8* dst = (u8*)pick_type + index;
+    u8* src = (u8*)pick_type + num_picks;
+    for (u8 i = 0; i < PICK_FIELDS; ++i) {
+      *dst = *src;
+      src += MAX_PICKS;
+      dst += MAX_PICKS;
+    }
     pickmap[pick_pos[index]] = index + 1;
   }
 }
