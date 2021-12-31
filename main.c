@@ -373,7 +373,7 @@ void main(void) NONBANKED {
 
   // Initialize for gameplay
   init_win(0);
-  LCDC_REG = 0b11100011;  // display on, window/bg/obj on, window@9c00
+  LCDC_REG = (LCDCF_ON | LCDCF_WINON | LCDCF_BGON | LCDCF_OBJON | LCDCF_WIN9C00); // display on, window/bg/obj on, window@9c00  
   gb_decompress_bkg_data(0x80, shared_bin);
   gb_decompress_sprite_data(0, sprites_bin);
   add_VBL(vbl_interrupt);

@@ -15,15 +15,15 @@ rule bin2c
 
 rule cc
   depfile = $depfile
-  command = ../gbdk/bin/lcc -Wf-MD -Wa-l $in -c -o $out
+  command = ../gbdk/bin/lcc -mgbz80:ap -Wf-MD -Wa-l $in -c -o $out
   description = lcc $out
 
 rule asm
-  command = ../gbdk/bin/lcc -Wa-l $in -c -o $out
+  command = ../gbdk/bin/lcc -mgbz80:ap -Wa-l $in -c -o $out
   description = lcc $out
 
 rule link
-  command = ../gbdk/bin/lcc -Wl-j -Wl-m -Wl-w -Wl-yo4 -Wl-yt1 -Wm-ynPORKLIKE -Wm-yS -Wl-b_CALIGNED=0x0200 -Wl-b_CODE=0x300 -Wl-b_DALIGNED=0xc100 -Wl-b_DATA=0xcf00 $in -o $out
+  command = ../gbdk/bin/lcc -mgbz80:ap -Wl-j -Wl-m -Wl-w -Wl-yo4 -Wl-yt1 -Wm-ynPORKLIKE -Wm-yS -Wl-b_CALIGNED=0x0200 -Wl-b_CODE=0x300 -Wl-b_DALIGNED=0xc100 -Wl-b_DATA=0xcf00 $in -o $out
   description = link $out
 
 build out/bg.bin: rgbgfx bg.png
@@ -66,4 +66,4 @@ build out/sound.o: cc sound.c
 build out/main.o: cc main.c | out/tilebg.h out/tileshared.h out/tilesprites.h out/tiledead.h
   depfile = out/main.d
 
-build porklike.gb: link out/bank0.o out/aligned.o out/main.o out/sound.o out/util.o out/music.o out/title.o out/tiletitle.c out/tilebg.c out/tileshared.c out/tilesprites.c out/tiledead.c out/gen.o
+build porklike.pocket: link out/bank0.o out/aligned.o out/main.o out/sound.o out/util.o out/music.o out/title.o out/tiletitle.c out/tilebg.c out/tileshared.c out/tilesprites.c out/tiledead.c out/gen.o

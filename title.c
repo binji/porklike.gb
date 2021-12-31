@@ -100,7 +100,7 @@ void titlescreen(void) {
   gb_decompress_bkg_data(0x80, title_bin);
 
   init_bkg(0x8e);
-  LCDC_REG = 0b10000011;  // display on, bg/obj on,
+  LCDC_REG = (LCDCF_ON | LCDCF_BGON | LCDCF_OBJON); // display on, bg/obj on,
 
   // fade from white to black
   titlefadein();
@@ -148,7 +148,7 @@ void titlescreen(void) {
 
   WX_REG = 16 + 7;
   WY_REG = 160;
-  LCDC_REG = 0b11100011;  // display on, window/bg/obj on, window@9c00
+  LCDC_REG = (LCDCF_ON | LCDCF_WINON | LCDCF_BGON | LCDCF_OBJON | LCDCF_WIN9C00); // display on, window/bg/obj on, window@9c00
   init_win(0x8e);
   set_win_tiles(0, 0, TITLEBOT_WIDTH, TITLEBOT_HEIGHT, titlebot_map);
 
