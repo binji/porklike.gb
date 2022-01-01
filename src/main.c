@@ -5,10 +5,10 @@
 #pragma bank 1
 
 #include "main.h"
-#include "out/tilebg.h"
-#include "out/tileshared.h"
-#include "out/tilesprites.h"
-#include "out/tiledead.h"
+#include "tilebg.h"
+#include "tileshared.h"
+#include "tilesprites.h"
+#include "tiledead.h"
 
 #define MAX_DEAD_MOBS 4
 #define MAX_MOBS 32    /* XXX Figure out what this should be */
@@ -379,9 +379,9 @@ void main(void) NONBANKED {
 
   // Initialize for gameplay
   init_win(0);
-  LCDC_REG = 0b11100011;  // display on, window/bg/obj on, window@9c00
-  gb_decompress_bkg_data(0x80, shared_bin);
-  gb_decompress_sprite_data(0, sprites_bin);
+  LCDC_REG = LCDCF_ON | LCDCF_WINON | LCDCF_BGON | LCDCF_OBJON | LCDCF_WIN9C00;
+  gb_decompress_bkg_data(0x80, tileshared_bin);
+  gb_decompress_sprite_data(0, tilesprites_bin);
   add_VBL(vbl_interrupt);
   gameinit();
   doloadfloor = 1;
@@ -402,7 +402,7 @@ void main(void) NONBANKED {
 
         // Hide window
         move_win(23, 160);
-        gb_decompress_bkg_data(0, dead_bin);
+        gb_decompress_bkg_data(0, tiledead_bin);
         init_bkg(0);
         if (gameover_state == GAME_OVER_WIN) {
           music_win();
@@ -514,7 +514,7 @@ void gameinit(void) {
   // Reset scroll registers
   move_bkg(240, 0);
   // Reload bg tiles
-  gb_decompress_bkg_data(0, bg_bin);
+  gb_decompress_bkg_data(0, tilebg_bin);
   init_bkg(0);
 
   // Reset player mob

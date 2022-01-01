@@ -1,8 +1,7 @@
+.include "global.s"
+
 _clear_wram::
-  ; TODO: no idea how to get the linker to calculate this for me...
   ld hl, #l__DALIGNED
-  ld de, #l__DATA
-  add hl, de
   push hl
   ld hl, #0
   push hl
@@ -288,8 +287,8 @@ _counter_out::
   ld l, a      ; hl = dest
 
 1$:
-  ldh a, (#0x41) ; wait until VRAM is unlocked
-  and a, #2
+  ldh a, (.STAT) ; wait until VRAM is unlocked
+  and a, #STATF_BUSY
   jr nz, 1$
 
   ld a, (de)    ; copy tile
@@ -316,8 +315,8 @@ _vram_copy::
   ld l, a  ; hl = dst
 
 1$:
-  ldh a, (#0x41) ; wait until VRAM is unlocked
-  and a, #2
+  ldh a, (.STAT) ; wait until VRAM is unlocked
+  and a, #STATF_BUSY
   jr nz, 1$
 
   ld a, (de)    ; copy tile
