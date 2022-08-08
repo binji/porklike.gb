@@ -130,6 +130,16 @@ _xrnd_init::
   ld (#_xrnd_seed + 1), a
   ret
 
+; mix in 8 bits of entropy by xoring with the low byte of the seed, then
+; calling xrnd to distribute it across the 16 bit seed.
+_xrnd_mix::
+  ldhl sp, #1
+  ld d, (hl)
+  ld a, (#_xrnd_seed)
+  xor d
+  ld (#_xrnd_seed), a
+  jp _xrnd
+
 
 _counter_zero::
   ldhl sp, #2

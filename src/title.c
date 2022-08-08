@@ -187,6 +187,7 @@ void titlescreen(void) {
   u8 ps_display = 0;
 
   // Wait for start button
+  joy = joypad();
   while(1) {
     lastjoy = joy;
     joy = joypad();
@@ -203,7 +204,8 @@ void titlescreen(void) {
 
     if (newjoy & J_START) {
       sfx(SFX_OK);
-      xrnd_init((sys_time << 8) | DIV_REG);
+      // Not much entropy, but it's OK -- we'll generate more on floor 0.
+      xrnd_init(DIV_REG);
       break;
     }
     wait_vbl_done();

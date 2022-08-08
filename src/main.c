@@ -391,6 +391,12 @@ void main(void) NONBANKED {
     joy = joypad();
     newjoy = (joy ^ lastjoy) & joy;
 
+    // On floor 0, try to gather more entropy from player inputs.
+    if (floor == 0 && newjoy) {
+      xrnd_mix(joy);
+      xrnd_mix(DIV_REG);
+    }
+
     begin_animate();
 
     if (gameover_state != GAME_OVER_NONE) {

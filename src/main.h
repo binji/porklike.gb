@@ -296,6 +296,7 @@ void clear_wram(void) PRESERVES_REGS(b, c);
 u16 drag(u16 x);
 u8 xrnd(void) PRESERVES_REGS(b, c);
 void xrnd_init(u16) PRESERVES_REGS(b, c);
+void xrnd_mix(u8) PRESERVES_REGS(b, c);
 void counter_zero(Counter* c) PRESERVES_REGS(b, c);
 void counter_thirty(Counter* c) PRESERVES_REGS(b, c);
 void counter_inc(Counter* c);
