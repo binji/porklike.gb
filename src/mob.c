@@ -5,6 +5,7 @@
 #include "ai.h"
 #include "gameplay.h"
 #include "inventory.h"
+#include "palette.h"
 #include "sprite.h"
 
 #pragma bank 1
@@ -212,11 +213,11 @@ u8 animate_mobs(void) {
         *next_sprite++ = mob_x[i];
         if (mob_flash[i]) {
           *next_sprite++ = frame - TILE_MOB_FLASH_DIFF;
-          *next_sprite++ = S_PALETTE | prop;
+          *next_sprite++ = MOB_FLASH_HIT_PAL | prop;
           --mob_flash[i];
         } else {
           *next_sprite++ = frame;
-          *next_sprite++ = prop | (i + 1 == key_mob ? S_PALETTE : 0);
+          *next_sprite++ = prop | (i + 1 == key_mob ? MOB_FLASH_KEY_PAL : 0);
         }
       }
 
@@ -291,7 +292,8 @@ void adddeadmob(u8 index) {
   dmob_y[num_dead_mobs] = mob_y[index];
   dmob_tile[num_dead_mobs] =
       mob_type_anim_frames[mob_anim_frame[index]] - TILE_MOB_FLASH_DIFF;
-  dmob_prop[num_dead_mobs] = S_PALETTE | (mob_flip[index] ? S_FLIPX : 0);
+  dmob_prop[num_dead_mobs] =
+      MOB_FLASH_HIT_PAL | (mob_flip[index] ? S_FLIPX : 0);
   dmob_timer[num_dead_mobs] = DEAD_MOB_FRAMES;
   ++num_dead_mobs;
 }

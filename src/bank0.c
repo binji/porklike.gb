@@ -1,3 +1,5 @@
+#include <gb/cgb.h>
+
 #include "inventory.h"
 #include "main.h"
 #include "mob.h"
@@ -50,6 +52,67 @@ const u8 obj_pal1[] = {
     0b01110101, // 0:LightGray 1:LightGray 2:Black 3:LightGray
     0b10110101, // 0:LightGray 1:LightGray 2:Black 3:DarkGray
     0b01110101, // 0:LightGray 1:LightGray 2:Black 3:LightGray
+};
+
+#define CBLACK  RGB8(0x00, 0x00, 0x00)
+#define CDGRAY  RGB8(0x5f, 0x57, 0x4f)
+#define CLGRAY  RGB8(0xc2, 0xc3, 0xc7)
+#define CWHITE  RGB8(0xff, 0xf1, 0xe8)
+#define CYELLOW RGB8(0xff, 0xec, 0x27)
+#define CORANGE RGB8(0xff, 0xa3, 0x00)
+#define CRED    RGB8(0xff, 0x00, 0x4d)
+#define CPINK   RGB8(0xff, 0x77, 0xa8)
+
+const palette_color_t cgb_bkg_pals[] = {
+  CLGRAY,  CDGRAY,  CBLACK, CYELLOW,  // bg0: ground
+  CWHITE,  CDGRAY,  CBLACK, CWHITE,   // bg1: saws/text
+  CDGRAY,  CDGRAY,  CBLACK, CDGRAY,   // bg2: game over stats text
+  CLGRAY,  CDGRAY,  CBLACK, CLGRAY,   // bg3: title credit text
+  CLGRAY,  CDGRAY,  CBLACK, CDGRAY,   // bg4: title credit text
+};
+
+const palette_color_t cgb_obp_pals[] = {
+  CYELLOW, CYELLOW, CBLACK, CYELLOW,  // spr0: mobs/pickups/interact.
+  CORANGE, CORANGE, CBLACK, CORANGE,  // spr1: mobs damage float
+  CRED,    CRED,    CRED,   CBLACK,   // spr2: player damage float
+  CWHITE,  CWHITE,  CBLACK, CWHITE,   // spr3: mob hit flash
+  CYELLOW, CYELLOW, CBLACK, CYELLOW,  // spr4: mob key flash
+  CLGRAY,  CLGRAY,  CBLACK, CLGRAY,   // spr5: text/messages
+  CLGRAY,  CDGRAY,  CBLACK, CYELLOW,  // spr6: PRESS START
+};
+
+
+const palette_color_t cgb_player_dmg_flash_pals[] = {
+  CRED, CRED,   CRED, CBLACK,
+  CRED, CPINK,  CRED, CBLACK,
+  CRED, CWHITE, CRED, CBLACK,
+  CRED, CRED,   CRED, CBLACK,
+  CRED, CRED,   CRED, CBLACK,
+  CRED, CPINK,  CRED, CBLACK,
+  CRED, CWHITE, CRED, CBLACK,
+  CRED, CRED,   CRED, CBLACK,
+};
+
+const palette_color_t cgb_mob_key_flash_pals[] = {
+  CYELLOW, CYELLOW, CBLACK, CYELLOW,
+  CYELLOW, CYELLOW, CBLACK, CYELLOW,
+  CYELLOW, CYELLOW, CBLACK, CYELLOW,
+  CYELLOW, CYELLOW, CBLACK, CYELLOW,
+  CYELLOW, CYELLOW, CBLACK, CYELLOW,
+  CYELLOW, CYELLOW, CBLACK, CYELLOW,
+  CYELLOW, CYELLOW, CBLACK, CWHITE,
+  CYELLOW, CYELLOW, CBLACK, CWHITE,
+};
+
+const palette_color_t cgb_press_start_flash_pals[] = {
+  CLGRAY,  CBLACK,  CBLACK, CDGRAY,
+  CLGRAY,  CBLACK,  CBLACK, CDGRAY,
+  CLGRAY,  CBLACK,  CBLACK, CLGRAY,
+  CLGRAY,  CBLACK,  CBLACK, CLGRAY,
+  CLGRAY,  CBLACK,  CBLACK, CLGRAY,
+  CLGRAY,  CBLACK,  CBLACK, CWHITE,
+  CLGRAY,  CBLACK,  CBLACK, CWHITE,
+  CLGRAY,  CBLACK,  CBLACK, CWHITE,
 };
 
 const Dir invdir[] = {DIR_RIGHT, DIR_LEFT, DIR_DOWN, DIR_UP}; // L R U D

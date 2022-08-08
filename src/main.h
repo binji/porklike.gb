@@ -3,6 +3,7 @@
 
 #ifdef __SDCC
 #include <gb/gb.h>
+#include <gb/cgb.h>
 #endif
 
 #include "common.h"

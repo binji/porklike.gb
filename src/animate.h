@@ -14,4 +14,7 @@ extern u8 *anim_tile_ptr;
 extern u8 dirty_code[];
 extern u8 *dirty_ptr;
 
+extern u8 dirty_saw[];
+extern u8 *dirty_saw_ptr;
+
 #endif // ANIMATE_H_

@@ -33,7 +33,7 @@ void msg_show(u8 index, u8 y) {
       *p++ = y;
       *p++ = 52 + (i << 3);
       *p++ = msg_tiles[index++];
-      *p++ = 0;
+      *p++ = 5;
     }
     y += 8;
   }

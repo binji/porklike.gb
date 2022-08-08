@@ -33,7 +33,7 @@ u8 ai_run_mob_task(u8 index) {
     switch (mob_task[index]) {
       case MOB_AI_WAIT:
         if (mobsightmap[pos]) {
-          float_add(pos, FLOAT_FOUND);
+          float_add(pos, FLOAT_FOUND, 0);
           mob_task[index] = mob_type_ai_active[mob_type[index]];
           mob_target_pos[index] = mob_pos[PLAYER_MOB];
           mob_ai_cool[index] = 0;
@@ -90,7 +90,7 @@ u8 ai_run_mob_task(u8 index) {
         if (!mobsightmap[pos]) {
           mob_task[index] = MOB_AI_WAIT;
           mob_active[index] = 0;
-          float_add(pos, FLOAT_LOST);
+          float_add(pos, FLOAT_LOST, 0);
         } else {
           mob_target_pos[index] = mob_pos[PLAYER_MOB];
           if (mob_charge[index] == 0) {
@@ -204,7 +204,7 @@ u8 ai_tcheck(u8 index) {
   }
   if (mob_target_pos[index] == mob_pos[index] ||
       mob_ai_cool[index] > AI_COOL_MOVES) {
-    float_add(mob_pos[index], FLOAT_LOST);
+    float_add(mob_pos[index], FLOAT_LOST, 0);
     mob_task[index] = MOB_AI_WAIT;
     mob_active[index] = 0;
     return 0;

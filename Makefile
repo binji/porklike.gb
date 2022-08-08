@@ -9,7 +9,7 @@ PYTHON = python
 # Set platforms to build here, spaced separated. (These are in the separate Makefile.targets)
 # They can also be built/cleaned individually: "make gg" and "make gg-clean"
 # Possible are: gb gbc pocket megaduck sms gg
-TARGETS=gb pocket # megaduck sms gg
+TARGETS=gbc gb pocket # megaduck sms gg
 
 # Configure platform specific LCC flags here:
 LCCFLAGS_gb      = -Wm-ys #

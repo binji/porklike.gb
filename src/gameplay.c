@@ -113,6 +113,15 @@ Counter st_recover;
 
 u8 wurstchain;
 
+void clear_bkg(void) {
+  init_bkg(0);
+  if (_cpu == CGB_TYPE) {
+    VBK_REG = 1;
+    init_bkg(0);
+    VBK_REG = 0;
+  }
+}
+
 void gameplay_init(void) {
   animate_init();
 
@@ -120,7 +129,7 @@ void gameplay_init(void) {
   move_bkg(240, 0);
   // Reload bg tiles
   gb_decompress_bkg_data(0, tilebg_bin);
-  init_bkg(0);
+  clear_bkg();
 
   // Reset player mob
   num_mobs = 0;
@@ -167,6 +176,7 @@ void gameplay_update(void) NONBANKED {
     SWITCH_ROM_MBC1(3);
     mapgen();
     SWITCH_ROM_MBC1(1);
+    clear_bkg(); // clear before enabling vblank
     joy_action = 0;
     IE_REG |= VBL_IFLAG;
     animate_end();
@@ -174,6 +184,10 @@ void gameplay_update(void) NONBANKED {
       msg_wurstchain(wurstchain, MSG_WURSTCHAIN_PROP_LIT);
     }
     doupdatemap = 1;
+    // Update animations once so the mobs/pickups/etc. are shown on fadein.
+    animate_begin();
+    animate();
+    animate_end();
     pal_fadein();
     animate_begin();
   }
@@ -837,8 +851,11 @@ void hitmob(u8 index, u8 dmg) {
 
     sfx(sound);
   } else {
-    float_add(pos, float_dmg[dmg] +
-                       (index == PLAYER_MOB ? TILE_PLAYER_HIT_DMG_DIFF : 0));
+    if (index == PLAYER_MOB) {
+      float_add(pos, float_dmg[dmg] + TILE_PLAYER_HIT_DMG_DIFF, 2);
+    } else {
+      float_add(pos, float_dmg[dmg], 1);
+    }
 
     if (mob_hp[index] <= dmg) {
       adddeadmob(index);
