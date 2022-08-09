@@ -3,6 +3,8 @@
 
 #include "main.h"
 #include "rand.h"
+#include "sound.h"
+
 #include "tiletitle.h"
 
 #pragma bank 2

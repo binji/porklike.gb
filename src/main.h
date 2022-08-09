@@ -23,40 +23,6 @@
 #define VALID_L_OR_UL  0b10000001
 #define VALID_U_OR_UL  0b00100001
 
-#define IS_WALL_FLAG(flag)             ((flag) & 0b00000001)
-#define IS_SPECIAL_FLAG(flag)          ((flag) & 0b00000010)
-#define IS_WALL_OR_SPECIAL_FLAG(flag)  ((flag) & 0b00000011)
-#define IS_OPAQUE_FLAG(flag)           ((flag) & 0b00000100)
-#define IS_CRACKED_WALL_FLAG(flag)     ((flag) & 0b00001000)
-#define IS_ANIMATED_FLAG(flag)         ((flag) & 0b00010000)
-#define IS_WALL_FACE_FLAG(flag)        ((flag) & 0b00100000)
-#define FLAG_HAS_CRACKED_VARIANT(flag) ((flag) & 0b01000000)
-#define IS_BREAKABLE_WALL_FLAG(flag)   ((flag) & 0b10000000)
-
-#define IS_WALL_TILE(tile)             IS_WALL_FLAG(flags_bin[tile])
-#define IS_SPECIAL_TILE(tile)          IS_SPECIAL_FLAG(flags_bin[tile])
-#define IS_WALL_OR_SPECIAL_TILE(tile)  IS_WALL_OR_SPECIAL_FLAG(flags_bin[tile])
-#define IS_OPAQUE_TILE(tile)           IS_OPAQUE_FLAG(flags_bin[tile])
-#define IS_CRACKED_WALL_TILE(tile)     IS_CRACKED_WALL_FLAG(flags_bin[tile])
-#define IS_ANIMATED_TILE(tile)         IS_ANIMATED_FLAG(flags_bin[tile])
-#define IS_WALL_FACE_TILE(tile)        IS_WALL_FACE_FLAG(flags_bin[tile])
-#define TILE_HAS_CRACKED_VARIANT(tile) FLAG_HAS_CRACKED_VARIANT(flags_bin[tile])
-#define IS_BREAKABLE_WALL_TILE(tile)   IS_BREAKABLE_WALL_FLAG(flags_bin[tile])
-#define IS_SMARTMOB_TILE(tile, pos) (IS_WALL_OR_SPECIAL_TILE(tile) || mobmap[pos])
-
-// Optimizations for fetching tile flags;
-// NOTE: cannot be used during level generation! The flagmap is not initialized
-// and overlaps with the sigmap
-#define IS_WALL_POS(pos)             IS_WALL_FLAG(flagmap[pos])
-#define IS_SPECIAL_POS(pos)          IS_SPECIAL_FLAG(flagmap[pos])
-#define IS_OPAQUE_POS(pos)           IS_OPAQUE_FLAG(flagmap[pos])
-#define IS_CRACKED_WALL_POS(pos)     IS_CRACKED_WALL_FLAG(flagmap[pos])
-#define IS_ANIMATED_POS(pos)         IS_ANIMATED_FLAG(flagmap[pos])
-#define IS_WALL_FACE_POS(pos)        IS_WALL_FACE_FLAG(flagmap[pos])
-#define POS_HAS_CRACKED_VARIANT(pos) FLAG_HAS_CRACKED_VARIANT(flagmap[pos])
-#define IS_BREAKABLE_WALL_POS(pos)   IS_BREAKABLE_WALL_FLAG(flagmap[pos])
-#define IS_SMARTMOB_POS(pos) (IS_WALL_OR_SPECIAL_FLAG(flagmap[pos]) || mobmap[pos])
-
 // BG tiles
 #define TILE_NONE 0
 #define TILE_EMPTY 1
@@ -96,32 +62,6 @@
 #define TILE_STEPS 0x60
 #define TILE_ENTRANCE 0x61
 
-#define SFX_BLIND 0
-#define SFX_TELEPORT 1
-#define SFX_BACK 2
-#define SFX_OK 3
-#define SFX_STAIRS 4
-#define SFX_SELECT 5
-#define SFX_HIT_PLAYER 6
-#define SFX_HIT_MOB 7
-#define SFX_OPEN_OBJECT 8
-#define SFX_OOPS 9
-#define SFX_PICKUP 10
-#define SFX_USE_EQUIP 11
-#define SFX_PLAYER_STEP 12
-#define SFX_MOB_PUSH 13
-#define SFX_BOOM 14
-#define SFX_REAPER 15
-#define SFX_SPIN 16
-#define SFX_SPEAR 17
-#define SFX_DESTROY_WALL 18
-#define SFX_BUMP_TILE 19
-#define SFX_HEART 20
-#define SFX_FAIL 21
-
-extern const u8 flags_bin[];
-
-extern const u8 permutation_4[];
 extern const u8 fadepal[];
 extern const u8 obj_pal1[];
 extern const Dir invdir[];
@@ -129,9 +69,6 @@ extern const u8 n_over_3[];
 extern const u16 three_over_n[];
 
 extern const u8 sightsig[];
-
-extern const u8 dirvalid[];
-extern const u8 validmap[];
 
 extern const u8 dirt_tiles[];
 
@@ -169,12 +106,6 @@ extern const u8 dead_map[];
 extern const u8 win_map[];
 extern const u8 stats_map[];
 
-void soundinit(void);
-void music_main(void);
-void music_win(void);
-void music_dead(void);
-void sfx(u8 id);
-
 void titlescreen(void);
 void clear_wram(void) PRESERVES_REGS(b, c);
 u16 drag(u16 x);
@@ -194,8 +125,6 @@ extern Map tmap;
 extern Map dtmap;
 extern Map dirtymap;
 extern Map roommap;
-extern Map distmap;
-extern Map flagmap;
 extern Map sigmap;
 extern Map tempmap;
 extern Map sawmap;
