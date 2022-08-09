@@ -98,6 +98,8 @@
 #define MSG_FRAMES 120
 #define INV_SELECT_FRAMES 8
 #define INV_TARGET_FRAMES 2
+#define JOY_REPEAT_FIRST_WAIT_FRAMES 30
+#define JOY_REPEAT_NEXT_WAIT_FRAMES 8
 
 #define SPIN_SPR_FRAMES 12
 #define SPIN_SPR_ANIM_SPEED 3
@@ -337,7 +339,9 @@ u8 gameover_timer;
 u8 is_targeting;
 Dir target_dir;
 
-u8 joy, lastjoy, newjoy;
+u8 joy, lastjoy, newjoy, repeatjoy;
+u8 joy_repeat_count[8];
+u8 joy_action; // The most recently pressed action button
 u8 doupdatemap, dofadeout, doloadfloor, donextfloor, doblind, dosight;
 u8 *next_sprite, *last_next_sprite;
 
@@ -390,6 +394,28 @@ void main(void) NONBANKED {
     lastjoy = joy;
     joy = joypad();
     newjoy = (joy ^ lastjoy) & joy;
+    repeatjoy = newjoy;
+
+    if (joy) {
+      u8 mask = 1, i = 0;
+      while (mask) {
+        if (newjoy & mask) {
+          joy_repeat_count[i] = JOY_REPEAT_FIRST_WAIT_FRAMES;
+        } else if (joy & mask) {
+          if (--joy_repeat_count[i] == 0) {
+            repeatjoy |= mask;
+            joy_repeat_count[i] = JOY_REPEAT_NEXT_WAIT_FRAMES;
+          }
+        }
+
+        if (repeatjoy & mask) {
+          joy_action = mask;
+        }
+
+        mask <<= 1;
+        ++i;
+      }
+    }
 
     // On floor 0, try to gather more entropy from player inputs.
     if (floor == 0 && newjoy) {
@@ -470,6 +496,7 @@ void main(void) NONBANKED {
         SWITCH_ROM_MBC1(3);
         mapgen();
         SWITCH_ROM_MBC1(1);
+        joy_action = 0;
         IE_REG |= VBL_IFLAG;
         end_animate();
         doupdatemap = 1;
@@ -544,6 +571,7 @@ void gameinit(void) {
   counter_zero(&st_floor);
   counter_zero(&st_steps);
   counter_zero(&st_kills);
+  joy_action = 0;
 }
 
 void begin_animate(void) {
@@ -644,10 +672,10 @@ void hide_sprites(void) NONBANKED {
 void do_turn(void) {
   if (inv_anim_up) {
     if (!inv_anim_timer) {
-      if (newjoy & (J_UP | J_DOWN)) {
-        if (newjoy & J_UP) {
+      if (joy_action & (J_UP | J_DOWN)) {
+        if (joy_action & J_UP) {
           inv_select += 3;
-        } else if (newjoy & J_DOWN) {
+        } else if (joy_action & J_DOWN) {
           ++inv_select;
         }
         inv_select &= 3;
@@ -659,7 +687,7 @@ void do_turn(void) {
         inv_anim_timer = INV_ANIM_FRAMES;
         inv_anim_up = 0;
         sfx(SFX_BACK);
-      } else if (newjoy & J_A) {
+      } else if (joy_action & J_A) {
         if (inv_selected_pick == PICKUP_TYPE_NONE) {
           sfx(SFX_OOPS);
         } else {
@@ -687,6 +715,7 @@ void do_turn(void) {
         set_vram_byte((u8 *)(INV_FLOOR_ADDR + 6), 0);
         set_vram_byte((u8 *)(INV_FLOOR_ADDR + 7), 0);
       }
+      joy_action = 0;
     }
   } else if (turn == TURN_PLAYER) {
     move_player();
@@ -766,12 +795,12 @@ void move_player(void) {
   u8 dir, tile;
 
   if (mob_move_timer[PLAYER_MOB] == 0 && !inv_anim_timer) {
-    if (joy & (J_LEFT | J_RIGHT | J_UP | J_DOWN)) {
-      if (joy & J_LEFT) {
+    if (joy_action & (J_LEFT | J_RIGHT | J_UP | J_DOWN)) {
+      if (joy_action & J_LEFT) {
         dir = DIR_LEFT;
-      } else if (joy & J_RIGHT) {
+      } else if (joy_action & J_RIGHT) {
         dir = DIR_RIGHT;
-      } else if (joy & J_UP) {
+      } else if (joy_action & J_UP) {
         dir = DIR_UP;
       } else {
         dir = DIR_DOWN;
@@ -864,12 +893,13 @@ void move_player(void) {
         turn = TURN_PLAYER_MOVED;
         sfx(SFX_OK);
       }
-    } else if (newjoy & J_A) {
+    } else if (joy_action & J_A) {
       // Open inventory
       inv_anim_timer = INV_ANIM_FRAMES;
       inv_anim_up = 1;
       sfx(SFX_OK);
     }
+    joy_action = 0;
   }
 }
 
@@ -1376,6 +1406,7 @@ u8 ai_run_mob_task(u8 index) {
           mob_target_pos[index] = mob_pos[PLAYER_MOB];
           mob_ai_cool[index] = 0;
           mob_active[index] = 1;
+          joy_action = 0;
         }
         break;
 
