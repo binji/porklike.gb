@@ -1346,10 +1346,11 @@ void hitpos(u8 pos, u8 dmg, u8 stun) {
   u8 tile, mob;
   tile = tmap[pos];
   if ((mob = mobmap[pos])) {
-    hitmob(mob - 1, dmg); // XXX maybe recursive...
+    // Stun first, since hitmob may delete the mob.
     if (stun) {
       mob_stun[mob - 1] = 1;
     }
+    hitmob(mob - 1, dmg); // XXX maybe recursive...
   }
   if ((tmap[pos] & TILE_SAW_MASK) == TILE_SAW) {
     tile = TILE_SAW_BROKEN;
