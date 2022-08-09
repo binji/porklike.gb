@@ -36,7 +36,7 @@ OBJDIR      = obj/$(EXT)
 BINDIR      = build/$(EXT)
 MKDIRS      = $(OBJDIR) $(BINDIR) # See bottom of Makefile for directory auto-creation
 
-CSOURCES = bank0.c gen.c main.c sound.c title.c
+CSOURCES = bank0.c gen.c main.c sound.c title.c rand.c
 ASMSOURCES = util.s music.s aligned.s
 IMGSOURCES = bg.png shared.png sprites.png dead.png title.png
 

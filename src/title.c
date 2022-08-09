@@ -2,6 +2,7 @@
 #include <gb/gbdecompress.h>
 
 #include "main.h"
+#include "rand.h"
 #include "tiletitle.h"
 
 #pragma bank 2

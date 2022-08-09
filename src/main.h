@@ -4,13 +4,8 @@
 #ifdef __SDCC
 #include <gb/gb.h>
 #endif
-#include <stdint.h>
 
-#ifdef __SDCC
-#define PRESERVES_REGS(...) __preserves_regs(__VA_ARGS__)
-#else
-#define PRESERVES_REGS(...)
-#endif
+#include "common.h"
 
 #define MAP_WIDTH 16
 #define MAP_HEIGHT 16
@@ -42,13 +37,6 @@
 #define POS_D(pos)        ((u8)(pos + 16))
 #define POS_DR(pos)       ((u8)(pos + 17))
 #define POS_DIR(pos, dir) ((u8)(pos + dirpos[dir]))
-
-#define XRND_10_PERCENT() (xrnd() < 26)
-#define XRND_12_5_PERCENT() ((xrnd() & 7) == 0)
-#define XRND_20_PERCENT() (xrnd() < 51)
-#define XRND_25_PERCENT() ((xrnd() & 3) == 0)
-#define XRND_33_PERCENT() (xrnd() < 85)
-#define XRND_50_PERCENT() (xrnd() & 1)
 
 #define IS_WALL_FLAG(flag)             ((flag) & 0b00000001)
 #define IS_SPECIAL_FLAG(flag)          ((flag) & 0b00000010)
@@ -145,12 +133,6 @@
 #define SFX_BUMP_TILE 19
 #define SFX_HEART 20
 #define SFX_FAIL 21
-
-typedef int8_t s8;
-typedef uint8_t u8;
-typedef int16_t s16;
-typedef uint16_t u16;
-typedef void (*vfp)(void);
 
 typedef u8 Map[MAP_WIDTH * MAP_HEIGHT];
 
@@ -294,9 +276,6 @@ void sfx(u8 id);
 void titlescreen(void);
 void clear_wram(void) PRESERVES_REGS(b, c);
 u16 drag(u16 x);
-u8 xrnd(void) PRESERVES_REGS(b, c);
-void xrnd_init(u16) PRESERVES_REGS(b, c);
-void xrnd_mix(u8) PRESERVES_REGS(b, c);
 void counter_zero(Counter* c) PRESERVES_REGS(b, c);
 void counter_thirty(Counter* c) PRESERVES_REGS(b, c);
 void counter_inc(Counter* c);
@@ -313,7 +292,6 @@ void mapgen(void);
 void sight(void);
 void addmob(MobType type, u8 pos);
 void addpick(PickupType type, u8 pos);
-u8 randint(u8 mx);
 
 extern u8 joy, lastjoy, newjoy;
 

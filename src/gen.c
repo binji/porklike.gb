@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "main.h"
+#include "rand.h"
 
 #include "map.c"
 
@@ -188,7 +189,6 @@ u8 void_exit[MAX_VOIDS];      // Exit tile for a given void region
 u8 num_voids;
 
 u16 floor_seed;
-extern u16 xrnd_seed;
 
 void mapgen(void) {
   floor_seed = xrnd_seed;
