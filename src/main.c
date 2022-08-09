@@ -6,6 +6,8 @@
 
 #include "main.h"
 #include "rand.h"
+#include "counter.h"
+
 #include "tilebg.h"
 #include "tileshared.h"
 #include "tilesprites.h"

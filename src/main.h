@@ -136,11 +136,6 @@
 
 typedef u8 Map[MAP_WIDTH * MAP_HEIGHT];
 
-typedef struct Counter {
-  u8 start;   // First digit index in data[]
-  u8 data[5]; // Digits as tile indexes, left padded
-} Counter;
-
 typedef enum Dir {
   DIR_LEFT,
   DIR_RIGHT,
@@ -276,11 +271,6 @@ void sfx(u8 id);
 void titlescreen(void);
 void clear_wram(void) PRESERVES_REGS(b, c);
 u16 drag(u16 x);
-void counter_zero(Counter* c) PRESERVES_REGS(b, c);
-void counter_thirty(Counter* c) PRESERVES_REGS(b, c);
-void counter_inc(Counter* c);
-void counter_dec(Counter* c);
-void counter_out(Counter* c, u16 vram);
 
 void vram_copy(u16 dst, void* src, u8 len);
 
