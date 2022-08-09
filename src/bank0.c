@@ -1,4 +1,5 @@
 #include "main.h"
+#include "mob.h"
 
 // Only const data needs to go in here, since functions can be marked with
 // NONBANKED to put them in bank 0.

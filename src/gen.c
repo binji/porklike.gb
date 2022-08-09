@@ -5,6 +5,7 @@
 
 #include "main.h"
 #include "rand.h"
+#include "mob.h"
 
 #include "map.c"
 
