@@ -60,6 +60,7 @@ extern const u8 diry4[];
 extern const u8 dirpos[];
 extern const u8 hopy4[];
 extern const u8 hopy12[];
+extern const u8 pickbounce[];
 
 extern Map fogmap;
 
@@ -68,6 +69,7 @@ extern u8 *next_sprite, *last_next_sprite;
 void dirty_tile(u8 pos);
 u8 ai_dobump(u8 index);
 void trigger_step(u8 index);
+u8 dropspot(u8 pos);
 
 
 #endif // COMMON_H_

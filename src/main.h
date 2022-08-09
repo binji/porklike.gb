@@ -119,23 +119,6 @@
 #define SFX_HEART 20
 #define SFX_FAIL 21
 
-typedef enum PickupType {
-  PICKUP_TYPE_HEART,
-  PICKUP_TYPE_KEY,
-  PICKUP_TYPE_JUMP,
-  PICKUP_TYPE_BOLT,
-  PICKUP_TYPE_PUSH,
-  PICKUP_TYPE_GRAPPLE,
-  PICKUP_TYPE_SPEAR,
-  PICKUP_TYPE_SMASH,
-  PICKUP_TYPE_HOOK,
-  PICKUP_TYPE_SPIN,
-  PICKUP_TYPE_SUPLEX,
-  PICKUP_TYPE_SLAP,
-  PICKUP_TYPE_FULL, // Used to display "full!" message
-  PICKUP_TYPE_NONE = 0,
-} PickupType;
-
 extern const u8 flags_bin[];
 
 extern const u8 permutation_4[];
@@ -145,7 +128,6 @@ extern const Dir invdir[];
 extern const u8 n_over_3[];
 extern const u16 three_over_n[];
 
-extern const u8 pickbounce[];
 extern const u8 sightsig[];
 
 extern const u8 dirvalid[];
@@ -153,9 +135,6 @@ extern const u8 validmap[];
 
 extern const u8 dirt_tiles[];
 
-extern const u8 pick_type_anim_frames[];
-extern const u8 pick_type_anim_start[];
-extern const u8 pick_type_sprite_tile[];
 extern const u8 pick_type_name_tile[];
 extern const u8 pick_type_name_start[];
 extern const u8 pick_type_name_len[];
@@ -208,7 +187,6 @@ void fadein(void);
 
 void mapgen(void);
 void sight(void);
-void addpick(PickupType type, u8 pos);
 
 extern u8 joy, lastjoy, newjoy;
 
@@ -217,7 +195,6 @@ extern Map dtmap;
 extern Map dirtymap;
 extern Map roommap;
 extern Map distmap;
-extern Map pickmap;
 extern Map flagmap;
 extern Map sigmap;
 extern Map tempmap;
@@ -241,7 +218,6 @@ extern u8 *anim_tile_ptr;
 extern u8 void_exit[];
 
 extern u8 start_room;
-extern u8 num_picks;
 extern u8 floor;
 extern u8 startpos;
 extern u16 steps;
