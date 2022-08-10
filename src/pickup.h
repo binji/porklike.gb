@@ -43,4 +43,7 @@ extern u8 pick_dx[];         // dx moving sprite
 extern u8 pick_dy[];         // dy moving sprite
 extern u8 pick_move_timer[]; // timer for sprite animation
 
+// XXX move to UI/inventory
+extern PickupType inv_selected_pick;
+
 #endif // PICKUP_H_

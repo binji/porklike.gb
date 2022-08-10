@@ -3,11 +3,11 @@
 #endif
 #include <string.h>
 
+#include "gameplay.h"
 #include "main.h"
 #include "mob.h"
 #include "pickup.h"
 #include "rand.h"
-#include "mob.h"
 
 #include "map.c"
 

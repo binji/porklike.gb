@@ -1,6 +1,7 @@
 #include <gb/gb.h>
 
 #include "ai.h"
+#include "gameplay.h"
 #include "mob.h"
 #include "rand.h"
 #include "sound.h"
