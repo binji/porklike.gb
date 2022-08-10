@@ -45,6 +45,5 @@ extern u8 room_avoid[];
 extern u8 dirty[];
 
 extern u8 start_room;
-extern u16 steps;
 
 #endif // MAIN_H_

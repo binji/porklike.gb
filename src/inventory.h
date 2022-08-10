@@ -26,4 +26,7 @@ void inv_close(void);
 u8 inv_acquire_pickup(PickupType ptype);
 void inv_use_pickup(void);
 
+extern u8 inv_anim_up;
+extern u8 inv_anim_timer;
+
 #endif // INVENTORY_H_

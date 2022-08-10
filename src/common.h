@@ -141,13 +141,6 @@ typedef enum Dir {
   DIR_DOWN,
 } Dir;
 
-typedef enum Turn {
-  TURN_PLAYER,
-  TURN_PLAYER_MOVED,
-  TURN_AI,
-  TURN_WEEDS,
-} Turn;
-
 typedef enum GameOverState {
   GAME_OVER_NONE,
   GAME_OVER_DEAD,
@@ -190,8 +183,6 @@ extern const u8 validmap[];
 
 extern const u8 dirt_tiles[];
 
-extern const u8 inventory_map[];
-
 extern const u8 sightsig[];
 
 extern Map tmap;
@@ -213,20 +204,11 @@ extern u8 num_cands;
 
 extern u8 *next_sprite, *last_next_sprite;
 
-extern Turn turn;
-extern u8 dopassturn, doai;
-extern u8 noturn;
-
 extern u8 joy, lastjoy, newjoy, repeatjoy;
 extern u8 joy_action; // The most recently pressed action button
 
 extern u8 is_targeting;
 extern Dir target_dir;
-
-extern u8 inv_anim_up;
-extern u8 inv_anim_timer;
-extern u8 inv_select;
-extern u8 inv_msg_update;
 
 extern u8 doupdatemap, dofadeout, doloadfloor, donextfloor, doblind, dosight;
 extern GameOverState gameover_state;
@@ -236,15 +218,9 @@ extern SprType spr_type[];
 extern u8 spr_anim_frame[];  // Actual sprite tile (not index)
 extern u8 spr_trigger_val[]; // Which value to use for trigger action
 
-extern u8 equip_type[];
-extern u8 equip_charge[];
-
 extern u8 void_exit[];
 
 extern u8* next_float;
-
-extern u8 equip_type[MAX_EQUIPS];
-extern u8 equip_charge[MAX_EQUIPS];
 
 extern u8 anim_tiles[];
 extern u8 *anim_tile_ptr;
@@ -257,15 +233,8 @@ extern u8 startpos;
 extern u8 floor;
 
 void dirty_tile(u8 pos);
-u8 ai_dobump(u8 index);
-void trigger_step(u8 index);
 u8 dropspot(u8 pos);
 void addfloat(u8 pos, u8 tile);
-void hitpos(u8 pos, u8 dmg, u8 stun);
-void hitmob(u8 index, u8 dmg);
-void update_tile(u8 pos, u8 tile);
-void unfog_tile(u8 pos);
-void update_wall_face(u8 pos);
 void showmsg(u8 index, u8 y);
 u8 addspr(u8 speed, u16 x, u16 y, u16 dx, u16 dy, u8 drag, u8 timer, u8 prop);
 void nop_saw_anim(u8 pos);

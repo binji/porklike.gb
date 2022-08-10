@@ -61,6 +61,10 @@ extern const u16 boom_spr_dy[];
 
 extern const u8 float_dmg[];
 
+Turn turn;
+u8 dopassturn, doai;
+u8 noturn;
+
 u8 recover; // how long until recovering from blind
 u16 steps;
 u8 num_keys;

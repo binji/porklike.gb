@@ -36,6 +36,8 @@
 
 #define TILE_0 0xe5
 
+extern const u8 inventory_map[];
+
 extern const u8 inventory_up_y[];
 extern const u8 inventory_down_y[];
 

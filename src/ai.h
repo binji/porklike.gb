@@ -5,6 +5,7 @@
 
 void ai_run_tasks(void);
 u8 ai_run_mob_task(u8 index);
+u8 ai_dobump(u8 index);
 u8 ai_tcheck(u8 index);
 u8 ai_getnextstep(u8 index);
 u8 ai_getnextstep_rev(u8 index);

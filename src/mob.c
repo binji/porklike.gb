@@ -2,6 +2,8 @@
 
 #include "mob.h"
 
+#include "ai.h"
+#include "gameplay.h"
 #include "inventory.h"
 
 #pragma bank 1

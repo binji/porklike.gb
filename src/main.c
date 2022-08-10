@@ -125,9 +125,6 @@ u8 msg_timer;
 OAM_item_t float_sprites[MAX_FLOATS];
 u8* next_float;
 
-Turn turn;
-u8 dopassturn, doai;
-u8 noturn;
 GameOverState gameover_state;
 u8 gameover_timer;
 
