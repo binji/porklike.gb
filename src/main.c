@@ -9,6 +9,7 @@
 #include "ai.h"
 #include "counter.h"
 #include "gameplay.h"
+#include "inventory.h"
 #include "mob.h"
 #include "pickup.h"
 #include "rand.h"
@@ -27,13 +28,6 @@
 #define DIRTY_SIZE 128
 #define DIRTY_CODE_SIZE 256
 #define ANIM_TILES_SIZE 64
-
-#define INV_WIDTH 16
-#define INV_HEIGHT 13
-#define INV_DESC_ADDR 0x9d01
-#define INV_SELECT_X_OFFSET 32
-#define INV_SELECT_Y_OFFSET 40
-#define INV_FLOOR_3_SPACES_LEN 8 /* "FLOOR   " */
 
 #define DEAD_X_OFFSET 4
 #define DEAD_Y_OFFSET 2
@@ -61,7 +55,6 @@
 
 #define OBJ1_PAL_FRAMES 8
 #define MSG_FRAMES 120
-#define INV_SELECT_FRAMES 8
 #define INV_TARGET_FRAMES 2
 #define JOY_REPEAT_FIRST_WAIT_FRAMES 30
 #define JOY_REPEAT_NEXT_WAIT_FRAMES 8
@@ -85,8 +78,6 @@ void hide_sprites(void);
 void vbl_interrupt(void);
 
 void update_sprites(void);
-
-void inv_animate(void);
 
 void update_obj1_pal(void);
 void fadeout(void);
@@ -149,18 +140,9 @@ u8 joy_action; // The most recently pressed action button
 u8 doupdatemap, dofadeout, doloadfloor, donextfloor, doblind, dosight;
 u8 *next_sprite, *last_next_sprite;
 
-u8 inv_anim_up;
-u8 inv_anim_timer;
-u8 inv_select;
-u8 inv_select_timer;
-u8 inv_select_frame;
 u8 inv_target_timer;
 u8 inv_target_frame;
-u8 inv_msg_update;
-PickupType inv_selected_pick;
 
-u8 equip_type[MAX_EQUIPS];
-u8 equip_charge[MAX_EQUIPS];
 Counter st_floor;
 Counter st_steps;
 Counter st_kills;
@@ -282,15 +264,11 @@ void main(void) NONBANKED {
         donextfloor = 0;
         ++floor;
         counter_inc(&st_floor);
-
-        // Set back to FLOOR #
-        vram_copy(INV_FLOOR_ADDR, inventory_map + INV_FLOOR_OFFSET,
-                  INV_FLOOR_3_SPACES_LEN);
         recover = 0;
       }
       if (doloadfloor) {
         doloadfloor = 0;
-        counter_out(&st_floor, INV_FLOOR_NUM_ADDR);
+        inv_display_floor();
         hide_sprites();
         IE_REG &= ~VBL_IFLAG;
         SWITCH_ROM_MBC1(3);
@@ -353,19 +331,15 @@ void gameinit(void) {
   // Reset player mob
   num_mobs = 0;
   addmob(MOB_TYPE_PLAYER, 0);
-  set_vram_byte((u8 *)INV_HP_ADDR, TILE_0 + mob_hp[PLAYER_MOB]);
+  inv_update_hp();
 
   turn = TURN_PLAYER;
   next_float = (u8*)float_sprites;
 
   // Set up inventory window
   move_win(23, 128);
-  inv_select_timer = INV_SELECT_FRAMES;
+  inv_init();
   inv_target_timer = INV_TARGET_FRAMES;
-  inv_selected_pick = PICKUP_TYPE_NONE;
-  inv_msg_update = 1;
-  memset(equip_type, PICKUP_TYPE_NONE, sizeof(equip_type));
-  set_win_tiles(0, 0, INV_WIDTH, INV_HEIGHT, inventory_map);
 
   floor = 0;
   counter_zero(&st_floor);
@@ -685,44 +659,6 @@ void update_sprites(void) {
           *next_sprite++ = TILE_ARROW_L + dir;
           *next_sprite++ = 0;
         }
-      }
-    }
-  }
-}
-
-void inv_animate(void) {
-  if (inv_anim_timer) {
-    --inv_anim_timer;
-    WY_REG = inv_anim_up ? inventory_up_y[inv_anim_timer]
-                         : inventory_down_y[inv_anim_timer];
-  }
-
-  if (inv_anim_timer || inv_anim_up) {
-    if (--inv_select_timer == 0) {
-      inv_select_timer = INV_SELECT_FRAMES;
-      ++inv_select_frame;
-    }
-    *next_sprite++ = WY_REG + INV_SELECT_Y_OFFSET + (inv_select << 3);
-    *next_sprite++ = INV_SELECT_X_OFFSET + pickbounce[inv_select_frame & 7];
-    *next_sprite++ = 0;
-    *next_sprite++ = 0;
-
-    if (inv_msg_update) {
-      inv_msg_update = 0;
-
-      u16 addr = INV_DESC_ADDR;
-      u8 pick = equip_type[inv_select];
-      u8 i;
-      for (i = 0; i < NUM_INV_ROWS; ++i) {
-        u8 len = pick_type_desc_len[pick][i];
-        if (len) {
-          vram_copy(addr, pick_type_desc_tile + pick_type_desc_start[pick][i],
-                    len);
-        }
-
-        // Fill the rest of the row with 0
-        vmemset((u8 *)addr + len, 0, INV_ROW_LEN - len);
-        addr += 32;
       }
     }
   }

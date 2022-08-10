@@ -1,8 +1,10 @@
 #include <gb/gb.h>
 
 #include "mob.h"
+
 #include "pickup.h"
 #include "rand.h"
+#include "inventory.h"
 
 #pragma bank 1
 

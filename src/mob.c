@@ -2,6 +2,8 @@
 
 #include "mob.h"
 
+#include "inventory.h"
+
 #pragma bank 1
 
 #define MAX_DEAD_MOBS 4

@@ -2,6 +2,7 @@
 #define GAMEPLAY_H_
 
 #include "common.h"
+#include "counter.h"
 
 void do_turn(void);
 void pass_turn(void);
@@ -23,5 +24,11 @@ void unfog_tile(u8 pos);
 
 extern u8 recover; // how long until recovering from blind
 extern u16 steps;
+extern u8 num_keys;
+
+extern Counter st_floor;
+extern Counter st_steps;
+extern Counter st_kills;
+extern Counter st_recover;
 
 #endif // GAMEPLAY_H_

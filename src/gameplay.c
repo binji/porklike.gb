@@ -4,6 +4,7 @@
 #include "gameplay.h"
 
 #include "counter.h"
+#include "inventory.h"
 #include "mob.h"
 #include "pickup.h"
 #include "rand.h"
@@ -13,9 +14,6 @@
 
 #define MSG_KEY 18
 #define MSG_KEY_Y 80
-
-#define INV_KEYS_ADDR 0x9c25
-#define INV_EQUIP_ADDR 0x9c63
 
 #define TILE_VOID_EXIT_DIFF 0x35
 #define TILE_VOID_OPEN_DIFF 3
@@ -33,15 +31,9 @@
 
 #define RECOVER_MOVES 30
 
-#define PICKUP_CHARGES 2
-
 #define REAPER_AWAKENS_STEPS 100
 #define MSG_REAPER 0
 #define MSG_LEN 18
-
-#define INV_BLANK_ROW_OFFSET 49 /* offset into inventory_map */
-#define INV_BLIND_LEN 5          /* BLIND */
-#define INV_FLOOR_LEN 5          /* FLOOR */
 
 #define FLOAT_BLIND_X_OFFSET 0xfb
 
@@ -56,14 +48,9 @@
 #define IS_UNSPECIAL_WALL_TILE(tile)                                           \
   ((flags_bin[tile] & 0b00000011) == 0b00000001)
 
-extern const u8 pick_type_name_tile[];
-extern const u8 pick_type_name_start[];
-extern const u8 pick_type_name_len[];
 extern const u8 float_pick_type_tiles[];
 extern const u8 float_pick_type_start[];
 extern const u8 float_pick_type_x_offset[];
-
-extern const u8 blind_map[];
 
 extern const u8 boom_spr_speed[];
 extern const u8 boom_spr_anim_speed[];
@@ -74,64 +61,13 @@ extern const u16 boom_spr_dy[];
 
 extern const u8 float_dmg[];
 
-// XXX
-extern Counter st_floor;
-extern Counter st_steps;
-extern Counter st_kills;
-extern Counter st_recover;
-
 u8 recover; // how long until recovering from blind
 u16 steps;
 u8 num_keys;
 
 void do_turn(void) {
   if (inv_anim_up) {
-    if (!inv_anim_timer) {
-      if (joy_action & (J_UP | J_DOWN)) {
-        if (joy_action & J_UP) {
-          inv_select += 3;
-        } else if (joy_action & J_DOWN) {
-          ++inv_select;
-        }
-        inv_select &= 3;
-        inv_msg_update = 1;
-        inv_selected_pick = equip_type[inv_select];
-        sfx(SFX_SELECT);
-      }
-      if (newjoy & J_B) {
-        inv_anim_timer = INV_ANIM_FRAMES;
-        inv_anim_up = 0;
-        sfx(SFX_BACK);
-      } else if (joy_action & J_A) {
-        if (inv_selected_pick == PICKUP_TYPE_NONE) {
-          sfx(SFX_OOPS);
-        } else {
-          inv_anim_timer = INV_ANIM_FRAMES;
-          inv_anim_up = 0;
-          is_targeting = 1;
-          sfx(SFX_OK);
-        }
-      } else if (joy == (J_LEFT | J_START)) {
-        // Display level seed instead of the floor
-        static const u8 hextile[] = {
-            0xe5, 0xe6, 0xe7, 0xe8, 0xe9, 0xea, 0xeb, 0xec,
-            0xed, 0xee, 0xcb, 0xcc, 0xcd, 0xce, 0xcf, 0xd0,
-        };
-
-        set_vram_byte((u8 *)(INV_FLOOR_ADDR),
-                      hextile[(floor_seed >> 12) & 0xf]);
-        set_vram_byte((u8 *)(INV_FLOOR_ADDR + 1),
-                      hextile[(floor_seed >> 8) & 0xf]);
-        set_vram_byte((u8 *)(INV_FLOOR_ADDR + 2),
-                      hextile[(floor_seed >> 4) & 0xf]);
-        set_vram_byte((u8 *)(INV_FLOOR_ADDR + 3), hextile[floor_seed & 0xf]);
-        set_vram_byte((u8 *)(INV_FLOOR_ADDR + 4), TILE_0 + dogate);
-        set_vram_byte((u8 *)(INV_FLOOR_ADDR + 5), 0);
-        set_vram_byte((u8 *)(INV_FLOOR_ADDR + 6), 0);
-        set_vram_byte((u8 *)(INV_FLOOR_ADDR + 7), 0);
-      }
-      joy_action = 0;
-    }
+    inv_update();
   } else if (turn == TURN_PLAYER) {
     move_player();
   }
@@ -170,9 +106,7 @@ void pass_turn(void) {
     }
     if (doblind) {
       // Update floor to display recover count instead
-      vram_copy(INV_FLOOR_ADDR, blind_map, INV_BLIND_LEN);
-      counter_thirty(&st_recover);
-      counter_out(&st_recover, INV_FLOOR_NUM_ADDR);
+      inv_display_blind();
 
       // Display float
       u8 i, x, y;
@@ -190,16 +124,10 @@ void pass_turn(void) {
     } else if (recover) {
       if (--recover == 0) {
         // Set back to FLOOR #
-        vram_copy(INV_FLOOR_ADDR, inventory_map + INV_FLOOR_OFFSET,
-                  INV_FLOOR_LEN);
-        counter_out(&st_floor, INV_FLOOR_NUM_ADDR);
+        inv_display_floor();
         dosight = 1;
       } else {
-        // Decrement recover counter
-        counter_dec(&st_recover);
-        // Blank out the right tile, in case of 10 -> 9
-        set_vram_byte((u8 *)(INV_FLOOR_NUM_ADDR + 1), 0);
-        counter_out(&st_recover, INV_FLOOR_NUM_ADDR);
+        inv_decrement_recover();
       }
     }
     break;
@@ -249,7 +177,7 @@ void move_player(void) {
                     --num_keys;
 
                     update_tile(newpos, TILE_EMPTY);
-                    set_vram_byte((u8 *)INV_KEYS_ADDR, TILE_0 + num_keys);
+                    inv_update_keys();
                     dosight = 1;
                     sfx(SFX_BUMP_TILE);
                     goto dobump;
@@ -299,8 +227,7 @@ void move_player(void) {
     } else if (is_targeting) {
       if (newjoy & J_B) {
         // Back out of targeting
-        inv_anim_timer = INV_ANIM_FRAMES;
-        inv_anim_up = 1;
+        inv_open();
         is_targeting = 0;
         sfx(SFX_BACK);
       } else if (newjoy & J_A) {
@@ -309,9 +236,7 @@ void move_player(void) {
         sfx(SFX_OK);
       }
     } else if (joy_action & J_A) {
-      // Open inventory
-      inv_anim_timer = INV_ANIM_FRAMES;
-      inv_anim_up = 1;
+      inv_open();
       sfx(SFX_OK);
     }
     joy_action = 0;
@@ -456,19 +381,7 @@ void use_pickup(void) {
       break;
   }
 
-  u16 equip_addr = INV_EQUIP_ADDR - 2 + (inv_select << 5);
-  if (--equip_charge[inv_select] == 0) {
-    equip_type[inv_select] = PICKUP_TYPE_NONE;
-    inv_selected_pick = PICKUP_TYPE_NONE;
-    inv_msg_update = 1;
-
-    // Clear equip display
-    vram_copy(equip_addr, inventory_map + INV_BLANK_ROW_OFFSET, INV_ROW_LEN);
-  } else {
-    // Update charge count display
-    set_vram_byte((u8 *)(equip_addr + pick_type_name_len[inv_selected_pick]),
-                  TILE_0 + equip_charge[inv_select]);
-  }
+  inv_use_pickup();
 
   mob_trigger[PLAYER_MOB] = 1;
   dosight = 1;
@@ -541,8 +454,7 @@ u8 rope(u8 from, u8 to) {
 }
 
 void trigger_step(u8 mob) {
-  u8 pos, tile, ptype, pindex, i, flt_start, flt_end, x, y, len, teleported;
-  u16 equip_addr;
+  u8 pos, tile, ptype, pindex, i, flt_start, flt_end, x, y, teleported;
 
   teleported = 0;
 redo:
@@ -565,62 +477,23 @@ redo:
       if (ptype == PICKUP_TYPE_HEART) {
         if (mob_hp[PLAYER_MOB] < 9) {
           ++mob_hp[PLAYER_MOB];
-          set_vram_byte((u8 *)INV_HP_ADDR, TILE_0 + mob_hp[PLAYER_MOB]);
+          inv_update_hp();
         }
         sound = SFX_HEART;
       } else if (ptype == PICKUP_TYPE_KEY) {
         if (num_keys < 9) {
           ++num_keys;
-          set_vram_byte((u8 *)INV_KEYS_ADDR, TILE_0 + num_keys);
+          inv_update_keys();
         }
       } else {
-        len = pick_type_name_len[ptype];
-
-        // First check whether this equipment already exists, so we can
-        // increase the number of charges
-        equip_addr = INV_EQUIP_ADDR;
-        for (i = 0; i < MAX_EQUIPS; ++i) {
-          if (equip_type[i] == ptype) {
-            // Increase charges
-            if (equip_charge[i] < 9) {
-              equip_charge[i] += PICKUP_CHARGES;
-              if (equip_charge[i] > 9) { equip_charge[i] = 9; }
-              set_vram_byte((u8 *)(equip_addr + len - 2),
-                            TILE_0 + equip_charge[i]);
-            }
-            goto pickup;
-          }
-          equip_addr += 32;
+        if (!inv_acquire_pickup(ptype)) {
+          // No room, display "full!"
+          ptype = PICKUP_TYPE_FULL;
+          sound = SFX_OOPS;
+          goto done;
         }
-
-        // Next check whether there is a new spot for this equipment
-        equip_addr = INV_EQUIP_ADDR;
-        for (i = 0; i < MAX_EQUIPS; ++i) {
-          if (equip_type[i] == PICKUP_TYPE_NONE) {
-            // Use this slot
-            equip_type[i] = ptype;
-            equip_charge[i] = PICKUP_CHARGES;
-            vram_copy(equip_addr,
-                      pick_type_name_tile + pick_type_name_start[ptype], len);
-
-            // Update the inventory message if the selection was set to this
-            // equip slot
-            if (inv_select == i) {
-              inv_selected_pick = equip_type[inv_select];
-              inv_msg_update = 1;
-            }
-            goto pickup;
-          }
-          equip_addr += 32;
-        }
-
-        // No room, display "full!"
-        ptype = PICKUP_TYPE_FULL;
-        sound = SFX_OOPS;
-        goto done;
       }
 
-    pickup:
       delpick(pindex);
 
     done:
@@ -877,14 +750,14 @@ void hitmob(u8 index, u8 dmg) {
       dirty_tile(pos);
 
       if (index == PLAYER_MOB) {
-        set_vram_byte((u8 *)INV_HP_ADDR, TILE_0);
+        inv_update_hp();
         gameover_timer = GAMEOVER_FRAMES;
       } else {
         // Killing a reaper restores the your health to 5 and drops a free key
         if (mtype == MOB_TYPE_REAPER) {
           if (mob_hp[PLAYER_MOB] < 5) {
             mob_hp[PLAYER_MOB] = 5;
-            set_vram_byte((u8 *)INV_HP_ADDR, (u8)(TILE_0 + 5));
+            inv_update_hp();
           }
           droppick(PICKUP_TYPE_KEY, pos);
           sfx(SFX_HEART);
@@ -898,7 +771,7 @@ void hitmob(u8 index, u8 dmg) {
       mob_hp[index] -= dmg;
       mob_vis[index] = 1;
       if (index == PLAYER_MOB) {
-        set_vram_byte((u8 *)INV_HP_ADDR, TILE_0 + mob_hp[PLAYER_MOB]);
+        inv_update_hp();
         sfx(SFX_HIT_PLAYER);
       } else {
         sfx(SFX_HIT_MOB);

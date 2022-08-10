@@ -1,3 +1,4 @@
+#include "inventory.h"
 #include "main.h"
 #include "mob.h"
 

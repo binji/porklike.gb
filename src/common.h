@@ -41,10 +41,6 @@
 #define POS_TO_X(pos) (((pos & 0xf) << 3) + 24)
 #define POS_TO_Y(pos) (((pos & 0xf0) >> 1) + 16)
 
-// Hide sprites under this y position, so they aren't displayed on top of the
-// inventory
-#define INV_TOP_Y() (WY_REG + 9)
-
 #define IS_WALL_FLAG(flag)             ((flag) & 0b00000001)
 #define IS_SPECIAL_FLAG(flag)          ((flag) & 0b00000010)
 #define IS_WALL_OR_SPECIAL_FLAG(flag)  ((flag) & 0b00000011)
@@ -122,15 +118,6 @@
 #define TILE_ENTRANCE 0x61
 
 // Shared tiles
-#define TILE_0 0xe5
-
-#define INV_ANIM_FRAMES 25
-#define INV_ROW_LEN 14
-#define INV_HP_ADDR 0x9c22
-#define INV_FLOOR_ADDR 0x9c27
-#define INV_FLOOR_NUM_ADDR 0x9c2d
-#define INV_FLOOR_OFFSET 23      /* offset into inventory_map */
-
 #define FLOAT_FRAMES 70
 
 #define MAX_EQUIPS 4

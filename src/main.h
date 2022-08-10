@@ -7,23 +7,14 @@
 
 #include "common.h"
 
-#define NUM_INV_ROWS 4
-
 #define MAX_ROOMS 4
 
 extern const u8 fadepal[];
 extern const u8 obj_pal1[];
 
-extern const u8 pick_type_desc_tile[];
-extern const u16 pick_type_desc_start[][NUM_INV_ROWS];
-extern const u8 pick_type_desc_len[][NUM_INV_ROWS];
-
 extern const u8 float_diff_y[];
 
 extern const u8 drop_diff[];
-
-extern const u8 inventory_up_y[];
-extern const u8 inventory_down_y[];
 
 extern const u8 msg_tiles[];
 
