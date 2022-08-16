@@ -62,7 +62,6 @@ extern const u16 boom_spr_dy[];
 extern const u8 float_dmg[];
 
 Turn turn;
-u8 dopassturn, doai;
 u8 noturn;
 
 u8 recover; // how long until recovering from blind
@@ -77,7 +76,7 @@ void do_turn(void) {
   }
 }
 
-void pass_turn(void) {
+u8 pass_turn(void) {
   if (dosight) {
     dosight = 0;
     sight();
@@ -90,14 +89,13 @@ void pass_turn(void) {
       noturn = 0;
     } else {
       turn = TURN_AI;
-      doai = 1;
+      return 1;
     }
     break;
 
   case TURN_AI:
     turn = TURN_WEEDS;
-    doai = 1;
-    break;
+    return 1;
 
   case TURN_WEEDS:
     turn = TURN_PLAYER;
@@ -136,6 +134,8 @@ void pass_turn(void) {
     }
     break;
   }
+
+  return 0;
 }
 
 void move_player(void) {

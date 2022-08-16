@@ -14,14 +14,15 @@
 
 #pragma bank 1
 
-void ai_run_tasks(void) {
-  dopassturn = 1;
+u8 ai_run_tasks(void) {
+  u8 ai_acted = 1;
   u8 i;
   for (i = 0; i < num_mobs; ++i) {
     if ((mob_type[i] == MOB_TYPE_WEED) == (turn == TURN_WEEDS)) {
-      dopassturn &= !ai_run_mob_task(i);
+      ai_acted |= ai_run_mob_task(i);
     }
   }
+  return ai_acted;
 }
 
 u8 ai_run_mob_task(u8 index) {

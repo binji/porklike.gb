@@ -12,7 +12,7 @@ typedef enum Turn {
 } Turn;
 
 void do_turn(void);
-void pass_turn(void);
+u8 pass_turn(void);
 
 void move_player(void);
 void use_pickup(void);
@@ -32,7 +32,6 @@ void update_tile(u8 pos, u8 tile);
 void unfog_tile(u8 pos);
 
 extern Turn turn;
-extern u8 dopassturn, doai;
 
 extern u8 recover; // how long until recovering from blind
 extern u16 steps;

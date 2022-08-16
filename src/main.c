@@ -57,7 +57,7 @@
 #define MSG_FRAMES 120
 #define INV_TARGET_FRAMES 2
 #define JOY_REPEAT_FIRST_WAIT_FRAMES 30
-#define JOY_REPEAT_NEXT_WAIT_FRAMES 8
+#define JOY_REPEAT_NEXT_WAIT_FRAMES 4
 
 #define SIGHT_DIST_BLIND 1
 #define SIGHT_DIST_DEFAULT 4
@@ -72,7 +72,7 @@
 
 void gameinit(void);
 void begin_animate(void);
-void animate(void);
+u8 animate(void);
 void end_animate(void);
 void hide_sprites(void);
 void vbl_interrupt(void);
@@ -289,21 +289,16 @@ void main(void) NONBANKED {
 
       update_sprites();
 
-      do {
-        animate();
-        if (dopassturn) {
-          dopassturn = 0;
-          pass_turn();
-          if (doai) {
-            doai = 0;
-            ai_run_tasks();
-            if (!dopassturn) {
-              // AI took a step, so do 1 round of animation
-              animate();
-            }
-          }
+      while (1) {
+        if (!animate()) break;
+
+        if (pass_turn()) {
+          if (!ai_run_tasks()) continue;
+          // AI took a step, so do 1 round of animation
+          animate();
         }
-      } while (dopassturn);
+        break;
+      }
 
       inv_animate();
       end_animate();
@@ -440,7 +435,7 @@ void hide_sprites(void) NONBANKED {
   num_sprs = 0;
 }
 
-void animate(void) {
+u8 animate(void) {
   u8 animdone = num_sprs == 0;
 
   // Loop through all animating tiles
@@ -460,9 +455,7 @@ void animate(void) {
   // Draw all dead mobs as sprites
   animate_deadmobs();
 
-  if (animdone) {
-    dopassturn = 1;
-  }
+  return animdone;
 }
 
 void vbl_interrupt(void) NONBANKED {

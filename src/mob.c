@@ -226,7 +226,6 @@ u8 animate_mobs(void) {
       mob_tile[i] = frame;
 
       if (mob_move_timer[i]) {
-        animdone = 0;
         mob_x[i] += mob_dx[i];
         mob_y[i] += mob_dy[i];
 
@@ -274,6 +273,8 @@ u8 animate_mobs(void) {
             mob_trigger[i] = 0;
             trigger_step(i);
           }
+        } else {
+          animdone = 0;
         }
       } else if (dotile) {
         dirty_tile(pos);
