@@ -1,4 +1,5 @@
 import math
+import pprint
 
 def sgn(n): return 1 if n >= 0 else -1
 
@@ -31,11 +32,46 @@ def los2(pos1, pos2):
   else:
     return fwd + ((0, 0),) + rev + ((0, 0),)
 
-for j in range(-4, 5):
-  for i in range(-4, 5):
-    dist = math.ceil(math.sqrt(i*i+j*j))
-    if 0 < dist <= 4:
-      a = los2((0, 0), (i, j))
-      # a = [y*16+x for x, y in a]
-      print(i, j, a)
-  print()
+def PrintDepthFirstLosTraversal():
+  paths = []
+  for j in range(-4, 5):
+    for i in range(-4, 5):
+      dist = math.ceil(math.sqrt(i*i+j*j))
+      if 0 < dist <= 4:
+        fwd = los((0, 0), (i, j))
+        rev = los((i, j), (0, 0))[::-1]
+        if fwd != rev:
+          paths.append(fwd + ((i, j),))
+          paths.append(rev + ((i, j),))
+        else:
+          paths.append(fwd + ((i, j),))
+
+  # pprint.pp(paths)
+
+  def recurse(index, curpath):
+    total = []
+    count = []
+    dist = []
+    for pos in set([path[index] for path in paths
+                    if len(path) > index and path[:index] == curpath]):
+      total.append(pos)
+      count.append(len(total))
+      dist.append(index)
+      p = len(count) - 1
+      t, c, d = recurse(index + 1, curpath + (pos,))
+      total.extend(t)
+      count.extend(c)
+      dist.extend(d)
+      count[p] = len(total) - count[p]
+    return total, count, dist
+
+  def h(n):
+    return hex((n + 16) & 15)[2:]
+
+  t, c, d = recurse(0, ())
+  print('const u8 sightdiff[] = {{{}}};'.format(', '.join(f'0x{h(x[1])}{h(x[0])}' for x in t)))
+  print('const u8 sightskip[] = {{{}}};'.format(', '.join(map(str, c))))
+  print('const u8 sightdist[] = {{{}}};'.format(', '.join(map(str, d))))
+
+
+PrintDepthFirstLosTraversal()

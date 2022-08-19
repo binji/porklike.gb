@@ -29,7 +29,6 @@ void hitpos(u8 pos, u8 dmg, u8 stun);
 void update_wall_face(u8 pos);
 void dirty_tile(u8 pos);
 void update_tile(u8 pos, u8 tile);
-void unfog_tile(u8 pos);
 
 extern Turn turn;
 

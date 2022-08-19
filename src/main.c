@@ -83,8 +83,6 @@ void update_obj1_pal(void);
 void fadeout(void);
 void fadein(void);
 
-u8 is_valid(u8 pos, u8 diff) __preserves_regs(b, c);
-
 extern OAM_item_t shadow_OAM2[40];
 
 u8 room_pos[MAX_ROOMS];
@@ -682,8 +680,8 @@ void fadein(void) NONBANKED {
 u8 dropspot(u8 pos) {
   u8 i = 0, newpos;
   do {
-    if ((newpos = is_valid(pos, drop_diff[i])) &&
-        !(IS_SMARTMOB_POS(newpos) || pickmap[newpos])) {
+    if (is_new_pos_valid(pos, drop_diff[i]) &&
+        !(IS_SMARTMOB_POS(newpos = pos_result) || pickmap[newpos])) {
       return newpos;
     }
   } while (++i);

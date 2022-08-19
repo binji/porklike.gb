@@ -45,6 +45,8 @@
 #define GAMEOVER_FRAMES 70
 #define MOB_FLASH_FRAMES 20
 
+#define SIGHT_DIFF_COUNT 57
+
 #define IS_UNSPECIAL_WALL_TILE(tile)                                           \
   ((flags_bin[tile] & 0b00000011) == 0b00000001)
 
@@ -67,6 +69,12 @@ u8 noturn;
 u8 recover; // how long until recovering from blind
 u16 steps;
 u8 num_keys;
+
+static void unfog_tile(u8 pos);
+static void unfog_center(u8 pos);
+static void unfog_neighbors(u8 pos);
+static void sight_blind(void);
+
 
 void do_turn(void) {
   if (inv_anim_up) {
@@ -561,71 +569,55 @@ redo:
 }
 
 void sight(void) NONBANKED {
-  u8 ppos, pos, adjpos, diff, head, oldtail, newtail, sig, valid, first,
-      dist, maxdist, dir;
+  u8 index, pos;
   memset(mobsightmap, 0, sizeof(mobsightmap));
 
-  ppos = mob_pos[PLAYER_MOB];
-
-  cands[head = 0] = 0;
-  newtail = 1;
-  first = 1;
-  dist = 0;
-
   if (recover) {
-    valid = validmap[ppos];
-    if (valid & VALID_U) { cands[newtail++] = POS_U(0); }
-    if (valid & VALID_L) { cands[newtail++] = POS_L(0); }
-    if (valid & VALID_R) { cands[newtail++] = POS_R(0); }
-    if (valid & VALID_D) { cands[newtail++] = POS_D(0); }
-    maxdist = 1;
-  } else {
-    maxdist = 255;
+    sight_blind();
+    return;
   }
 
-  do {
-    oldtail = newtail;
-    do {
-      diff = cands[head++];
-      mobsightmap[pos = (u8)(ppos + diff)] = 1;
+  for (index = 0; index < SIGHT_DIFF_COUNT;) {
+    if (!is_new_pos_valid(mob_pos[PLAYER_MOB], sightdiff[index])) {
+      ++index;
+      continue;
+    }
+    mobsightmap[pos = pos_result] = 1;
+    unfog_center(pos);
 
-      // Unfog this tile, within player sight range
-      if (dist < maxdist && fogmap[pos]) {
-        unfog_tile(pos);
+    if (IS_OPAQUE_POS(pos)) {
+      index += sightskip[index];
+    } else {
+      unfog_neighbors(pos);
+      ++index;
+    }
+  }
+}
 
-        // Potentially start animating this tile
-        if (IS_ANIMATED_POS(pos)) {
-          *anim_tile_ptr++ = pos;
+void sight_blind(void) {
+  u8 index, pos;
 
-          // Store the offset into anim_tiles for this animated saw
-          if ((tmap[pos] & TILE_SAW_MASK) == TILE_SAW) {
-            sawmap[pos] = anim_tile_ptr - anim_tiles - 1;
-          }
-        }
-      }
+  pos = mob_pos[PLAYER_MOB];
+  unfog_center(pos);
+  if (IS_OPAQUE_POS(pos)) unfog_neighbors(pos);
+  --pos; // C -> L
+  unfog_center(pos);
+  if (IS_OPAQUE_POS(pos)) unfog_neighbors(pos);
+  pos += 2; // L -> R
+  unfog_center(pos);
+  if (IS_OPAQUE_POS(pos)) unfog_neighbors(pos);
+  pos -= 17; // R -> U
+  unfog_center(pos);
+  if (IS_OPAQUE_POS(pos)) unfog_neighbors(pos);
+  pos += 32; // U -> D
+  unfog_center(pos);
+  if (IS_OPAQUE_POS(pos)) unfog_neighbors(pos);
 
-      if (first || !IS_OPAQUE_POS(pos)) {
-        first = 0;
-        valid = validmap[pos];
-
-        // Unfog neighboring walls, within player sight range
-        if (dist < maxdist) {
-          for (dir = 0; dir < 4; ++dir) {
-            if ((valid & dirvalid[dir]) && fogmap[adjpos = POS_DIR(pos, dir)] &&
-                IS_WALL_POS(adjpos)) {
-              unfog_tile(adjpos);
-            }
-          }
-        }
-
-        sig = sightsig[(u8)(68 + diff)] & valid;
-        for (dir = 0; dir < 8; ++dir) {
-          if (sig & dirvalid[dir]) { cands[newtail++] = POS_DIR(diff, dir); }
-        }
-      }
-    } while(head != oldtail);
-    ++dist;
-  } while (oldtail != newtail);
+  for (index = 0; index < SIGHT_DIFF_COUNT; ++index) {
+    if (is_new_pos_valid(mob_pos[PLAYER_MOB], sightdiff[index])) {
+      mobsightmap[pos_result] = 1;
+    }
+  }
 }
 
 void blind(void) {
@@ -634,7 +626,7 @@ void blind(void) {
 
     // Reset fogmap, dtmap and sawmap
     memset(fogmap, 1, sizeof(fogmap));
-    memset(dtmap, 0, sizeof(fogmap));
+    memset(dtmap, 0, sizeof(dtmap));
     memset(sawmap, 0, sizeof(sawmap));
 
     // Reset all tile animations (e.g. saws, torches)
@@ -842,4 +834,42 @@ void unfog_tile(u8 pos) NONBANKED {
   dtmap[pos] = tmap[pos]; // TODO: only needed when blinded
   fogmap[pos] = 0;
   dirty_tile(pos);
+}
+
+void unfog_center(u8 pos) NONBANKED {
+  if (fogmap[pos]) {
+    unfog_tile(pos);
+
+    // Potentially start animating this tile
+    if (IS_ANIMATED_POS(pos)) {
+      *anim_tile_ptr++ = pos;
+
+      // Store the offset into anim_tiles for this animated saw
+      if ((tmap[pos] & TILE_SAW_MASK) == TILE_SAW) {
+        sawmap[pos] = anim_tile_ptr - anim_tiles - 1;
+      }
+    }
+  }
+}
+
+void unfog_neighbors(u8 pos) NONBANKED {
+  u8 valid = validmap[pos];
+
+  // Unfog neighboring walls, within player sight range
+  u8 adjpos = POS_L(pos);
+  if ((valid & VALID_L) && fogmap[adjpos] && IS_WALL_POS(adjpos)) {
+    unfog_tile(adjpos);
+  }
+  adjpos += 2; // L -> R
+  if ((valid & VALID_R) && fogmap[adjpos] && IS_WALL_POS(adjpos)) {
+    unfog_tile(adjpos);
+  }
+  adjpos -= 17; // R -> U
+  if ((valid & VALID_U) && fogmap[adjpos] && IS_WALL_POS(adjpos)) {
+    unfog_tile(adjpos);
+  }
+  adjpos += 32; // U -> D
+  if ((valid & VALID_D) && fogmap[adjpos] && IS_WALL_POS(adjpos)) {
+    unfog_tile(adjpos);
+  }
 }

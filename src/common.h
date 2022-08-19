@@ -183,7 +183,8 @@ extern const u8 validmap[];
 
 extern const u8 dirt_tiles[];
 
-extern const u8 sightsig[];
+extern const u8 sightdiff[];
+extern const u8 sightskip[];
 
 extern Map tmap;
 extern Map distmap;
@@ -240,5 +241,8 @@ u8 addspr(u8 speed, u16 x, u16 y, u16 dx, u16 dy, u8 drag, u8 timer, u8 prop);
 void nop_saw_anim(u8 pos);
 
 void vram_copy(u16 dst, void* src, u8 len);
+
+u8 is_new_pos_valid(u8 pos, u8 diff) PRESERVES_REGS(b, c);
+extern u8 pos_result;
 
 #endif // COMMON_H_

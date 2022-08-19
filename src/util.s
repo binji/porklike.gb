@@ -49,40 +49,51 @@ _drag::
 2$:
   ret
 
-; u8 is_valid(u8 pos, u8 diff)
+; u8 is_new_pos_valid(u8 pos, u8 diff)
 ;
 ; pos is a location in a 16x16 grid, where (x, y) is 0xYX.
+; diff is a signed vector, from -8 to 7 in each dimension as 0xYX.
 ;
 ; checks whether pos + diff would overflow the grid in any direction. If so,
-; returns 0, otherwise returns pos + diff.
-;
-; TODO: This unfortunately means that (0, 0) is not considered valid
-_is_valid::
+; returns 0. Otherwise, returns 1 and sets pos_result to the sum.
+.area _DATA
+_pos_result:: .ds 1
+.area _CODE
+_is_new_pos_valid::
   ldhl sp, #3
-  ld a, (hl)
-  ld e, a
-  rlc a
-  jr C, 1$
-  dec hl
-  ld a, (hl)
-  add a, e
-  ld e, a
-  jr 2$
-1$:
-  ld a, e
+  ld a, (hl-)
+  ld d, a       ; d=diff (as 0xYX)
   cpl
-  inc a
-  ld e, a
-  dec hl
+  add #0x10
+  swap a
+  add #0x10
+  swap a
+  ld e, a       ; e=-diff (as independent 0xYX)
   ld a, (hl)
-  sub a, e
-  ld e, a
-2$:
-  ld a, #0
-  daa
-  ret Z
+  xor #0x88
+  ld l, a       ; l=pos'=pos^0x88, treats position as unsigned
+  sub e         ; deliberately sub instead of add to set N flag
+  ld e, a       ; e=sum
+  ld a, #0      ; a=0 (don't touch H or N flags)
+  daa           ; if half-carry => lo nibble=0xa
+  rla           ; rotate half-carry into low bit of hi nibble
+  and #0x10     ; mask off hi bit (either a=0 or a=0x10)
+  add e
+  ld h, a       ; h=sum' (corrected in case of overflow)
+  xor d
+  ld e, a       ; e=sum'^diff
+  ld a, l
+  xor h         ; a=pos'^sum'
+  and e         ; a=(pos'^sum')&(sum'^diff)
+  and #0x88     ; a=overflow in hi or lo nibble
   ld e, #0
-  ret
+  ret nz        ; return e=0 if there was overflow
+  ld a, h
+  xor #0x88
+  ld hl, #_pos_result
+  ld (hl), a
+  inc e
+  ret           ; otherwise return e=1 and write result to pos_result
 
 ; 16-bit xorshift implementation, from John Metcalf. See
 ; http://www.retroprogramming.com/2017/07/xorshift-pseudorandom-numbers-in-z80.html
