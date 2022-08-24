@@ -51,27 +51,23 @@ def PrintDepthFirstLosTraversal():
   def recurse(index, curpath):
     total = []
     count = []
-    dist = []
-    for pos in set([path[index] for path in paths
-                    if len(path) > index and path[:index] == curpath]):
+    for pos in sorted(set([path[index] for path in paths
+                          if len(path) > index and path[:index] == curpath])):
       total.append(pos)
       count.append(len(total))
-      dist.append(index)
       p = len(count) - 1
-      t, c, d = recurse(index + 1, curpath + (pos,))
+      t, c = recurse(index + 1, curpath + (pos,))
       total.extend(t)
       count.extend(c)
-      dist.extend(d)
       count[p] = len(total) - count[p]
-    return total, count, dist
+    return total, count
 
   def h(n):
     return hex((n + 16) & 15)[2:]
 
-  t, c, d = recurse(0, ())
+  t, c = recurse(0, ())
   print('const u8 sightdiff[] = {{{}}};'.format(', '.join(f'0x{h(x[1])}{h(x[0])}' for x in t)))
   print('const u8 sightskip[] = {{{}}};'.format(', '.join(map(str, c))))
-  print('const u8 sightdist[] = {{{}}};'.format(', '.join(map(str, d))))
 
 
 PrintDepthFirstLosTraversal()

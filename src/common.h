@@ -245,4 +245,6 @@ void vram_copy(u16 dst, void* src, u8 len);
 u8 is_new_pos_valid(u8 pos, u8 diff) PRESERVES_REGS(b, c);
 extern u8 pos_result;
 
+void clear_map(u8* map);
+
 #endif // COMMON_H_

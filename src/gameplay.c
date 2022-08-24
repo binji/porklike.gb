@@ -570,27 +570,24 @@ redo:
 
 void sight(void) NONBANKED {
   u8 index, pos;
-  memset(mobsightmap, 0, sizeof(mobsightmap));
+  clear_map(mobsightmap);
 
   if (recover) {
     sight_blind();
     return;
   }
 
-  for (index = 0; index < SIGHT_DIFF_COUNT;) {
-    if (!is_new_pos_valid(mob_pos[PLAYER_MOB], sightdiff[index])) {
-      ++index;
-      continue;
-    }
-    mobsightmap[pos = pos_result] = 1;
-    unfog_center(pos);
+  for (index = 0; index < SIGHT_DIFF_COUNT; ++index) {
+    if (is_new_pos_valid(mob_pos[PLAYER_MOB], sightdiff[index])) {
+      mobsightmap[pos = pos_result] = 1;
+      if (fogmap[pos]) unfog_center(pos);
 
-    if (IS_OPAQUE_POS(pos)) {
-      index += sightskip[index];
-    } else {
-      unfog_neighbors(pos);
-      ++index;
+      if (!IS_OPAQUE_POS(pos)) {
+        unfog_neighbors(pos);
+        continue;
+      }
     }
+    index += sightskip[index];
   }
 }
 
@@ -598,19 +595,19 @@ void sight_blind(void) {
   u8 index, pos;
 
   pos = mob_pos[PLAYER_MOB];
-  unfog_center(pos);
+  if (fogmap[pos]) unfog_center(pos);
   if (IS_OPAQUE_POS(pos)) unfog_neighbors(pos);
   --pos; // C -> L
-  unfog_center(pos);
+  if (fogmap[pos]) unfog_center(pos);
   if (IS_OPAQUE_POS(pos)) unfog_neighbors(pos);
   pos += 2; // L -> R
-  unfog_center(pos);
+  if (fogmap[pos]) unfog_center(pos);
   if (IS_OPAQUE_POS(pos)) unfog_neighbors(pos);
   pos -= 17; // R -> U
-  unfog_center(pos);
+  if (fogmap[pos]) unfog_center(pos);
   if (IS_OPAQUE_POS(pos)) unfog_neighbors(pos);
   pos += 32; // U -> D
-  unfog_center(pos);
+  if (fogmap[pos]) unfog_center(pos);
   if (IS_OPAQUE_POS(pos)) unfog_neighbors(pos);
 
   for (index = 0; index < SIGHT_DIFF_COUNT; ++index) {
@@ -626,8 +623,8 @@ void blind(void) {
 
     // Reset fogmap, dtmap and sawmap
     memset(fogmap, 1, sizeof(fogmap));
-    memset(dtmap, 0, sizeof(dtmap));
-    memset(sawmap, 0, sizeof(sawmap));
+    clear_map(dtmap);
+    clear_map(sawmap);
 
     // Reset all tile animations (e.g. saws, torches)
     anim_tile_ptr = anim_tiles;
@@ -837,39 +834,35 @@ void unfog_tile(u8 pos) NONBANKED {
 }
 
 void unfog_center(u8 pos) NONBANKED {
-  if (fogmap[pos]) {
-    unfog_tile(pos);
+  unfog_tile(pos);
 
-    // Potentially start animating this tile
-    if (IS_ANIMATED_POS(pos)) {
-      *anim_tile_ptr++ = pos;
+  // Potentially start animating this tile
+  if (IS_ANIMATED_POS(pos)) {
+    *anim_tile_ptr++ = pos;
 
-      // Store the offset into anim_tiles for this animated saw
-      if ((tmap[pos] & TILE_SAW_MASK) == TILE_SAW) {
-        sawmap[pos] = anim_tile_ptr - anim_tiles - 1;
-      }
+    // Store the offset into anim_tiles for this animated saw
+    if ((tmap[pos] & TILE_SAW_MASK) == TILE_SAW) {
+      sawmap[pos] = anim_tile_ptr - anim_tiles - 1;
     }
   }
 }
 
 void unfog_neighbors(u8 pos) NONBANKED {
   u8 valid = validmap[pos];
-
-  // Unfog neighboring walls, within player sight range
   u8 adjpos = POS_L(pos);
-  if ((valid & VALID_L) && fogmap[adjpos] && IS_WALL_POS(adjpos)) {
+  if (fogmap[adjpos] && IS_WALL_POS(adjpos) && (valid & VALID_L)) {
     unfog_tile(adjpos);
   }
   adjpos += 2; // L -> R
-  if ((valid & VALID_R) && fogmap[adjpos] && IS_WALL_POS(adjpos)) {
+  if (fogmap[adjpos] && IS_WALL_POS(adjpos) && (valid & VALID_R)) {
     unfog_tile(adjpos);
   }
   adjpos -= 17; // R -> U
-  if ((valid & VALID_U) && fogmap[adjpos] && IS_WALL_POS(adjpos)) {
+  if (fogmap[adjpos] && IS_WALL_POS(adjpos) && (valid & VALID_U)) {
     unfog_tile(adjpos);
   }
   adjpos += 32; // U -> D
-  if ((valid & VALID_D) && fogmap[adjpos] && IS_WALL_POS(adjpos)) {
+  if (fogmap[adjpos] && IS_WALL_POS(adjpos) && (valid & VALID_D)) {
     unfog_tile(adjpos);
   }
 }

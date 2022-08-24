@@ -11,6 +11,28 @@ _clear_wram::
   add sp, #6
   ret
 
+; void clear_map(u8* map)
+;
+_clear_map::
+  ldhl sp, #2
+  ld a, (hl+)
+  ld h, (hl)
+  ld l, a
+  xor a
+  ld e, #32
+1$:
+  ld (hl+), a
+  ld (hl+), a
+  ld (hl+), a
+  ld (hl+), a
+  ld (hl+), a
+  ld (hl+), a
+  ld (hl+), a
+  ld (hl+), a
+  dec e
+  jr nz, 1$
+  ret
+
 ; u16 drag(u16 x)
 ;
 ; equivalent to:  x -= (x >> 3), but handles sign properly
