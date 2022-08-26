@@ -2,6 +2,7 @@
 #include <gb/gbdecompress.h>
 
 #include "main.h"
+#include "palette.h"
 #include "rand.h"
 #include "sound.h"
 
@@ -116,7 +117,8 @@ void titlescreen(void) {
   SCX_REG = 232;
   SCY_REG = titletop_bounce[0];
   set_bkg_tiles(0, 0, TITLETOP_WIDTH, TITLETOP_HEIGHT, titletop_map);
-  BGP_REG = OBP0_REG = OBP1_REG = fadepal[3];
+  // 0:LightGray 1:DarkGray 2:Black 3:White
+  BGP_REG = OBP0_REG = OBP1_REG = 0b00111001;
 
   // drop title down
   for (i = 0; i < sizeof(titletop_bounce); ++i) {
@@ -214,7 +216,7 @@ void titlescreen(void) {
     wait_vbl_done();
   }
 
-  fadeout();
+  pal_fadeout();
   hide_sprites();
 }
 

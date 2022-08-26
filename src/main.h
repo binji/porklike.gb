@@ -9,9 +9,6 @@
 
 #define MAX_ROOMS 4
 
-extern const u8 fadepal[];
-extern const u8 obj_pal1[];
-
 extern const u8 float_diff_y[];
 
 extern const u8 drop_diff[];

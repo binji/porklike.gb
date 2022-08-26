@@ -11,6 +11,7 @@
 #include "gameplay.h"
 #include "inventory.h"
 #include "mob.h"
+#include "palette.h"
 #include "pickup.h"
 #include "rand.h"
 #include "sound.h"
@@ -51,9 +52,6 @@
 #define TILE_ANIM_FRAMES 8
 #define TILE_ANIM_FRAME_DIFF 16
 
-#define FADE_FRAMES 8
-
-#define OBJ1_PAL_FRAMES 8
 #define MSG_FRAMES 120
 #define INV_TARGET_FRAMES 2
 #define JOY_REPEAT_FIRST_WAIT_FRAMES 30
@@ -78,10 +76,6 @@ void hide_sprites(void);
 void vbl_interrupt(void);
 
 void update_sprites(void);
-
-void update_obj1_pal(void);
-void fadeout(void);
-void fadein(void);
 
 extern OAM_item_t shadow_OAM2[40];
 
@@ -143,14 +137,11 @@ Counter st_steps;
 Counter st_kills;
 Counter st_recover;
 
-u8 obj_pal1_timer, obj_pal1_index;
-
 void main(void) NONBANKED {
   // Initialize for title screen
   DISPLAY_OFF;
   clear_wram();
-  BGP_REG = OBP0_REG = OBP1_REG = fadepal[0];
-  obj_pal1_timer = OBJ1_PAL_FRAMES;
+  pal_init();
   soundinit();
   enable_interrupts();
 
@@ -206,7 +197,7 @@ void main(void) NONBANKED {
       if (gameover_state != GAME_OVER_WAIT) {
         end_animate();
         hide_sprites();
-        fadeout();
+        pal_fadeout();
         IE_REG &= ~VBL_IFLAG;
 
         // Hide window
@@ -230,14 +221,14 @@ void main(void) NONBANKED {
 
         gameover_state = GAME_OVER_WAIT;
         IE_REG |= VBL_IFLAG;
-        fadein();
+        pal_fadein();
       } else {
         // Wait for keypress
         if (newjoy & J_A) {
           sfx(SFX_OK);
           gameover_state = GAME_OVER_NONE;
           doloadfloor = 1;
-          fadeout();
+          pal_fadeout();
 
           // reset initial state
           music_main();
@@ -253,7 +244,7 @@ void main(void) NONBANKED {
 
       if (dofadeout) {
         dofadeout = 0;
-        fadeout();
+        pal_fadeout();
       }
       if (donextfloor) {
         donextfloor = 0;
@@ -273,7 +264,7 @@ void main(void) NONBANKED {
         IE_REG |= VBL_IFLAG;
         end_animate();
         doupdatemap = 1;
-        fadein();
+        pal_fadein();
         begin_animate();
       }
 
@@ -300,7 +291,7 @@ void main(void) NONBANKED {
 
       inv_animate();
       end_animate();
-      update_obj1_pal();
+      pal_update();
     }
     wait_vbl_done();
   }
@@ -650,31 +641,6 @@ void update_sprites(void) {
       }
     }
   }
-}
-
-void update_obj1_pal(void) {
-  if (--obj_pal1_timer == 0) {
-    obj_pal1_timer = OBJ1_PAL_FRAMES;
-    OBP1_REG = obj_pal1[obj_pal1_index = (obj_pal1_index + 1) & 7];
-  }
-}
-
-void fadeout(void) NONBANKED {
-  u8 i, j;
-  i = 3;
-  do {
-    for (j = 0; j < FADE_FRAMES; ++j) { wait_vbl_done(); }
-    BGP_REG = OBP0_REG = OBP1_REG = fadepal[i];
-  } while(i--);
-}
-
-void fadein(void) NONBANKED {
-  u8 i, j;
-  i = 0;
-  do {
-    for (j = 0; j < FADE_FRAMES; ++j) { wait_vbl_done(); }
-    BGP_REG = OBP0_REG = OBP1_REG = fadepal[i];
-  } while(++i != 4);
 }
 
 u8 dropspot(u8 pos) {
