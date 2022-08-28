@@ -1,4 +1,5 @@
-/out/*
+/build/*
+/obj/*
 /*.ihx
 /*.noi
 /*.map
