@@ -57,9 +57,6 @@
 #define JOY_REPEAT_FIRST_WAIT_FRAMES 30
 #define JOY_REPEAT_NEXT_WAIT_FRAMES 4
 
-#define SIGHT_DIST_BLIND 1
-#define SIGHT_DIST_DEFAULT 4
-
 #define INV_TARGET_OFFSET 3
 
 // Sprite tiles
@@ -79,17 +76,7 @@ void update_sprites(void);
 
 extern OAM_item_t shadow_OAM2[40];
 
-u8 room_pos[MAX_ROOMS];
-u8 room_w[MAX_ROOMS];
-u8 room_h[MAX_ROOMS];
-u8 room_avoid[MAX_ROOMS]; // ** only used during mapgen
-u8 num_rooms;
-
-u8 start_room;
 u8 floor;
-u8 startpos;
-
-u8 num_cands;
 
 SprType spr_type[MAX_SPRS];
 u8 spr_anim_frame[MAX_SPRS];            // Actual sprite tile (not index)

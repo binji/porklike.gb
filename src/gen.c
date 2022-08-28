@@ -13,6 +13,7 @@
 
 #pragma bank 3
 
+#define MAX_ROOMS 4
 #define MAX_DS_SET 64 /* XXX can be smaller */
 #define MAX_VOIDS 10 /* XXX Figure out what this should be */
 
@@ -176,6 +177,16 @@ u8 ds_find(u8 id);
 u8 ds_find_pos(u8 pos);
 u8 getpos(u8 cand);
 
+u8 room_pos[MAX_ROOMS];
+u8 room_w[MAX_ROOMS];
+u8 room_h[MAX_ROOMS];
+u8 room_avoid[MAX_ROOMS]; // ** only used during mapgen
+u8 num_rooms;
+
+u8 start_room;
+u8 startpos;
+
+u8 num_cands;
 
 // The following data structures is used for rooms as well as union-find
 // algorithm; see https://en.wikipedia.org/wiki/Disjoint-set_data_structure

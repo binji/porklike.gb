@@ -7,8 +7,6 @@
 
 #include "common.h"
 
-#define MAX_ROOMS 4
-
 extern const u8 float_diff_y[];
 
 extern const u8 drop_diff[];
@@ -34,13 +32,6 @@ extern u8 joy, lastjoy, newjoy;
 extern Map sigmap;
 extern Map tempmap;
 
-extern u8 room_pos[];
-extern u8 room_w[];
-extern u8 room_h[];
-extern u8 room_avoid[];
-
 extern u8 dirty[];
-
-extern u8 start_room;
 
 #endif // MAIN_H_
