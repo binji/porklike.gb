@@ -148,16 +148,6 @@ typedef enum GameOverState {
   GAME_OVER_WAIT,
 } GameOverState;
 
-typedef enum SprType {
-  SPR_TYPE_NONE,
-  SPR_TYPE_BOOM,
-  SPR_TYPE_BOLT,
-  SPR_TYPE_PUSH,
-  SPR_TYPE_GRAPPLE,
-  SPR_TYPE_HOOK,
-  SPR_TYPE_SPIN,
-} SprType;
-
 extern const u8 permutation_4[];
 extern const u8 n_over_3[];
 extern const u16 three_over_n[];
@@ -203,25 +193,14 @@ extern u8 num_rooms;
 extern u8 cands[];
 extern u8 num_cands;
 
-extern u8 *next_sprite, *last_next_sprite;
-
 extern u8 joy, lastjoy, newjoy, repeatjoy;
 extern u8 joy_action; // The most recently pressed action button
-
-extern u8 is_targeting;
-extern Dir target_dir;
 
 extern u8 doupdatemap, dofadeout, doloadfloor, donextfloor, doblind, dosight;
 extern GameOverState gameover_state;
 extern u8 gameover_timer;
 
-extern SprType spr_type[];
-extern u8 spr_anim_frame[];  // Actual sprite tile (not index)
-extern u8 spr_trigger_val[]; // Which value to use for trigger action
-
 extern u8 void_exit[];
-
-extern u8* next_float;
 
 extern u8 anim_tiles[];
 extern u8 *anim_tile_ptr;
@@ -235,9 +214,6 @@ extern u8 floor;
 
 void dirty_tile(u8 pos);
 u8 dropspot(u8 pos);
-void addfloat(u8 pos, u8 tile);
-void showmsg(u8 index, u8 y);
-u8 addspr(u8 speed, u16 x, u16 y, u16 dx, u16 dy, u8 drag, u8 timer, u8 prop);
 void nop_saw_anim(u8 pos);
 
 void vram_copy(u16 dst, void* src, u8 len);

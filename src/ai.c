@@ -1,13 +1,11 @@
 #include <gb/gb.h>
 
 #include "ai.h"
+#include "float.h"
 #include "gameplay.h"
 #include "mob.h"
 #include "rand.h"
 #include "sound.h"
-
-#define FLOAT_FOUND 0xe
-#define FLOAT_LOST 0xf
 
 #define QUEEN_CHARGE_MOVES 2
 #define AI_COOL_MOVES 8
@@ -34,7 +32,7 @@ u8 ai_run_mob_task(u8 index) {
     switch (mob_task[index]) {
       case MOB_AI_WAIT:
         if (mobsightmap[pos]) {
-          addfloat(pos, FLOAT_FOUND);
+          float_add(pos, FLOAT_FOUND);
           mob_task[index] = mob_type_ai_active[mob_type[index]];
           mob_target_pos[index] = mob_pos[PLAYER_MOB];
           mob_ai_cool[index] = 0;
@@ -91,7 +89,7 @@ u8 ai_run_mob_task(u8 index) {
         if (!mobsightmap[pos]) {
           mob_task[index] = MOB_AI_WAIT;
           mob_active[index] = 0;
-          addfloat(pos, FLOAT_LOST);
+          float_add(pos, FLOAT_LOST);
         } else {
           mob_target_pos[index] = mob_pos[PLAYER_MOB];
           if (mob_charge[index] == 0) {
@@ -205,7 +203,7 @@ u8 ai_tcheck(u8 index) {
   }
   if (mob_target_pos[index] == mob_pos[index] ||
       mob_ai_cool[index] > AI_COOL_MOVES) {
-    addfloat(mob_pos[index], FLOAT_LOST);
+    float_add(mob_pos[index], FLOAT_LOST);
     mob_task[index] = MOB_AI_WAIT;
     mob_active[index] = 0;
     return 0;

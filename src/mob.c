@@ -5,6 +5,7 @@
 #include "ai.h"
 #include "gameplay.h"
 #include "inventory.h"
+#include "sprite.h"
 
 #pragma bank 1
 

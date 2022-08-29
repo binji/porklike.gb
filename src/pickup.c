@@ -2,9 +2,10 @@
 
 #include "mob.h"
 
+#include "inventory.h"
 #include "pickup.h"
 #include "rand.h"
-#include "inventory.h"
+#include "sprite.h"
 
 #pragma bank 1
 

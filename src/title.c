@@ -5,6 +5,7 @@
 #include "palette.h"
 #include "rand.h"
 #include "sound.h"
+#include "spr.h"
 
 #include "tiletitle.h"
 
@@ -217,7 +218,7 @@ void titlescreen(void) {
   }
 
   pal_fadeout();
-  hide_sprites();
+  spr_hide();
 }
 
 void titlefadein(void) {

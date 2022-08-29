@@ -3,6 +3,7 @@
 
 #include "common.h"
 #include "counter.h"
+#include "spr.h"
 
 typedef enum Turn {
   TURN_PLAYER,
@@ -29,6 +30,7 @@ void hitpos(u8 pos, u8 dmg, u8 stun);
 void update_wall_face(u8 pos);
 void dirty_tile(u8 pos);
 void update_tile(u8 pos, u8 tile);
+void trigger_spr(SprType, u8 trigger_val);
 
 extern Turn turn;
 

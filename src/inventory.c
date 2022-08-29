@@ -8,6 +8,8 @@
 #include "mob.h"
 #include "pickup.h"
 #include "sound.h"
+#include "sprite.h"
+#include "targeting.h"
 
 #pragma bank 1
 

@@ -4,11 +4,15 @@
 #include "gameplay.h"
 
 #include "counter.h"
+#include "float.h"
 #include "inventory.h"
 #include "mob.h"
+#include "msg.h"
 #include "pickup.h"
 #include "rand.h"
 #include "sound.h"
+#include "spr.h"
+#include "targeting.h"
 
 #pragma bank 1
 
@@ -111,7 +115,7 @@ u8 pass_turn(void) {
       ++steps; // Make sure to only spawn reaper once per floor
       addmob(MOB_TYPE_REAPER, dropspot(startpos));
       mob_active[num_mobs - 1] = 1;
-      showmsg(MSG_REAPER, MSG_REAPER_Y);
+      msg_show(MSG_REAPER, MSG_REAPER_Y);
       sfx(SFX_REAPER);
     }
     if (doblind) {
@@ -194,7 +198,7 @@ void move_player(void) {
                     sfx(SFX_BUMP_TILE);
                     goto dobump;
                   } else {
-                    showmsg(MSG_KEY, MSG_KEY_Y);
+                    msg_show(MSG_KEY, MSG_KEY_Y);
                     sfx(SFX_OK);
                   }
                 } else if (tile == TILE_KIELBASA) {
@@ -354,8 +358,8 @@ void use_pickup(void) {
       u8 dir;
       for (dir = 0; dir < 4; ++dir) {
         if (valid & dirvalid[dir]) {
-          spr = addspr(SPIN_SPR_ANIM_SPEED + dir, x, y, dirx2[dir] << 8,
-                       diry2[dir] << 8, 1, SPIN_SPR_FRAMES + (dir << 2), 0);
+          spr = spr_add(SPIN_SPR_ANIM_SPEED + dir, x, y, dirx2[dir] << 8,
+                        diry2[dir] << 8, 1, SPIN_SPR_FRAMES + (dir << 2), 0);
           spr_type[spr] = SPR_TYPE_SPIN;
           spr_anim_frame[spr] = TILE_SPIN;
           spr_trigger_val[spr] = POS_DIR(pos, dir);
@@ -401,9 +405,9 @@ void use_pickup(void) {
 }
 
 u8 shoot(u8 pos, u8 hit, u8 tile, u8 prop) {
-  u8 spr = addspr(255, POS_TO_X(pos) << 8, POS_TO_Y(pos) << 8,
-                  dirx3[target_dir] << 8, diry3[target_dir] << 8, 0,
-                  n_over_3[shoot_dist(pos, hit)], prop);
+  u8 spr = spr_add(255, POS_TO_X(pos) << 8, POS_TO_Y(pos) << 8,
+                   dirx3[target_dir] << 8, diry3[target_dir] << 8, 0,
+                   n_over_3[shoot_dist(pos, hit)], prop);
   spr_anim_frame[spr] = tile;
   return spr;
 }
@@ -454,7 +458,7 @@ u8 rope(u8 from, u8 to) {
   }
 
   do {
-    u8 spr = addspr(255, x, y, dx, dy, 0, timer, prop);
+    u8 spr = spr_add(255, x, y, dx, dy, 0, timer, prop);
     spr_type[spr] = SPR_TYPE_NONE;
     spr_anim_frame[spr] = tail;
     dx += ddx;
@@ -714,9 +718,9 @@ void hitmob(u8 index, u8 dmg) {
 
       u8 spr;
       for (i = 0; i < NUM_BOOM_SPRS; ++i) {
-        spr =
-            addspr(boom_spr_anim_speed[i], x + boom_spr_x[i], y + boom_spr_y[i],
-                   boom_spr_dx[i], boom_spr_dy[i], 1, boom_spr_speed[i], 0);
+        spr = spr_add(boom_spr_anim_speed[i], x + boom_spr_x[i],
+                      y + boom_spr_y[i], boom_spr_dx[i], boom_spr_dy[i], 1,
+                      boom_spr_speed[i], 0);
         spr_type[spr] = SPR_TYPE_BOOM;
         spr_anim_frame[spr] = TILE_BOOM;
       }
@@ -724,8 +728,8 @@ void hitmob(u8 index, u8 dmg) {
 
     sfx(sound);
   } else {
-    addfloat(pos, float_dmg[dmg] +
-                      (index == PLAYER_MOB ? TILE_PLAYER_HIT_DMG_DIFF : 0));
+    float_add(pos, float_dmg[dmg] +
+                       (index == PLAYER_MOB ? TILE_PLAYER_HIT_DMG_DIFF : 0));
 
     if (mob_hp[index] <= dmg) {
       adddeadmob(index);
@@ -864,5 +868,52 @@ void unfog_neighbors(u8 pos) NONBANKED {
   adjpos += 32; // U -> D
   if (fogmap[adjpos] && IS_WALL_POS(adjpos) && (valid & VALID_D)) {
     unfog_tile(adjpos);
+  }
+}
+
+void trigger_spr(SprType type, u8 trigger_val) {
+  u8 dir, stun;
+  switch (type) {
+  case SPR_TYPE_SPIN:
+    stun = 0;
+    goto hit;
+
+  case SPR_TYPE_BOLT:
+    stun = 1;
+    goto hit;
+
+  hit:
+    hitpos(trigger_val, 1, stun);
+    break;
+
+  case SPR_TYPE_HOOK:
+    dir = invdir[target_dir];
+    goto push;
+
+  case SPR_TYPE_PUSH:
+    dir = target_dir;
+    goto push;
+
+  push: {
+    u8 mob = trigger_val;
+    if (mob) {
+      u8 pos = mob_pos[mob - 1];
+      if (validmap[pos] & dirvalid[dir]) {
+        u8 newpos = POS_DIR(pos, dir);
+        if (!IS_WALL_OR_MOB(newpos)) {
+          mobwalk(mob - 1, dir);
+        } else {
+          mobbump(mob - 1, dir);
+        }
+      }
+      mob_stun[mob - 1] = mob_vis[mob - 1] = 1;
+      sfx(SFX_MOB_PUSH);
+    }
+    break;
+  }
+
+  case SPR_TYPE_GRAPPLE:
+    mobhop(PLAYER_MOB, trigger_val);
+    break;
   }
 }
