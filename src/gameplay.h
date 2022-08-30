@@ -22,6 +22,7 @@ void hitmob(u8 index, u8 dmg);
 void hitpos(u8 pos, u8 dmg, u8 stun);
 void dirty_tile(u8 pos);
 void trigger_spr(SprType, u8 trigger_val);
+u8 dropspot(u8 pos);
 
 extern Turn turn;
 

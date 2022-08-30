@@ -166,9 +166,6 @@ extern const u8 validmap[];
 
 extern const u8 dirt_tiles[];
 
-extern const u8 sightdiff[];
-extern const u8 sightskip[];
-
 extern Map tmap;
 extern Map distmap;
 extern Map fogmap;
@@ -179,20 +176,12 @@ extern Map dtmap;
 extern Map sawmap;
 extern Map dirtymap;
 
-extern u8 *dirty_ptr;
-
 extern u8 num_rooms;
-
-extern u8 cands[];
-extern u8 num_cands;
 
 extern u8 joy, lastjoy, newjoy, repeatjoy;
 extern u8 joy_action; // The most recently pressed action button
 
 extern u8 void_exit[];
-
-extern u8 anim_tiles[];
-extern u8 *anim_tile_ptr;
 
 // Info used for debugging generated levels
 extern u8 dogate;
@@ -200,9 +189,6 @@ extern u16 floor_seed;
 
 extern u8 startpos;
 extern u8 floor;
-
-void dirty_tile(u8 pos);
-u8 dropspot(u8 pos);
 
 void vram_copy(u16 dst, void* src, u8 len);
 

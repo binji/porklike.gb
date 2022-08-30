@@ -3,6 +3,7 @@
 #endif
 #include <string.h>
 
+#include "animate.h"
 #include "gameplay.h"
 #include "main.h"
 #include "mob.h"
@@ -36,6 +37,10 @@
 #define IS_DOOR(pos) sigmatch((pos), doorsig, doormask)
 #define CAN_CARVE(pos) sigmatch((pos), carvesig, carvemask)
 #define IS_FREESTANDING(pos) sigmatch((pos), freesig, freemask)
+
+extern Map cands;
+extern Map tempmap;
+extern Map sigmap;
 
 typedef enum RoomKind {
   ROOM_KIND_VASE,

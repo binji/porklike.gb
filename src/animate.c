@@ -2,6 +2,7 @@
 
 #include "animate.h"
 
+#include "gameplay.h"
 #include "mob.h"
 #include "pickup.h"
 #include "spr.h"

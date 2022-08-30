@@ -2,6 +2,7 @@
 
 #include "mob.h"
 
+#include "gameplay.h"
 #include "inventory.h"
 #include "pickup.h"
 #include "rand.h"

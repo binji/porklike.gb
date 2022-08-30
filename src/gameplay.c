@@ -88,6 +88,12 @@ extern const u16 boom_spr_dy[];
 
 extern const u8 float_dmg[];
 
+extern const u8 drop_diff[];
+
+extern const u8 sightdiff[];
+extern const u8 sightskip[];
+
+
 // TODO: move to its own file
 void mapgen(void);
 
@@ -1011,3 +1017,13 @@ void nop_saw_anim(u8 pos) {
   anim_tiles[index] = pos;
 }
 
+u8 dropspot(u8 pos) {
+  u8 i = 0, newpos;
+  do {
+    if (is_new_pos_valid(pos, drop_diff[i]) &&
+        !(IS_SMARTMOB_POS(newpos = pos_result) || pickmap[newpos])) {
+      return newpos;
+    }
+  } while (++i);
+  return 0;
+}

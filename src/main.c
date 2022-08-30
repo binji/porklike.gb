@@ -25,6 +25,7 @@
 #define JOY_REPEAT_FIRST_WAIT_FRAMES 30
 #define JOY_REPEAT_NEXT_WAIT_FRAMES 4
 
+void titlescreen(void);
 void gameinit(void);
 void vbl_interrupt(void);
 
@@ -134,16 +135,5 @@ void vbl_interrupt(void) NONBANKED {
     doupdatemap = 0;
   }
   ((vfp)dirty_code)();
-}
-
-u8 dropspot(u8 pos) {
-  u8 i = 0, newpos;
-  do {
-    if (is_new_pos_valid(pos, drop_diff[i]) &&
-        !(IS_SMARTMOB_POS(newpos = pos_result) || pickmap[newpos])) {
-      return newpos;
-    }
-  } while (++i);
-  return 0;
 }
 
