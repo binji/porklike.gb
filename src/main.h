@@ -16,8 +16,6 @@ void hide_sprites(void);
 void fadeout(void);
 void fadein(void);
 
-void mapgen(void);
-
 extern u8 joy, lastjoy, newjoy;
 
 extern Map sigmap;

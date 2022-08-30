@@ -189,8 +189,6 @@ extern u8 num_cands;
 extern u8 joy, lastjoy, newjoy, repeatjoy;
 extern u8 joy_action; // The most recently pressed action button
 
-extern u8 doupdatemap, dofadeout, doloadfloor, donextfloor, doblind, dosight;
-
 extern u8 void_exit[];
 
 extern u8 anim_tiles[];

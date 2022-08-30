@@ -3,16 +3,19 @@
 
 #include "gameplay.h"
 
+#include "ai.h"
 #include "counter.h"
 #include "float.h"
 #include "gameover.h"
 #include "inventory.h"
 #include "mob.h"
 #include "msg.h"
+#include "palette.h"
 #include "pickup.h"
 #include "rand.h"
 #include "sound.h"
 #include "spr.h"
+#include "sprite.h"
 #include "targeting.h"
 
 #pragma bank 1
@@ -55,6 +58,22 @@
 #define IS_UNSPECIAL_WALL_TILE(tile)                                           \
   ((flags_bin[tile] & 0b00000011) == 0b00000001)
 
+static void do_turn(void);
+static u8 pass_turn(void);
+static void move_player(void);
+static void use_pickup(void);
+static u8 shoot(u8 pos, u8 hit, u8 tile, u8 prop);
+static u8 shoot_dist(u8 pos, u8 hit);
+static u8 rope(u8 from, u8 to);
+static void update_wall_face(u8 pos);
+static void update_tile(u8 pos, u8 tile);
+
+static void unfog_tile(u8 pos);
+static void unfog_center(u8 pos);
+static void unfog_neighbors(u8 pos);
+static void sight_blind(void);
+static void nop_saw_anim(u8 pos);
+
 extern const u8 float_pick_type_tiles[];
 extern const u8 float_pick_type_start[];
 extern const u8 float_pick_type_x_offset[];
@@ -68,6 +87,14 @@ extern const u16 boom_spr_dy[];
 
 extern const u8 float_dmg[];
 
+// TODO: move to its own file
+u8 animate(void);
+void begin_animate(void);
+void end_animate(void);
+void mapgen(void);
+
+u8 doupdatemap, dofadeout, doloadfloor, donextfloor, doblind, dosight;
+
 Turn turn;
 u8 noturn;
 
@@ -80,11 +107,66 @@ Counter st_steps;
 Counter st_kills;
 Counter st_recover;
 
-static void unfog_tile(u8 pos);
-static void unfog_center(u8 pos);
-static void unfog_neighbors(u8 pos);
-static void sight_blind(void);
+void gameplay_update(void) NONBANKED {
+#if 0
+      if (newjoy & J_START) { // XXX cheat
+        dofadeout = donextfloor = doloadfloor = 1;
+      }
+#endif
 
+  if (dofadeout) {
+    dofadeout = 0;
+    pal_fadeout();
+  }
+  if (donextfloor) {
+    donextfloor = 0;
+    ++floor;
+    counter_inc(&st_floor);
+    recover = 0;
+  }
+  if (doloadfloor) {
+    doloadfloor = 0;
+    inv_display_floor();
+    sprite_hide();
+    IE_REG &= ~VBL_IFLAG;
+    SWITCH_ROM_MBC1(3);
+    mapgen();
+    SWITCH_ROM_MBC1(1);
+    joy_action = 0;
+    IE_REG |= VBL_IFLAG;
+    end_animate();
+    doupdatemap = 1;
+    pal_fadein();
+    begin_animate();
+  }
+
+  if (gameover_timer) {
+    if (--gameover_timer == 0) {
+      gameover_state = GAME_OVER_DEAD;
+    }
+  } else {
+    do_turn();
+  }
+
+  sprite_update();
+
+  while (1) {
+    if (!animate())
+      break;
+
+    if (pass_turn()) {
+      if (!ai_run_tasks())
+        continue;
+      // AI took a step, so do 1 round of animation
+      animate();
+    }
+    break;
+  }
+
+  inv_animate();
+  end_animate();
+  pal_update();
+}
 
 void do_turn(void) {
   if (inv_anim_up) {

@@ -3,7 +3,6 @@
 
 #include "main.h"
 
-#include "ai.h"
 #include "counter.h"
 #include "float.h"
 #include "gameover.h"
@@ -54,7 +53,6 @@ u8 anim_tile_timer; // timer for animating tiles (every TILE_ANIM_FRAMES frames)
 u8 joy, lastjoy, newjoy, repeatjoy;
 u8 joy_repeat_count[8];
 u8 joy_action; // The most recently pressed action button
-u8 doupdatemap, dofadeout, doloadfloor, donextfloor, doblind, dosight;
 
 void main(void) NONBANKED {
   // Initialize for title screen
@@ -115,62 +113,7 @@ void main(void) NONBANKED {
     if (gameover_state != GAME_OVER_NONE) {
       gameover_update();
     } else {
-#if 0
-      if (newjoy & J_START) { // XXX cheat
-        dofadeout = donextfloor = doloadfloor = 1;
-      }
-#endif
-
-      if (dofadeout) {
-        dofadeout = 0;
-        pal_fadeout();
-      }
-      if (donextfloor) {
-        donextfloor = 0;
-        ++floor;
-        counter_inc(&st_floor);
-        recover = 0;
-      }
-      if (doloadfloor) {
-        doloadfloor = 0;
-        inv_display_floor();
-        sprite_hide();
-        IE_REG &= ~VBL_IFLAG;
-        SWITCH_ROM_MBC1(3);
-        mapgen();
-        SWITCH_ROM_MBC1(1);
-        joy_action = 0;
-        IE_REG |= VBL_IFLAG;
-        end_animate();
-        doupdatemap = 1;
-        pal_fadein();
-        begin_animate();
-      }
-
-      if (gameover_timer) {
-        if (--gameover_timer == 0) {
-          gameover_state = GAME_OVER_DEAD;
-        }
-      } else {
-        do_turn();
-      }
-
-      sprite_update();
-
-      while (1) {
-        if (!animate()) break;
-
-        if (pass_turn()) {
-          if (!ai_run_tasks()) continue;
-          // AI took a step, so do 1 round of animation
-          animate();
-        }
-        break;
-      }
-
-      inv_animate();
-      end_animate();
-      pal_update();
+      gameplay_update();
     }
     wait_vbl_done();
   }
@@ -316,7 +259,6 @@ void vbl_interrupt(void) NONBANKED {
   }
   ((vfp)dirty_code)();
 }
-
 
 u8 dropspot(u8 pos) {
   u8 i = 0, newpos;
