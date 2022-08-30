@@ -6,6 +6,7 @@
 #include "ai.h"
 #include "counter.h"
 #include "float.h"
+#include "gameover.h"
 #include "gameplay.h"
 #include "inventory.h"
 #include "mob.h"
@@ -22,31 +23,11 @@
 #include "tilebg.h"
 #include "tileshared.h"
 #include "tilesprites.h"
-#include "tiledead.h"
 
 // TODO: how big to make these arrays?
 #define DIRTY_SIZE 128
 #define DIRTY_CODE_SIZE 256
 #define ANIM_TILES_SIZE 64
-
-#define DEAD_X_OFFSET 4
-#define DEAD_Y_OFFSET 2
-#define DEAD_WIDTH 8
-#define DEAD_HEIGHT 5
-
-#define WIN_X_OFFSET 2
-#define WIN_Y_OFFSET 2
-#define WIN_WIDTH 12
-#define WIN_HEIGHT 6
-
-#define STATS_X_OFFSET 3
-#define STATS_Y_OFFSET 9
-#define STATS_WIDTH 9
-#define STATS_HEIGHT 6
-
-#define STATS_FLOOR_ADDR 0x992c
-#define STATS_STEPS_ADDR 0x994c
-#define STATS_KILLS_ADDR 0x996c
 
 #define TILE_ANIM_FRAMES 8
 #define TILE_ANIM_FRAME_DIFF 16
@@ -70,18 +51,10 @@ u8 anim_tiles[ANIM_TILES_SIZE];
 u8 *anim_tile_ptr;
 u8 anim_tile_timer; // timer for animating tiles (every TILE_ANIM_FRAMES frames)
 
-GameOverState gameover_state;
-u8 gameover_timer;
-
 u8 joy, lastjoy, newjoy, repeatjoy;
 u8 joy_repeat_count[8];
 u8 joy_action; // The most recently pressed action button
 u8 doupdatemap, dofadeout, doloadfloor, donextfloor, doblind, dosight;
-
-Counter st_floor;
-Counter st_steps;
-Counter st_kills;
-Counter st_recover;
 
 void main(void) NONBANKED {
   // Initialize for title screen
@@ -140,47 +113,7 @@ void main(void) NONBANKED {
     begin_animate();
 
     if (gameover_state != GAME_OVER_NONE) {
-      if (gameover_state != GAME_OVER_WAIT) {
-        end_animate();
-        sprite_hide();
-        pal_fadeout();
-        IE_REG &= ~VBL_IFLAG;
-
-        // Hide window
-        move_win(23, 160);
-        gb_decompress_bkg_data(0, tiledead_bin);
-        init_bkg(0);
-        if (gameover_state == GAME_OVER_WIN) {
-          music_win();
-          set_bkg_tiles(WIN_X_OFFSET, WIN_Y_OFFSET, WIN_WIDTH, WIN_HEIGHT,
-                        win_map);
-        } else {
-          music_dead();
-          set_bkg_tiles(DEAD_X_OFFSET, DEAD_Y_OFFSET, DEAD_WIDTH, DEAD_HEIGHT,
-                        dead_map);
-        }
-        set_bkg_tiles(STATS_X_OFFSET, STATS_Y_OFFSET, STATS_WIDTH, STATS_HEIGHT,
-                      stats_map);
-        counter_out(&st_floor, STATS_FLOOR_ADDR);
-        counter_out(&st_steps, STATS_STEPS_ADDR);
-        counter_out(&st_kills, STATS_KILLS_ADDR);
-
-        gameover_state = GAME_OVER_WAIT;
-        IE_REG |= VBL_IFLAG;
-        pal_fadein();
-      } else {
-        // Wait for keypress
-        if (newjoy & J_A) {
-          sfx(SFX_OK);
-          gameover_state = GAME_OVER_NONE;
-          doloadfloor = 1;
-          pal_fadeout();
-
-          // reset initial state
-          music_main();
-          gameinit();
-        }
-      }
+      gameover_update();
     } else {
 #if 0
       if (newjoy & J_START) { // XXX cheat

@@ -1,6 +1,8 @@
 #ifndef COUNTER_H_
 #define COUNTER_H_
 
+#include "common.h"
+
 typedef struct Counter {
   u8 start;   // First digit index in data[]
   u8 data[5]; // Digits as tile indexes, left padded

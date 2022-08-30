@@ -141,13 +141,6 @@ typedef enum Dir {
   DIR_DOWN,
 } Dir;
 
-typedef enum GameOverState {
-  GAME_OVER_NONE,
-  GAME_OVER_DEAD,
-  GAME_OVER_WIN,
-  GAME_OVER_WAIT,
-} GameOverState;
-
 extern const u8 permutation_4[];
 extern const u8 n_over_3[];
 extern const u16 three_over_n[];
@@ -197,8 +190,6 @@ extern u8 joy, lastjoy, newjoy, repeatjoy;
 extern u8 joy_action; // The most recently pressed action button
 
 extern u8 doupdatemap, dofadeout, doloadfloor, donextfloor, doblind, dosight;
-extern GameOverState gameover_state;
-extern u8 gameover_timer;
 
 extern u8 void_exit[];
 

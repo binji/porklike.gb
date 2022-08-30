@@ -9,10 +9,6 @@
 
 extern const u8 drop_diff[];
 
-extern const u8 dead_map[];
-extern const u8 win_map[];
-extern const u8 stats_map[];
-
 void titlescreen(void);
 void clear_wram(void) PRESERVES_REGS(b, c);
 

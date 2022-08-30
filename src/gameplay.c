@@ -5,6 +5,7 @@
 
 #include "counter.h"
 #include "float.h"
+#include "gameover.h"
 #include "inventory.h"
 #include "mob.h"
 #include "msg.h"
@@ -73,6 +74,11 @@ u8 noturn;
 u8 recover; // how long until recovering from blind
 u16 steps;
 u8 num_keys;
+
+Counter st_floor;
+Counter st_steps;
+Counter st_kills;
+Counter st_recover;
 
 static void unfog_tile(u8 pos);
 static void unfog_center(u8 pos);
