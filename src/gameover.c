@@ -81,7 +81,7 @@ void gameover_update(void) {
 
       // reset initial state
       music_main();
-      gameinit();
+      gameplay_init();
     }
   }
 }

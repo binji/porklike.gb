@@ -12,6 +12,7 @@ typedef enum Turn {
   TURN_WEEDS,
 } Turn;
 
+void gameplay_init(void);
 void gameplay_update(void);
 
 void trigger_step(u8 mob);

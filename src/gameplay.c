@@ -1,4 +1,5 @@
 #include <gb/gb.h>
+#include <gb/gbdecompress.h>
 #include <string.h>
 
 #include "gameplay.h"
@@ -21,6 +22,8 @@
 #include "targeting.h"
 
 #pragma bank 1
+
+#include "tilebg.h"
 
 #define MSG_KEY 18
 #define MSG_KEY_Y 80
@@ -111,6 +114,35 @@ Counter st_floor;
 Counter st_steps;
 Counter st_kills;
 Counter st_recover;
+
+void gameplay_init(void) {
+  animate_init();
+
+  // Reset scroll registers
+  move_bkg(240, 0);
+  // Reload bg tiles
+  gb_decompress_bkg_data(0, tilebg_bin);
+  init_bkg(0);
+
+  // Reset player mob
+  num_mobs = 0;
+  addmob(MOB_TYPE_PLAYER, 0);
+  inv_update_hp();
+
+  turn = TURN_PLAYER;
+  float_hide();
+
+  // Set up inventory window
+  move_win(23, 128);
+  inv_init();
+  targeting_init();
+
+  floor = 0;
+  counter_zero(&st_floor);
+  counter_zero(&st_steps);
+  counter_zero(&st_kills);
+  joy_init();
+}
 
 void gameplay_update(void) NONBANKED {
 #if 0

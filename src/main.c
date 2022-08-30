@@ -19,12 +19,10 @@
 
 #pragma bank 1
 
-#include "tilebg.h"
 #include "tileshared.h"
 #include "tilesprites.h"
 
 void titlescreen(void);
-void gameinit(void);
 void vbl_interrupt(void);
 
 u8 floor;
@@ -47,7 +45,7 @@ void main(void) NONBANKED {
   gb_decompress_bkg_data(0x80, tileshared_bin);
   gb_decompress_sprite_data(0, tilesprites_bin);
   add_VBL(vbl_interrupt);
-  gameinit();
+  gameplay_init();
   doloadfloor = 1;
 
   while(1) {
@@ -68,35 +66,6 @@ void main(void) NONBANKED {
     }
     wait_vbl_done();
   }
-}
-
-void gameinit(void) {
-  animate_init();
-
-  // Reset scroll registers
-  move_bkg(240, 0);
-  // Reload bg tiles
-  gb_decompress_bkg_data(0, tilebg_bin);
-  init_bkg(0);
-
-  // Reset player mob
-  num_mobs = 0;
-  addmob(MOB_TYPE_PLAYER, 0);
-  inv_update_hp();
-
-  turn = TURN_PLAYER;
-  float_hide();
-
-  // Set up inventory window
-  move_win(23, 128);
-  inv_init();
-  targeting_init();
-
-  floor = 0;
-  counter_zero(&st_floor);
-  counter_zero(&st_steps);
-  counter_zero(&st_kills);
-  joy_init();
 }
 
 void vbl_interrupt(void) NONBANKED {
