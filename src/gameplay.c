@@ -9,6 +9,7 @@
 #include "float.h"
 #include "gameover.h"
 #include "inventory.h"
+#include "joy.h"
 #include "mob.h"
 #include "msg.h"
 #include "palette.h"

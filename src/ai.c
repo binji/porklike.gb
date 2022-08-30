@@ -3,6 +3,7 @@
 #include "ai.h"
 #include "float.h"
 #include "gameplay.h"
+#include "joy.h"
 #include "mob.h"
 #include "rand.h"
 #include "sound.h"

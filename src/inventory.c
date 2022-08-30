@@ -5,6 +5,7 @@
 
 #include "counter.h"
 #include "gameplay.h"
+#include "joy.h"
 #include "mob.h"
 #include "pickup.h"
 #include "sound.h"

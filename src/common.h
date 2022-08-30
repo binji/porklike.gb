@@ -178,9 +178,6 @@ extern Map dirtymap;
 
 extern u8 num_rooms;
 
-extern u8 joy, lastjoy, newjoy, repeatjoy;
-extern u8 joy_action; // The most recently pressed action button
-
 extern u8 void_exit[];
 
 // Info used for debugging generated levels

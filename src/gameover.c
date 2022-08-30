@@ -6,6 +6,7 @@
 #include "animate.h"
 #include "counter.h"
 #include "gameplay.h"
+#include "joy.h"
 #include "palette.h"
 #include "sound.h"
 #include "sprite.h"

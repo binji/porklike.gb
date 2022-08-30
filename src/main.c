@@ -9,6 +9,7 @@
 #include "gameover.h"
 #include "gameplay.h"
 #include "inventory.h"
+#include "joy.h"
 #include "mob.h"
 #include "palette.h"
 #include "pickup.h"
@@ -22,18 +23,11 @@
 #include "tileshared.h"
 #include "tilesprites.h"
 
-#define JOY_REPEAT_FIRST_WAIT_FRAMES 30
-#define JOY_REPEAT_NEXT_WAIT_FRAMES 4
-
 void titlescreen(void);
 void gameinit(void);
 void vbl_interrupt(void);
 
 u8 floor;
-
-u8 joy, lastjoy, newjoy, repeatjoy;
-u8 joy_repeat_count[8];
-u8 joy_action; // The most recently pressed action button
 
 void main(void) NONBANKED {
   // Initialize for title screen
@@ -57,31 +51,7 @@ void main(void) NONBANKED {
   doloadfloor = 1;
 
   while(1) {
-    lastjoy = joy;
-    joy = joypad();
-    newjoy = (joy ^ lastjoy) & joy;
-    repeatjoy = newjoy;
-
-    if (joy) {
-      u8 mask = 1, i = 0;
-      while (mask) {
-        if (newjoy & mask) {
-          joy_repeat_count[i] = JOY_REPEAT_FIRST_WAIT_FRAMES;
-        } else if (joy & mask) {
-          if (--joy_repeat_count[i] == 0) {
-            repeatjoy |= mask;
-            joy_repeat_count[i] = JOY_REPEAT_NEXT_WAIT_FRAMES;
-          }
-        }
-
-        if (repeatjoy & mask) {
-          joy_action = mask;
-        }
-
-        mask <<= 1;
-        ++i;
-      }
-    }
+    joy_update();
 
     // On floor 0, try to gather more entropy from player inputs.
     if (floor == 0 && newjoy) {
@@ -126,7 +96,7 @@ void gameinit(void) {
   counter_zero(&st_floor);
   counter_zero(&st_steps);
   counter_zero(&st_kills);
-  joy_action = 0;
+  joy_init();
 }
 
 void vbl_interrupt(void) NONBANKED {
