@@ -48,9 +48,6 @@
 #define MSG_REAPER 0
 #define MSG_LEN 18
 
-#define FLOAT_BLIND_X_OFFSET 0xfb
-
-#define TILE_BLIND 0x37
 #define TILE_BOOM 0x05
 
 #define TILE_PLAYER_HIT_DMG_DIFF 0x5f
@@ -78,10 +75,6 @@ static void unfog_center(u8 pos);
 static void unfog_neighbors(u8 pos);
 static void sight_blind(void);
 static void nop_saw_anim(u8 pos);
-
-extern const u8 float_pick_type_tiles[];
-extern const u8 float_pick_type_start[];
-extern const u8 float_pick_type_x_offset[];
 
 extern const u8 boom_spr_speed[];
 extern const u8 boom_spr_anim_speed[];
@@ -246,19 +239,7 @@ u8 pass_turn(void) {
     if (doblind) {
       // Update floor to display recover count instead
       inv_display_blind();
-
-      // Display float
-      u8 i, x, y;
-      x = POS_TO_X(mob_pos[PLAYER_MOB]) + FLOAT_BLIND_X_OFFSET;
-      y = POS_TO_Y(mob_pos[PLAYER_MOB]);
-      for (i = 0; i < 3; ++i) {
-        *next_float++ = y;
-        *next_float++ = x;
-        *next_float++ = TILE_BLIND + i;
-        *next_float++ = FLOAT_FRAMES;  // hijack prop for float timer
-        x += 8;
-      }
-
+      float_blind();
       doblind = 0;
     } else if (recover) {
       if (--recover == 0) {
@@ -595,7 +576,7 @@ u8 rope(u8 from, u8 to) {
 }
 
 void trigger_step(u8 mob) {
-  u8 pos, tile, ptype, pindex, i, flt_start, flt_end, x, y, teleported;
+  u8 pos, tile, ptype, pindex, teleported;
 
   teleported = 0;
 redo:
@@ -639,18 +620,7 @@ redo:
 
     done:
       sfx(sound);
-      flt_start = float_pick_type_start[ptype];
-      flt_end = float_pick_type_start[ptype + 1];
-      x = POS_TO_X(pos) + float_pick_type_x_offset[ptype];
-      y = POS_TO_Y(pos);
-
-      for (i = flt_start; i < flt_end; ++i) {
-        *next_float++ = y;
-        *next_float++ = x;
-        *next_float++ = float_pick_type_tiles[i];
-        *next_float++ = FLOAT_FRAMES; // hijack prop for float timer
-        x += 8;
-      }
+      float_pickup(ptype);
     }
 
     // Expose the exit button for this void region.
