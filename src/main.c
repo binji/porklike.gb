@@ -329,10 +329,3 @@ u8 dropspot(u8 pos) {
   return 0;
 }
 
-void nop_saw_anim(u8 pos) {
-  u8 index = sawmap[pos];
-  pos = *--anim_tile_ptr;
-  if (sawmap[pos]) { sawmap[pos] = index; }
-  anim_tiles[index] = pos;
-}
-

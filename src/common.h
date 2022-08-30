@@ -205,7 +205,6 @@ extern u8 floor;
 
 void dirty_tile(u8 pos);
 u8 dropspot(u8 pos);
-void nop_saw_anim(u8 pos);
 
 void vram_copy(u16 dst, void* src, u8 len);
 

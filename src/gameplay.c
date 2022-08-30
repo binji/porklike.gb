@@ -923,3 +923,11 @@ void trigger_spr(SprType type, u8 trigger_val) {
     break;
   }
 }
+
+void nop_saw_anim(u8 pos) {
+  u8 index = sawmap[pos];
+  pos = *--anim_tile_ptr;
+  if (sawmap[pos]) { sawmap[pos] = index; }
+  anim_tiles[index] = pos;
+}
+
