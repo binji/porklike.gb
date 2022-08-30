@@ -4,6 +4,7 @@
 #include "gameplay.h"
 
 #include "ai.h"
+#include "animate.h"
 #include "counter.h"
 #include "float.h"
 #include "gameover.h"
@@ -88,9 +89,6 @@ extern const u16 boom_spr_dy[];
 extern const u8 float_dmg[];
 
 // TODO: move to its own file
-u8 animate(void);
-void begin_animate(void);
-void end_animate(void);
 void mapgen(void);
 
 u8 doupdatemap, dofadeout, doloadfloor, donextfloor, doblind, dosight;
@@ -134,10 +132,10 @@ void gameplay_update(void) NONBANKED {
     SWITCH_ROM_MBC1(1);
     joy_action = 0;
     IE_REG |= VBL_IFLAG;
-    end_animate();
+    animate_end();
     doupdatemap = 1;
     pal_fadein();
-    begin_animate();
+    animate_begin();
   }
 
   if (gameover_timer) {
@@ -164,7 +162,7 @@ void gameplay_update(void) NONBANKED {
   }
 
   inv_animate();
-  end_animate();
+  animate_end();
   pal_update();
 }
 

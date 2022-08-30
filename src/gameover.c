@@ -3,6 +3,7 @@
 
 #include "gameover.h"
 
+#include "animate.h"
 #include "counter.h"
 #include "gameplay.h"
 #include "palette.h"
@@ -33,7 +34,6 @@
 #define STATS_KILLS_ADDR 0x996c
 
 void gameinit(void);
-void end_animate(void);
 
 extern const u8 dead_map[];
 extern const u8 win_map[];
@@ -44,7 +44,7 @@ u8 gameover_timer;
 
 void gameover_update(void) {
   if (gameover_state != GAME_OVER_WAIT) {
-    end_animate();
+    animate_end();
     sprite_hide();
     pal_fadeout();
     IE_REG &= ~VBL_IFLAG;
