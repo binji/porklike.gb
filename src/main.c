@@ -31,6 +31,7 @@ void main(void) NONBANKED {
   // Initialize for title screen
   DISPLAY_OFF;
   clear_wram();
+  sram_init();
   pal_init();
   soundinit();
   enable_interrupts();

@@ -122,9 +122,9 @@
 
 #define MAX_EQUIPS 4
 
-#define MSG_REAPER_Y 83
-
 #define NUM_BOOM_SPRS 16
+
+#define MAX_WURSTCHAIN 7
 
 typedef int8_t s8;
 typedef uint8_t u8;

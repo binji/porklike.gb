@@ -21,7 +21,7 @@ LCCFLAGS_gg      =
 
 LCCFLAGS += $(LCCFLAGS_$(EXT)) # This adds the current platform specific LCC Flags
 
-LCCFLAGS += -Wl-j -Wl-m -Wl-w -Wm-yo4 -Wm-yt1 -Wm-ynPORKLIKE
+LCCFLAGS += -Wl-j -Wl-m -Wl-w -Wm-yo4 -Wm-ya1 -Wm-yt3 -Wm-ynPORKLIKE
 LCCFLAGS += -Wl-b_CALIGNED=0x0200 -Wl-b_CODE=0x300 -Wl-b_DALIGNED=0xc100 -Wl-b_DATA=0xcf00
 # LCCFLAGS += -debug # Uncomment to enable debug output
 # LCCFLAGS += -v     # Uncomment for lcc verbose output

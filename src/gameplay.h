@@ -25,6 +25,9 @@ void dirty_tile(u8 pos);
 void trigger_spr(SprType, u8 trigger_val);
 u8 dropspot(u8 pos);
 
+void sram_init(void);
+void sram_update_wurstchain(u8 value);
+
 extern Turn turn;
 
 extern u8 recover; // how long until recovering from blind
@@ -36,5 +39,7 @@ extern Counter st_floor;
 extern Counter st_steps;
 extern Counter st_kills;
 extern Counter st_recover;
+
+extern u8 wurstchain;
 
 #endif // GAMEPLAY_H_

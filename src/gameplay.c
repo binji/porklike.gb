@@ -46,7 +46,10 @@
 
 #define REAPER_AWAKENS_STEPS 100
 #define MSG_REAPER 0
-#define MSG_LEN 18
+#define MSG_REAPER_Y 83
+
+#define MSG_WURSTCHAIN_PROP_LIT 5
+#define MSG_WURSTCHAIN_PROP_DIM (S_PALETTE | 4)
 
 #define TILE_BOOM 0x05
 
@@ -108,6 +111,8 @@ Counter st_steps;
 Counter st_kills;
 Counter st_recover;
 
+u8 wurstchain;
+
 void gameplay_init(void) {
   animate_init();
 
@@ -139,9 +144,9 @@ void gameplay_init(void) {
 
 void gameplay_update(void) NONBANKED {
 #if 0
-      if (newjoy & J_START) { // XXX cheat
-        dofadeout = donextfloor = doloadfloor = 1;
-      }
+  if (newjoy & J_START) { // XXX cheat
+    dofadeout = donextfloor = doloadfloor = 1;
+  }
 #endif
 
   if (dofadeout) {
@@ -165,6 +170,9 @@ void gameplay_update(void) NONBANKED {
     joy_action = 0;
     IE_REG |= VBL_IFLAG;
     animate_end();
+    if (floor == 0 && wurstchain) {
+      msg_wurstchain(wurstchain, MSG_WURSTCHAIN_PROP_LIT);
+    }
     doupdatemap = 1;
     pal_fadein();
     animate_begin();
@@ -752,6 +760,12 @@ void hitmob(u8 index, u8 dmg) {
       tile = TILE_CHEST_OPEN;
       slime = 0;
       sound = SFX_BUMP_TILE;
+      if (floor == 0 && wurstchain) {
+        msg_wurstchain(wurstchain, MSG_WURSTCHAIN_PROP_DIM);
+        // Clear out wurstchain in SRAM immediately; if you turn it off you're
+        // back to 0.
+        sram_update_wurstchain(0);
+      }
     } else if (mtype == MOB_TYPE_BOMB) {
       percent = 100;
       tile = TILE_BOMB_EXPLODED;
@@ -1029,4 +1043,26 @@ u8 dropspot(u8 pos) {
     }
   } while (++i);
   return 0;
+}
+
+void sram_init(void) {
+  ENABLE_RAM;
+  // Check SRAM.
+  if (!(_SRAM[0] == 'p' && _SRAM[1] == 'o' && _SRAM[2] == 'r' &&
+        _SRAM[3] == 'k' && _SRAM[4] < MAX_WURSTCHAIN)) {
+    _SRAM[0] = 'p';
+    _SRAM[1] = 'o';
+    _SRAM[2] = 'r';
+    _SRAM[3] = 'k';
+    _SRAM[4] = 0;
+  } else {
+    wurstchain = _SRAM[4];
+  }
+  DISABLE_RAM;
+}
+
+void sram_update_wurstchain(u8 value) {
+  ENABLE_RAM;
+  _SRAM[4] = value;
+  DISABLE_RAM;
 }
