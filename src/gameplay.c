@@ -698,7 +698,7 @@ void sight(void) NONBANKED {
   }
 }
 
-void sight_blind(void) {
+void sight_blind(void) NONBANKED {
   u8 index, pos;
 
   pos = mob_pos[PLAYER_MOB];
