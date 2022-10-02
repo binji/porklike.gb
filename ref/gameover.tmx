@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.9" tiledversion="1.9.1" orientation="orthogonal" renderorder="right-down" width="8" height="5" tilewidth="8" tileheight="8" infinite="0" nextlayerid="2" nextobjectid="1">
+ <tileset firstgid="1" name="dead" tilewidth="8" tileheight="8" tilecount="128" columns="16">
+  <image source="../img/dead.png" width="128" height="64"/>
+ </tileset>
+ <tileset firstgid="129" name="shared" tilewidth="8" tileheight="8" tilecount="128" columns="16">
+  <image source="../img/shared.png" width="128" height="64"/>
+ </tileset>
+ <layer id="1" name="Tile Layer 1" width="8" height="5">
+  <data encoding="csv">
+1,1,2,3,4,5,1,1,
+1,1,6,7,8,9,1,1,
+1,1,1,10,11,1,1,1,
+1,1,1,1,1,1,1,1,
+228,218,224,1,207,212,208,207
+</data>
+ </layer>
+</map>
