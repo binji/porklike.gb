@@ -15,8 +15,8 @@
 #pragma bank 3
 
 #define MAX_ROOMS 4
-#define MAX_DS_SET 64 /* XXX can be smaller */
-#define MAX_VOIDS 10 /* XXX Figure out what this should be */
+#define MAX_DS_SET 52
+#define MAX_VOIDS 10
 
 #define MIN_CARVECUT_DIST 21
 
@@ -1028,15 +1028,19 @@ void chests(void) {
   // Teleporter in level if level >= 5 and rnd(5)<1 (20%)
   has_teleporter = floor >= 5 && XRND_20_PERCENT();
 
-  // Pick a random room
-  room = randint(num_rooms);
+  // For all rooms, find a chest position (not on a wall).
+  num_cands = 0;
+  for (room = 0; room < num_rooms; ++room) {
+    u8 maxw = room_w[room], maxh = room_h[room];
+    pos = room_pos[room];
+    for (u8 h = 1; h < maxh - 1; ++h, pos += 16 - maxw) {
+      for (u8 w = 1; w < maxw - 1; ++w, ++pos) {
+        cands[num_cands++] = pos;
+      }
+    }
+  }
 
-  // Pick a random x,y in room (non-edge) for chest
-  chest_pos;
-  do {
-    chest_pos = room_pos[room] + (((randint(room_h[room] - 2) + 1) << 4) |
-                                  (randint(room_w[room] - 2) + 1));
-  } while (tmap[chest_pos] != 1);
+  chest_pos = cands[randint(num_cands)];
 
   // Pick a random position in each void and add it to the candidates. If
   // has_teleporter is true, then add chest_pos too.
@@ -1172,21 +1176,24 @@ void decoration(void) {
 
 void spawnmobs(void) {
   u8 pos, room, mob, mobs, i;
+  u8 pack = 0;
 
+  mobs = mob_plan_floor[floor + 1] - mob_plan_floor[floor];
+
+retry:
   pos = 0;
   num_cands = 0;
   do {
     room = roommap[pos];
     if (room && room != start_room && room <= num_rooms &&
-        !IS_SMARTMOB_TILE(tmap[pos], pos) && !room_avoid[room - 1]) {
+        !IS_SMARTMOB_TILE(tmap[pos], pos) &&
+        (!room_avoid[room - 1] || (pack && no_mob_neighbors(pos)))) {
       tempmap[pos] = 1;
       ++num_cands;
     } else {
       tempmap[pos] = 0;
     }
   } while (++pos);
-
-  mobs = mob_plan_floor[floor + 1] - mob_plan_floor[floor];
 
   do {
     pos = getpos(randint(num_cands));
@@ -1196,7 +1203,10 @@ void spawnmobs(void) {
     addmob(mob_plan[mob_plan_floor[floor] + mobs], pos);
   } while (mobs && num_cands);
 
-  // TODO: pack mobs into avoid rooms
+  if (mobs != 0 && !pack) {
+    pack = 1;
+    goto retry;
+  }
 
   // Give a mob a key, if this is a gate floor
   if (dogate) {
