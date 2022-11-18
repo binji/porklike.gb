@@ -143,7 +143,7 @@ void gameplay_init(void) {
 }
 
 void gameplay_update(void) NONBANKED {
-#if 1
+#if 0
   if (newjoy & J_START) { // XXX cheat
     dofadeout = donextfloor = doloadfloor = 1;
   }

@@ -1032,8 +1032,8 @@ void chests(void) {
   num_cands = 0;
   for (room = 0; room < num_rooms; ++room) {
     u8 maxw = room_w[room], maxh = room_h[room];
-    pos = room_pos[room];
-    for (u8 h = 1; h < maxh - 1; ++h, pos += 16 - maxw) {
+    pos = room_pos[room] + 17;
+    for (u8 h = 1; h < maxh - 1; ++h, pos += 18 - maxw) {
       for (u8 w = 1; w < maxw - 1; ++w, ++pos) {
         cands[num_cands++] = pos;
       }

@@ -33,7 +33,7 @@ void joy_update(void) {
         }
       }
 
-      if (repeatjoy & mask) {
+      if (repeatjoy & mask & (J_LEFT | J_RIGHT | J_UP | J_DOWN | J_A)) {
         joy_action = mask;
       }
 
