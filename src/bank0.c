@@ -148,6 +148,10 @@ const u8 sightdiff[] = {
     0x11, 0x21, 0x32, 0x12, 0x23, 0x22,
 };
 
+const u8 sightdiffblind[] = {
+    0x00, 0x0f, 0xf0, 0x10, 0x01,
+};
+
 const u8 sightskip[] = {
     0,
     5, 0, 1, 0, 1, 0,

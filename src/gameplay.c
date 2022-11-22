@@ -59,6 +59,7 @@
 #define MOB_FLASH_FRAMES 20
 
 #define SIGHT_DIFF_COUNT 57
+#define SIGHT_DIFF_BLIND_COUNT 5
 
 #define IS_UNSPECIAL_WALL_TILE(tile)                                           \
   ((flags_bin[tile] & 0b00000011) == 0b00000001)
@@ -92,6 +93,7 @@ extern const u8 drop_diff[];
 
 extern const u8 sightdiff[];
 extern const u8 sightskip[];
+extern const u8 sightdiffblind[];
 
 
 // TODO: move to its own file
@@ -144,6 +146,7 @@ void gameplay_init(void) {
   inv_init();
   targeting_init();
 
+  recover = 0;
   floor = 0;
   counter_zero(&st_floor);
   counter_zero(&st_steps);
@@ -714,27 +717,24 @@ void sight(void) NONBANKED {
 
 void sight_blind(void) NONBANKED {
   u8 index, pos;
+  for (index = 0; index < SIGHT_DIFF_BLIND_COUNT; ++index) {
+    if (is_new_pos_valid(mob_pos[PLAYER_MOB], sightdiffblind[index])) {
+      if (fogmap[pos = pos_result]) unfog_center(pos);
 
-  pos = mob_pos[PLAYER_MOB];
-  if (fogmap[pos]) unfog_center(pos);
-  if (IS_OPAQUE_POS(pos)) unfog_neighbors(pos);
-  --pos; // C -> L
-  if (fogmap[pos]) unfog_center(pos);
-  if (IS_OPAQUE_POS(pos)) unfog_neighbors(pos);
-  pos += 2; // L -> R
-  if (fogmap[pos]) unfog_center(pos);
-  if (IS_OPAQUE_POS(pos)) unfog_neighbors(pos);
-  pos -= 17; // R -> U
-  if (fogmap[pos]) unfog_center(pos);
-  if (IS_OPAQUE_POS(pos)) unfog_neighbors(pos);
-  pos += 32; // U -> D
-  if (fogmap[pos]) unfog_center(pos);
-  if (IS_OPAQUE_POS(pos)) unfog_neighbors(pos);
+      if (!IS_OPAQUE_POS(pos)) {
+        unfog_neighbors(pos);
+      }
+    }
+  }
 
   for (index = 0; index < SIGHT_DIFF_COUNT; ++index) {
     if (is_new_pos_valid(mob_pos[PLAYER_MOB], sightdiff[index])) {
-      mobsightmap[pos_result] = 1;
+      mobsightmap[pos = pos_result] = 1;
+      if (!IS_OPAQUE_POS(pos)) {
+        continue;
+      }
     }
+    index += sightskip[index];
   }
 }
 
