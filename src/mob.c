@@ -177,110 +177,108 @@ void delmob(u8 index) NONBANKED {  // XXX: only used in bank 1
 }
 
 u8 animate_mobs(void) {
-  u8 i, dotile, dosprite, prop, frame, animdone;
+  u8 i, dosprite, visible, animdone;
 
   animdone = 1;
+  dosprite = 0;
 
   // Loop through all mobs, update animations
   for (i = 0; i < num_mobs; ++i) {
     u8 pos = mob_pos[i];
 
-    // TODO: need to properly handle active fogged mobs; they should still do
-    // their triggers but not draw anything. We also probably want to display
-    // mobs that are partially fogged; if the start or end position is
-    // unfogged.
-    if (fogmap[pos] || !mob_vis[i]) { continue; }
-
-    dosprite = dotile = 0;
-    if (--mob_anim_timer[i] == 0) {
-      mob_anim_timer[i] = mob_anim_speed[i];
-      if (++mob_anim_frame[i] == mob_type_anim_start[mob_type[i] + 1]) {
-        mob_anim_frame[i] = mob_type_anim_start[mob_type[i]];
-      }
-      dotile = 1;
-    }
-
-    if (i + 1 == key_mob || mob_move_timer[i] || mob_flash[i]) {
-      dosprite = 1;
-    }
-
-    if (dotile || dosprite) {
-      frame = mob_type_anim_frames[mob_anim_frame[i]];
-
-      if (dosprite && mob_y[i] <= INV_TOP_Y()) {
-        prop = mob_flip[i] ? S_FLIPX : 0;
-        *next_sprite++ = mob_y[i];
-        *next_sprite++ = mob_x[i];
-        if (mob_flash[i]) {
-          *next_sprite++ = frame - TILE_MOB_FLASH_DIFF;
-          *next_sprite++ = MOB_FLASH_HIT_PAL | prop;
-          --mob_flash[i];
-        } else {
-          *next_sprite++ = frame;
-          *next_sprite++ = prop | (i + 1 == key_mob ? MOB_FLASH_KEY_PAL : 0);
+    // TODO: We probably want to display mobs that are partially fogged; if the
+    // start or end position is unfogged.
+    u8 dotile = 0;
+    if (visible = (!fogmap[pos] && mob_vis[i])) {
+      if (--mob_anim_timer[i] == 0) {
+        mob_anim_timer[i] = mob_anim_speed[i];
+        if (++mob_anim_frame[i] == mob_type_anim_start[mob_type[i] + 1]) {
+          mob_anim_frame[i] = mob_type_anim_start[mob_type[i]];
         }
+        dotile = 1;
       }
 
-      if (mob_flip[i]) {
-        frame += TILE_FLIP_DIFF;
+      if (i + 1 == key_mob || mob_move_timer[i] || mob_flash[i]) {
+        dosprite = 1;
       }
 
-      mob_tile[i] = frame;
+      if (dotile || dosprite) {
+        u8 frame = mob_type_anim_frames[mob_anim_frame[i]];
 
-      if (mob_move_timer[i]) {
-        mob_x[i] += mob_dx[i];
-        mob_y[i] += mob_dy[i];
-
-        --mob_move_timer[i];
-        // Check for hop4 or pounce
-        if ((mob_anim_state[i] & MOB_ANIM_STATE_HOP4_MASK) ==
-            MOB_ANIM_STATE_HOP4) {
-          mob_y[i] += hopy4[mob_move_timer[i]];
+        if (dosprite && mob_y[i] <= INV_TOP_Y()) {
+          u8 prop = mob_flip[i] ? S_FLIPX : 0;
+          *next_sprite++ = mob_y[i];
+          *next_sprite++ = mob_x[i];
+          if (mob_flash[i]) {
+            *next_sprite++ = frame - TILE_MOB_FLASH_DIFF;
+            *next_sprite++ = MOB_FLASH_HIT_PAL | prop;
+            --mob_flash[i];
+          } else {
+            *next_sprite++ = frame;
+            *next_sprite++ = prop | (i + 1 == key_mob ? MOB_FLASH_KEY_PAL : 0);
+          }
         }
 
-        if (mob_move_timer[i] == 0) {
-          switch (mob_anim_state[i]) {
-            case MOB_ANIM_STATE_BUMP1:
-              mob_anim_state[i] = MOB_ANIM_STATE_BUMP2;
-              mob_move_timer[i] = BUMP_FRAMES;
-              mob_dx[i] = -mob_dx[i];
-              mob_dy[i] = -mob_dy[i];
-              break;
+        if (mob_flip[i]) {
+          frame += TILE_FLIP_DIFF;
+        }
 
-            case MOB_ANIM_STATE_WALK:
+        mob_tile[i] = frame;
+        dosprite = 0;
+      }
+    }
+
+    if (mob_move_timer[i]) {
+      mob_x[i] += mob_dx[i];
+      mob_y[i] += mob_dy[i];
+
+      --mob_move_timer[i];
+      // Check for hop4 or pounce
+      if ((mob_anim_state[i] & MOB_ANIM_STATE_HOP4_MASK) ==
+          MOB_ANIM_STATE_HOP4) {
+        mob_y[i] += hopy4[mob_move_timer[i]];
+      }
+
+      if (mob_move_timer[i] == 0) {
+        switch (mob_anim_state[i]) {
+          case MOB_ANIM_STATE_BUMP1:
+            mob_anim_state[i] = MOB_ANIM_STATE_BUMP2;
+            mob_move_timer[i] = BUMP_FRAMES;
+            mob_dx[i] = -mob_dx[i];
+            mob_dy[i] = -mob_dy[i];
+            break;
+
+          case MOB_ANIM_STATE_POUNCE:
+            // bump player, if possible
+            if (!ai_dobump(i)) {
+              // Otherwise finish animation
               goto done;
+            }
+            break;
 
-            done:
-            case MOB_ANIM_STATE_BUMP2:
-            case MOB_ANIM_STATE_HOP4:
-              mob_anim_state[i] = MOB_ANIM_STATE_NONE;
-              mob_dx[i] = mob_dy[i] = 0;
+          done:
+          case MOB_ANIM_STATE_WALK:
+          case MOB_ANIM_STATE_BUMP2:
+          case MOB_ANIM_STATE_HOP4:
+            mob_anim_state[i] = MOB_ANIM_STATE_NONE;
+            mob_dx[i] = mob_dy[i] = 0;
+            if (visible) {
               dirty_tile(pos);
-              break;
-
-            case MOB_ANIM_STATE_POUNCE:
-              // bump player, if possible
-              if (!ai_dobump(i)) {
-                // Otherwise finish animation
-                mob_anim_state[i] = MOB_ANIM_STATE_NONE;
-                mob_dx[i] = mob_dy[i] = 0;
-                dirty_tile(pos);
-              }
-              break;
-          }
-          // Reset animation speed
-          mob_anim_speed[i] = mob_type_anim_speed[mob_type[i]];
-
-          if (mob_trigger[i]) {
-            mob_trigger[i] = 0;
-            trigger_step(i);
-          }
-        } else {
-          animdone = 0;
+            }
+            break;
         }
-      } else if (dotile) {
-        dirty_tile(pos);
+        // Reset animation speed
+        mob_anim_speed[i] = mob_type_anim_speed[mob_type[i]];
+
+        if (mob_trigger[i]) {
+          mob_trigger[i] = 0;
+          trigger_step(i);
+        }
+      } else {
+        animdone = 0;
       }
+    } else if (visible && dotile) {
+      dirty_tile(pos);
     }
   }
 
