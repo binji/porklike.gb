@@ -1,5 +1,6 @@
 #include <gb/gb.h>
 #include <gb/cgb.h>
+#include <string.h>
 
 #include "common.h"
 #include "palette.h"
@@ -18,7 +19,8 @@ extern const palette_color_t cgb_mob_key_flash_pals[];
 extern const palette_color_t cgb_press_start_flash_pals[];
 
 static u8 flash_pal_timer, flash_pal_index;
-static u8 saved_bkg_pal[64], saved_obp_pal[64];
+static u16 saved_bkg_pal[32], saved_obp_pal[32];
+static u16 cur_bkg_pal[32], cur_obp_pal[32];
 
 void pal_init(void) {
   if (_cpu == CGB_TYPE) {
@@ -55,38 +57,31 @@ u16 next_fadeout_color(u16 color) NONBANKED {
   return newcolor;
 }
 
+void get_bkg_palettes(u8* dest);
+void get_obp_palettes(u8* dest);
+
 void pal_fadeout(void) NONBANKED {
   u8 i, j;
   if (_cpu == CGB_TYPE) {
-    u16 color;
-
     // Save original palette.
-    for (i = 0; i < 64; ++i) {
-      rBCPS = i;
-      saved_bkg_pal[i] = rBCPD;
-      rOCPS = i;
-      saved_obp_pal[i] = rOCPD;
-    }
+    get_bkg_palettes(saved_bkg_pal);
+    get_obp_palettes(saved_obp_pal);
+
+    // Update cur palette.
+    memcpy(cur_bkg_pal, saved_bkg_pal, sizeof(cur_bkg_pal));
+    memcpy(cur_obp_pal, saved_obp_pal, sizeof(cur_obp_pal));
 
     i = FADE_FRAMES * 3;
     do {
-      for (j = 0; j < 64; j += 2) {
-        rBCPS = j + 1;
-        color = rBCPD << 8;
-        rBCPS = j | BCPSF_AUTOINC;
-        color |= rBCPD;
-        color = next_fadeout_color(color);
-        rBCPD = color & 0xff;
-        rBCPD = color >> 8;
-
-        rOCPS = j + 1;
-        color = rOCPD << 8;
-        rOCPS = j | OCPSF_AUTOINC;
-        color |= rOCPD;
-        color = next_fadeout_color(color);
-        rOCPD = color & 0xff;
-        rOCPD = color >> 8;
+      // Calculate next palette.
+      for (j = 0; j < 32; ++j) {
+        cur_bkg_pal[j] = next_fadeout_color(cur_bkg_pal[j]);
+        cur_obp_pal[j] = next_fadeout_color(cur_obp_pal[j]);
       }
+
+      // Write it.
+      set_bkg_palette(0, 8, cur_bkg_pal);
+      set_sprite_palette(0, 8, cur_obp_pal);
       wait_vbl_done();
     } while (i--);
   } else {
@@ -109,26 +104,19 @@ u16 next_fadein_color(u16 src, u16 dst) NONBANKED {
 void pal_fadein(void) NONBANKED {
   u8 i, j;
   if (_cpu == CGB_TYPE) {
-    u16 color;
     i = FADE_FRAMES * 3;
     do {
-      for (j = 0; j < 64; j += 2) {
-        rBCPS = j + 1;
-        color = rBCPD << 8;
-        rBCPS = j | BCPSF_AUTOINC;
-        color |= rBCPD;
-        color = next_fadein_color(color, *((u16 *)(saved_bkg_pal + j)));
-        rBCPD = color & 0xff;
-        rBCPD = color >> 8;
-
-        rOCPS = j + 1;
-        color = rOCPD << 8;
-        rOCPS = j | OCPSF_AUTOINC;
-        color |= rOCPD;
-        color = next_fadein_color(color, *((u16 *)(saved_obp_pal + j)));
-        rOCPD = color & 0xff;
-        rOCPD = color >> 8;
+      u16 *saved_bkg = saved_bkg_pal;
+      u16 *saved_obp = saved_obp_pal;
+      // Calculate next palette.
+      for (j = 0; j < 32; ++j) {
+        cur_bkg_pal[j] = next_fadein_color(cur_bkg_pal[j], saved_bkg[j]);
+        cur_obp_pal[j] = next_fadein_color(cur_obp_pal[j], saved_obp[j]);
       }
+
+      // Write it.
+      set_bkg_palette(0, 8, cur_bkg_pal);
+      set_sprite_palette(0, 8, cur_obp_pal);
       wait_vbl_done();
     } while (i--);
   } else {

@@ -370,6 +370,56 @@ _vram_copy::
   jr nz, 1$
   ret
 
+; void get_bkg_palettes(u8* dest)
+_get_bkg_palettes::
+  ldhl sp, #2
+  ld a, (hl+)
+  ld h, (hl)
+  ld l, a  ; hl = dst
+
+  ld b, #0  ; byte index
+
+1$:
+  ldh a, (.STAT) ; wait until VRAM is unlocked
+  and a, #STATF_BUSY
+  jr nz, 1$
+
+  ld a, b
+  ldh (0x68), a   ; write index
+  ldh a, (0x69)   ; read value
+  ld (hl+), a
+
+  inc b
+  ld a, b
+  cp #0x40
+  jr nz, 1$
+  ret
+
+; void get_obp_palettes(u8* dest)
+_get_obp_palettes::
+  ldhl sp, #2
+  ld a, (hl+)
+  ld h, (hl)
+  ld l, a  ; hl = dst
+
+  ld b, #0  ; byte index
+
+1$:
+  ldh a, (.STAT) ; wait until VRAM is unlocked
+  and a, #STATF_BUSY
+  jr nz, 1$
+
+  ld a, b
+  ldh (0x6a), a   ; write index
+  ldh a, (0x6b)   ; read value
+  ld (hl+), a
+
+  inc b
+  ld a, b
+  cp #0x40
+  jr nz, 1$
+  ret
+
 ; zero page vars
 DIST=0x93
 MAXDIST=0x94
