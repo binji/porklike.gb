@@ -118,11 +118,14 @@ void titlescreen(void) {
   SCX_REG = 232;
   SCY_REG = titletop_bounce[0];
   set_bkg_tiles(0, 0, TITLETOP_WIDTH, TITLETOP_HEIGHT, titletop_map);
+#ifdef CGB_SUPPORT
   if (_cpu == CGB_TYPE) {
     VBK_REG = 1;
     fill_bkg_rect(0, 0, TITLETOP_WIDTH, TITLETOP_HEIGHT, 1);
     VBK_REG = 0;
-  } else {
+  } else
+#endif
+  {
     // 0:LightGray 1:DarkGray 2:Black 3:White
     BGP_REG = OBP0_REG = OBP1_REG = 0b00111001;
   }
@@ -163,11 +166,13 @@ void titlescreen(void) {
   LCDC_REG = LCDCF_ON | LCDCF_WINON | LCDCF_BGON | LCDCF_OBJON | LCDCF_WIN9C00;
   init_win(0x8e);
   set_win_tiles(0, 0, TITLEBOT_WIDTH, TITLEBOT_HEIGHT, titlebot_map);
+#ifdef CGB_SUPPORT
   if (_cpu == CGB_TYPE) {
     VBK_REG = 1;
     fill_win_rect(0, 0, TITLEBOT_WIDTH, TITLEBOT_HEIGHT, 3);
     VBK_REG = 0;
   }
+#endif
 
   // slide up title, gameboy, and credits
   for (i = 0; i < sizeof(cubic_up) + SLIDE_LAG; ++i) {

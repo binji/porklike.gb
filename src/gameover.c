@@ -85,6 +85,7 @@ void gameover_update(void) {
     counter_out(&st_steps, STATS_STEPS_ADDR);
     counter_out(&st_kills, STATS_KILLS_ADDR);
 
+#ifdef CGB_SUPPORT
     if (_cpu == CGB_TYPE) {
       VBK_REG = 1;
       // Set the palette for the text rows.
@@ -97,6 +98,7 @@ void gameover_update(void) {
                     PRESS_A_HEIGHT, 4);
       VBK_REG = 0;
     }
+#endif
 
     gameover_state = GAME_OVER_WAIT;
     IE_REG |= VBL_IFLAG;

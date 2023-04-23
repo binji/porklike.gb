@@ -113,6 +113,7 @@ skip:
     dirtymap[pos] = 0;
   }
 
+#ifdef CGB_SUPPORT
   if (_cpu == CGB_TYPE && dirty_saw_ptr != dirty_saw) {
     // CGB needs to update the palette data too, but just for saws: animated
     // saws use pal 1, and broken saws use pal 0.
@@ -154,6 +155,7 @@ skip:
     *code++ = 0xe0; // ldh 0xff4f, a (set vram bank to 0)
     *code++ = 0x4f; //
   }
+#endif
 
   *code++ = 0xf1;       // pop af
   *code++ = 0xc9;       // ret

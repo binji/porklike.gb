@@ -70,12 +70,14 @@ void inv_init(void) {
   inv_msg_update = 1;
   memset(equip_type, PICKUP_TYPE_NONE, sizeof(equip_type));
   set_win_tiles(0, 0, INV_WIDTH, INV_HEIGHT, inventory_map);
+#ifdef CGB_SUPPORT
   if (_cpu == CGB_TYPE) {
     VBK_REG = 1;
     fill_win_rect(0, 0, INV_WIDTH, INV_HEIGHT, 3);
     set_vram_byte((u8 *)(INV_KEYS_ADDR - 1), 0); // make key yellow
     VBK_REG = 0;
   }
+#endif
 }
 
 void inv_update(void) {

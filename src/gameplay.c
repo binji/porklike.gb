@@ -117,11 +117,13 @@ u8 wurstchain;
 
 void clear_bkg(void) {
   init_bkg(0);
+#ifdef CGB_SUPPORT
   if (_cpu == CGB_TYPE) {
     VBK_REG = 1;
     init_bkg(0);
     VBK_REG = 0;
   }
+#endif
 }
 
 void gameplay_init(void) {

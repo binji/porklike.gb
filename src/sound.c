@@ -14,9 +14,12 @@ void soundinit(void) {
 
   // set up timer for sound
   TAC_REG = 0b100;     // timer enabled, clock / 1024
+#ifdef CGB_SUPPORT
   if (_cpu == CGB_TYPE) {
     TMA_REG = 0xbc;      // double speed clock / 1024 / 68 = ~120Hz
-  } else {
+  } else
+#endif
+  {
     TMA_REG = 0xde;      // clock / 1024 / 34 = ~120Hz
   }
   IE_REG |= TIM_IFLAG; // timer interrupt enabled

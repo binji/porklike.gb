@@ -15,7 +15,7 @@ TARGETS=gbc gb pocket # megaduck sms gg
 LCCFLAGS_gb      = -Wm-ys #
 LCCFLAGS_pocket  = -Wm-ys # Usually the same as required for .gb
 LCCFLAGS_duck    = -Wm-ys # Usually the same as required for .gb
-LCCFLAGS_gbc     = -Wm-ys -Wm-yc # Same as .gb with: -Wm-yc (gb & gbc) or Wm-yC (gbc exclusive)
+LCCFLAGS_gbc     = -DCGB_SUPPORT -Wm-ys -Wm-yc # Same as .gb with: -Wm-yc (gb & gbc) or Wm-yC (gbc exclusive)
 LCCFLAGS_sms     =
 LCCFLAGS_gg      =
 
