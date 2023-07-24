@@ -8,18 +8,18 @@ CMD_NOFX = 5
 ; manually assign song_ptr and wait_timer to HRAM
 ; TODO: better way?
 ch1_wait_timer = 0xffa0
-ch1_song_ptr   = ch1_wait_timer + 1
-ch1_stack      = ch1_song_ptr   + 2
-ch2_wait_timer = ch1_stack      + 2
-ch2_song_ptr   = ch2_wait_timer + 1
-ch2_stack      = ch2_song_ptr   + 2
-ch3_wait_timer = ch2_stack      + 2
-ch3_song_ptr   = ch3_wait_timer + 1
-ch3_stack      = ch3_song_ptr   + 2
-ch4_wait_timer = ch3_stack      + 2
-ch4_song_ptr   = ch4_wait_timer + 1
-ch4_stack      = ch4_song_ptr   + 2
-snddata_end    = ch4_stack      + 2
+ch1_song_ptr   = ch1_wait_timer + 1  ; ffa1
+ch1_stack      = ch1_song_ptr   + 2  ; ffa3
+ch2_wait_timer = ch1_stack      + 2  ; ffa5
+ch2_song_ptr   = ch2_wait_timer + 1  ; ffa6
+ch2_stack      = ch2_song_ptr   + 2  ; ffa8
+ch3_wait_timer = ch2_stack      + 2  ; ffaa
+ch3_song_ptr   = ch3_wait_timer + 1  ; ffab
+ch3_stack      = ch3_song_ptr   + 2  ; ffad
+ch4_wait_timer = ch3_stack      + 2  ; ffaf
+ch4_song_ptr   = ch4_wait_timer + 1  ; ffb0
+ch4_stack      = ch4_song_ptr   + 2  ; ffb2
+snddata_end    = ch4_stack      + 2  ; ffb4
 
 current_sfx_priority = snddata_end + 1
 
@@ -131,13 +131,12 @@ sfx_priority::
 
 _play_music::
   di
-  ld hl, #snddata_end - #ch1_wait_timer
-  push hl
-  push de
-  ld hl, #ch1_wait_timer
-  push hl
+  ld bc, #snddata_end - #ch1_wait_timer
+  push bc
+  ld c, e
+  ld b, d
+  ld de, #ch1_wait_timer
   call _memcpy
-  add sp, #6
   ei
   ret
 
@@ -158,9 +157,6 @@ _music_win::
 
 _sfx::
   di
-
-  ldhl sp, #2
-  ld a, (hl)
   ld d, a       ; d = a = sfx to play
 
   ld hl, #sfx_priority

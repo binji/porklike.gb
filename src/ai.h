@@ -9,6 +9,6 @@ u8 ai_dobump(u8 index);
 u8 ai_tcheck(u8 index);
 u8 ai_getnextstep(u8 index);
 u8 ai_getnextstep_rev(u8 index);
-void calcdist_ai(u8 from, u8 to);
+void calcdist_ai(u8 from, u8 to) __sdcccall(0);
 
 #endif // AI_H_

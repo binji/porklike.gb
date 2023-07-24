@@ -1,5 +1,6 @@
 .include "global.s"
 
+; void clear_wram(void)
 _clear_wram::
   ld hl, #l__DALIGNED
   push hl
@@ -12,12 +13,10 @@ _clear_wram::
   ret
 
 ; void clear_map(u8* map)
-;
+;   de = map
 _clear_map::
-  ldhl sp, #2
-  ld a, (hl+)
-  ld h, (hl)
-  ld l, a
+  ld l, e
+  ld h, d
   xor a
   ld e, #32
 1$:
@@ -34,44 +33,45 @@ _clear_map::
   ret
 
 ; u16 drag(u16 x)
+;   de = x
+;   bc = result
 ;
 ; equivalent to:  x -= (x >> 3), but handles sign properly
 _drag::
   ; de = bc = x
-  ldhl sp, #2
-  ld a, (hl+)
+  ld c, e
+  ld b, d
+  ; de >>= 3  (signed)
+  sra d
+  rr e
+  sra d
+  rr e
+  sra d
+  rr e
+  ; bc -= de
+  ld a, c
+  sub a, e
   ld c, a
-  ld e, a
-  ld b, (hl)
-  ld d, b
-  ; bc >>= 3  (signed)
-  sra b
-  rr c
-  sra b
-  rr c
-  sra b
-  rr c
-  ; de -= bc
-  ld a, e
-  sub a, c
-  ld e, a
-  ld a, d
-  sbc a, b
-  ld d, a
-  ; is bc < 0?
-  bit 7, b
+  ld a, b
+  sbc a, d
+  ld b, a
+  ; is de < 0?
+  bit 7, d
   jr z, 1$
-  ; bc >= 0, complement carry
+  ; de >= 0, complement carry
   ccf
 1$:
   ; did subtraction overflow?
   jr nc, 2$
-  ; overflow, de = 0
-  ld de, #0
+  ; overflow, bc = 0
+  ld bc, #0
 2$:
   ret
 
 ; u8 is_new_pos_valid(u8 pos, u8 diff)
+;   a = pos
+;   e = diff
+;   a = result
 ;
 ; pos is a location in a 16x16 grid, where (x, y) is 0xYX.
 ; diff is a signed vector, from -8 to 7 in each dimension as 0xYX.
@@ -82,40 +82,39 @@ _drag::
 _pos_result:: .ds 1
 .area _CODE
 _is_new_pos_valid::
-  ldhl sp, #3
-  ld a, (hl-)
-  ld d, a       ; d=diff (as 0xYX)
+  ld h, a       ; h=pos
+  ld a, e       ; a=e=diff (as 0xYX)
   cpl
   add #0x10
   swap a
   add #0x10
   swap a
-  ld e, a       ; e=-diff (as independent 0xYX)
-  ld a, (hl)
+  ld d, a       ; d=-diff (as independent 0xYX)
+  ld a, h       ; a=pos
   xor #0x88
   ld l, a       ; l=pos'=pos^0x88, treats position as unsigned
-  sub e         ; deliberately sub instead of add to set N flag
-  ld e, a       ; e=sum
+  sub d         ; deliberately sub instead of add to set N flag
+  ld d, a       ; e=sum
   ld a, #0      ; a=0 (don't touch H or N flags)
   daa           ; if half-carry => lo nibble=0xa
   rla           ; rotate half-carry into low bit of hi nibble
   and #0x10     ; mask off hi bit (either a=0 or a=0x10)
-  add e
+  add d
   ld h, a       ; h=sum' (corrected in case of overflow)
-  xor d
-  ld e, a       ; e=sum'^diff
+  xor e
+  ld d, a       ; d=sum'^diff
   ld a, l
   xor h         ; a=pos'^sum'
-  and e         ; a=(pos'^sum')&(sum'^diff)
+  and d         ; a=(pos'^sum')&(sum'^diff)
   and #0x88     ; a=overflow in hi or lo nibble
-  ld e, #0
-  ret nz        ; return e=0 if there was overflow
+  ld a, #0
+  ret nz        ; return a=0 if there was overflow
   ld a, h
   xor #0x88
   ld hl, #_pos_result
   ld (hl), a
-  inc e
-  ret           ; otherwise return e=1 and write result to pos_result
+  ld a, #1
+  ret           ; otherwise return a=1 and write result to pos_result
 
 ; 16-bit xorshift implementation, from John Metcalf. See
 ; http://www.retroprogramming.com/2017/07/xorshift-pseudorandom-numbers-in-z80.html
@@ -127,6 +126,8 @@ _xrnd_seed:: .ds 2
 
 .area _CODE
 
+; u8 xrnd(void)
+;   a = result
 _xrnd::
   ;; read seed
   ld hl, #_xrnd_seed
@@ -155,30 +156,33 @@ _xrnd::
   ld (hl), e
   ret
 
+; void xrnd_init(u16 seed)
+;   de = seed
 _xrnd_init::
-  ldhl sp, #2
-  ld a, (hl+)
+  ld a, e
   ld (#_xrnd_seed), a
-  ld a, (hl)
+  ld a, d
   ld (#_xrnd_seed + 1), a
   ret
 
+; void xrnd_mix(u8 entropy)
+;  a = entropy
+;
 ; mix in 8 bits of entropy by xoring with the low byte of the seed, then
 ; calling xrnd to distribute it across the 16 bit seed.
 _xrnd_mix::
-  ldhl sp, #1
-  ld d, (hl)
+  ld d, a
   ld a, (#_xrnd_seed)
   xor d
   ld (#_xrnd_seed), a
   jp _xrnd
 
 
+; void counter_zero(Counter* c)
+;   de = c
 _counter_zero::
-  ldhl sp, #2
-  ld a, (hl+)
-  ld h, (hl)
-  ld l, a
+  ld l, e
+  ld h, d
 
   ld a, #4
   ld (hl+), a  ; start=4
@@ -190,11 +194,11 @@ _counter_zero::
   ld (hl), a   ; 0
   ret
 
+; void counter_thirty(Counter* c)
+;   de = c
 _counter_thirty::
-  ldhl sp, #2
-  ld a, (hl+)
-  ld h, (hl)
-  ld l, a
+  ld l, e
+  ld h, d
 
   ld a, #3
   ld (hl+), a  ; start=3
@@ -208,13 +212,11 @@ _counter_thirty::
   ld (hl), a   ; 3
   ret
 
+; void counter_inc(Counter* c)
+;   de = c
 _counter_inc::
-  ldhl sp, #2
-  ld a, (hl+)
-  ld d, (hl)
-  ld e, a
+  ld l, e
   ld h, d
-  ld l, e   ; hl = de = [sp+2]
 
   inc hl
   inc hl
@@ -255,13 +257,11 @@ _counter_inc::
   ld (de), a
   ret
 
+; void counter_dec(Counter* c)
+;   de = c
 _counter_dec::
-  ldhl sp, #2
-  ld a, (hl+)
-  ld d, (hl)
-  ld e, a
+  ld l, e
   ld h, d
-  ld l, e   ; hl = de = [sp+2]
 
   inc hl
   inc hl
@@ -302,32 +302,25 @@ _counter_dec::
   ld (de), a
   ret
 
+; void counter_out(Counter* c, u16 vram)
+;   de = c
+;   bc = vram
 _counter_out::
-  ldhl sp, #2
-  ld a, (hl+)
-  ld h, (hl)
-  ld l, a
-
-  ld a, (hl+)  ; read start value
-  ld b, a      ; copy it to b
+  ld l, c      ; save low dest byte to l
+  ld a, (de)   ; read start value
+  inc de
+  ld h, a      ; copy it to h
   ld a, #5
-  sub a, b
-  ld c, a      ; c is len
+  sub a, h
+  ld c, a      ; c = len
 
-  ld a, b      ; move forward to first non-zero digit
-  add a, l
-  ld l, a
-  ld a, h
+  ld a, h      ; move forward to first non-zero digit
+  add a, e
+  ld e, a
+  ld a, d
   adc a, #0
-  ld h, a
-
-  ld e, l      ; de = source
-  ld d, h
-
-  ldhl sp, #4
-  ld a, (hl+)
-  ld h, (hl)
-  ld l, a      ; hl = dest
+  ld d, a      ; de = source
+  ld h, b      ; hl = dest (high byte was loaded at start)
 
 1$:
   ldh a, (.STAT) ; wait until VRAM is unlocked
@@ -343,19 +336,17 @@ _counter_out::
   ret
 
 ; void vram_copy(u16 dst, void* src, u8 len);
+;   dst = de
+;   src = bc
+;   len = stack
 _vram_copy::
-  ldhl sp, #6
-  ld c, (hl)
-
-  ldhl sp, #4
-  ld a, (hl+)
-  ld d, (hl)
-  ld e, a  ; de = src
-
   ldhl sp, #2
-  ld a, (hl+)
-  ld h, (hl)
-  ld l, a  ; hl = dst
+  ld a, (hl)  ; a = len
+  ld l, e
+  ld h, d     ; hl = dst
+  ld e, c
+  ld d, b     ; de = src
+  ld c, a     ; c = len
 
 1$:
   ldh a, (.STAT) ; wait until VRAM is unlocked
@@ -368,14 +359,16 @@ _vram_copy::
 
   dec c
   jr nz, 1$
-  ret
+  pop hl
+  add sp, #-1
+  pop de
+  jp (hl)
 
 ; void get_bkg_palettes(u8* dest)
+;   de = dest
 _get_bkg_palettes::
-  ldhl sp, #2
-  ld a, (hl+)
-  ld h, (hl)
-  ld l, a  ; hl = dst
+  ld l, e
+  ld h, d  ; hl = dst
 
   ld b, #0  ; byte index
 
@@ -396,11 +389,10 @@ _get_bkg_palettes::
   ret
 
 ; void get_obp_palettes(u8* dest)
+;   de = dest
 _get_obp_palettes::
-  ldhl sp, #2
-  ld a, (hl+)
-  ld h, (hl)
-  ld l, a  ; hl = dst
+  ld l, e
+  ld h, d  ; hl = dst
 
   ld b, #0  ; byte index
 
