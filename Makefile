@@ -11,11 +11,11 @@ PYTHON = python
 # Possible are: gb gbc pocket megaduck sms gg
 TARGETS=gbc gb pocket # megaduck sms gg
 
-# Configure platform specific LCC flags here:
+# Configure platform specific link flags here:
 LCCFLAGS_gb      = -Wm-ys #
 LCCFLAGS_pocket  = -Wm-ys # Usually the same as required for .gb
 LCCFLAGS_duck    = -Wm-ys # Usually the same as required for .gb
-LCCFLAGS_gbc     = -DCGB_SUPPORT -Wm-ys -Wm-yc # Same as .gb with: -Wm-yc (gb & gbc) or Wm-yC (gbc exclusive)
+LCCFLAGS_gbc     = -Wm-ys -Wm-yc # Same as .gb with: -Wm-yc (gb & gbc) or Wm-yC (gbc exclusive)
 LCCFLAGS_sms     =
 LCCFLAGS_gg      =
 
@@ -25,6 +25,16 @@ LCCFLAGS += -Wl-j -Wl-m -Wl-w -Wm-yo4 -Wm-ya1 -Wm-yt3 -Wm-ynPORKLIKE
 LCCFLAGS += -Wl-b_CALIGNED=0x0200 -Wl-b_CODE=0x300 -Wl-b_DALIGNED=0xc100 -Wl-b_DATA=0xcf00
 # LCCFLAGS += -debug # Uncomment to enable debug output
 # LCCFLAGS += -v     # Uncomment for lcc verbose output
+
+# Configure platform specific compiler flags here:
+CFLAGS_gb      =
+CFLAGS_pocket  =
+CFLAGS_duck    =
+CFLAGS_gbc     = -DCGB_SUPPORT
+CFLAGS_sms     =
+CFLAGS_gg      =
+
+CFLAGS += $(CFLAGS_$(EXT)) # This adds the current platform specific C Flags
 
 # You can set the name of the ROM file here
 PROJECTNAME = porklike
