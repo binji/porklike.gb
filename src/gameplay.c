@@ -268,7 +268,8 @@ u8 pass_turn(void) {
       inv_display_blind();
       float_blind();
       doblind = 0;
-    } else if (recover) {
+    }
+    if (recover) {
       if (--recover == 0) {
         // Set back to FLOOR #
         inv_display_floor();
