@@ -61,8 +61,8 @@
 #define SIGHT_DIFF_COUNT 57
 #define SIGHT_DIFF_BLIND_COUNT 5
 
-#define IS_UNSPECIAL_WALL_TILE(tile)                                           \
-  ((flags_bin[tile] & 0b00000011) == 0b00000001)
+#define IS_UNSPECIAL_FLOOR_TILE(tile)                                          \
+  ((flags_bin[tile] & 0b00000011) == 0b00000000)
 
 static void do_turn(void);
 static u8 pass_turn(void);
@@ -826,7 +826,7 @@ void hitmob(u8 index, u8 dmg) {
           u8 tile = tmap[newpos];
           if (IS_WALL_FACE_TILE(tile)) {
             tile = TILE_WALL_FACE_RUBBLE;
-          } else if (IS_UNSPECIAL_WALL_TILE(tile)) {
+          } else if (IS_UNSPECIAL_FLOOR_TILE(tile)) {
             tile = dirt_tiles[xrnd() & 3];
           } else {
             goto noupdate;
