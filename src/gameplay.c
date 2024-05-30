@@ -241,7 +241,7 @@ u8 pass_turn(void) {
 
   switch (turn) {
   case TURN_PLAYER_MOVED:
-    if (noturn) {
+    if (noturn || doloadfloor) {
       turn = TURN_PLAYER;
       noturn = 0;
     } else {
