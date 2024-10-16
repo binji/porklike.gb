@@ -13,6 +13,8 @@
 void inv_init(void);
 void inv_update(void);
 void inv_animate(void);
+void restart_menu_update(void);
+void restart_menu_animate(void);
 
 void inv_display_blind();
 void inv_display_floor();
@@ -22,11 +24,14 @@ void inv_update_keys(void);
 
 void inv_open(void);
 void inv_close(void);
+void restart_menu_open(void);
+void restart_menu_close(void);
 
 u8 inv_acquire_pickup(PickupType ptype);
 void inv_use_pickup(void);
 
 extern u8 inv_anim_up;
 extern u8 inv_anim_timer;
+extern u8 restart_menu_up;
 
 #endif // INVENTORY_H_

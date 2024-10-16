@@ -1,22 +1,25 @@
 import math
 
-speed = 6
-y = 40
-desty = 128
-a = []
+def output(name, a):
+  s = ', '.join(map(str, a[::-1]))
+  print(f"const u8 {name}[] = {{{s}}};")
 
-while desty - y > 1:
-  y += (desty - y) / speed
-  a.append(math.ceil(y))
+def down(speed, y, desty, a=None):
+  if a is None: a = []
+  while desty - y > 1:
+    y += (desty - y) / speed
+    a.append(math.ceil(y))
+  return a
 
-print(f"#{len(a)} {a[::-1]}")
+def up(speed, y, desty, a=None):
+  if a is None: a = []
+  while y - desty > 1:
+    y -= (y - desty) / speed
+    a.append(math.floor(y))
+  return a
 
-y = 128
-desty = 40
-a = []
+output('inventory_up_y', up(6, 128, 40))
+output('inventory_down_y', down(6, 40, 128))
 
-while y - desty > 1:
-  y -= (y - desty) / speed
-  a.append(math.floor(y))
-
-print(f"#{len(a)} {a[::-1]}")
+output('restart_menu_up_y', up(5, 144, 60, down(5, 128, 144)))
+output('restart_menu_down_y', up(5, 144, 128, down(5, 60, 144)))

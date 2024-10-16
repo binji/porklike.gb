@@ -221,6 +221,7 @@ void gameplay_update(void) NONBANKED {
   }
 
   inv_animate();
+  restart_menu_animate();
   animate_end();
   pal_update();
 }
@@ -228,6 +229,8 @@ void gameplay_update(void) NONBANKED {
 void do_turn(void) {
   if (inv_anim_up) {
     inv_update();
+  } else if (restart_menu_up) {
+    restart_menu_update();
   } else if (turn == TURN_PLAYER) {
     move_player();
   }
@@ -387,6 +390,9 @@ void move_player(void) {
       }
     } else if (joy_action & J_A) {
       inv_open();
+      sfx(SFX_OK);
+    } else if (newjoy & J_START) {
+      restart_menu_open();
       sfx(SFX_OK);
     }
     joy_action = 0;

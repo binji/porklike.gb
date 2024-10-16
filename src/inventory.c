@@ -7,6 +7,7 @@
 #include "gameplay.h"
 #include "joy.h"
 #include "mob.h"
+#include "palette.h"
 #include "pickup.h"
 #include "sound.h"
 #include "sprite.h"
@@ -30,6 +31,13 @@
 #define INV_SELECT_X_OFFSET 32
 #define INV_SELECT_Y_OFFSET 40
 
+#define RESTART_MENU_WIDTH 16
+#define RESTART_MENU_HEIGHT 3
+#define RESTART_MENU_Y (32 - RESTART_MENU_HEIGHT - 8)
+#define RESTART_MENU_SELECT_X_OFFSET 32
+#define RESTART_MENU_SELECT_Y_OFFSET 24
+#define RESTART_MENU_ANIM_FRAMES 33
+
 #define INV_FLOOR_OFFSET 23      /* offset into inventory_map */
 #define INV_BLANK_ROW_OFFSET 49  /* offset into inventory_map */
 #define INV_BLIND_LEN 5          /* BLIND */
@@ -40,9 +48,12 @@
 #define TILE_0 0xe5
 
 extern const u8 inventory_map[];
+extern const u8 restart_menu_map[];
 
 extern const u8 inventory_up_y[];
 extern const u8 inventory_down_y[];
+extern const u8 restart_menu_up_y[];
+extern const u8 restart_menu_down_y[];
 
 extern const u8 pick_type_name_tile[];
 extern const u8 pick_type_name_start[];
@@ -63,6 +74,10 @@ PickupType inv_selected_pick;
 
 u8 equip_type[MAX_EQUIPS];
 u8 equip_charge[MAX_EQUIPS];
+
+u8 restart_menu_up;
+u8 restart_menu_anim_timer;
+u8 restart_menu_select;
 
 void inv_init(void) {
   inv_select_timer = INV_SELECT_FRAMES;
@@ -169,6 +184,81 @@ void inv_animate(void) {
   }
 }
 
+void restart_menu_update(void) {
+  if (!restart_menu_anim_timer) {
+    if (joy_action & (J_LEFT | J_RIGHT)) {
+      restart_menu_select ^= 1;
+      sfx(SFX_SELECT);
+    }
+    if (newjoy & J_B) {
+      restart_menu_close();
+      sfx(SFX_BACK);
+    } else if (joy_action & J_A) {
+      if (restart_menu_select) {
+        restart_menu_up = 0;
+        restart_menu_select = 0;
+        // restart game
+        doloadfloor = 1;
+        pal_fadeout();
+        music_main();
+        gameplay_init();
+      } else {
+        restart_menu_close();
+        sfx(SFX_BACK);
+      }
+    }
+    joy_action = 0;
+  }
+}
+
+void restart_menu_animate(void) {
+  if (restart_menu_anim_timer) {
+    --restart_menu_anim_timer;
+    if (restart_menu_up) {
+      WY_REG = restart_menu_up_y[restart_menu_anim_timer];
+      if (restart_menu_anim_timer == 20) {
+        vmemcpy((u8 *)0x9da0, (u8 *)0x9c00, 0x20 * 18);
+        set_win_tiles(0, 0, RESTART_MENU_WIDTH, RESTART_MENU_HEIGHT,
+                      restart_menu_map);
+#ifdef CGB_SUPPORT
+        if (_cpu == CGB_TYPE) {
+          VBK_REG = 1;
+          vmemcpy((u8 *)0x9da0, (u8 *)0x9c00, 0x20 * 18);
+          fill_win_rect(0, 0, RESTART_MENU_WIDTH, RESTART_MENU_HEIGHT, 3);
+          VBK_REG = 0;
+        }
+#endif
+        vmemset((u8 *)0x9c60, 0, 0x20 * 8);
+      }
+    } else {
+      WY_REG = restart_menu_down_y[restart_menu_anim_timer];
+      if (restart_menu_anim_timer == 13) {
+        vmemcpy((u8 *)0x9c00, (u8 *)0x9da0, 0x20 * 18);
+#ifdef CGB_SUPPORT
+        if (_cpu == CGB_TYPE) {
+          VBK_REG = 1;
+          vmemcpy((u8 *)0x9c00, (u8 *)0x9da0, 0x20 * 18);
+          VBK_REG = 0;
+        }
+#endif
+      }
+    }
+  }
+
+  if (restart_menu_anim_timer || restart_menu_up) {
+    if (--inv_select_timer == 0) {
+      inv_select_timer = INV_SELECT_FRAMES;
+      ++inv_select_frame;
+    }
+    *next_sprite++ = WY_REG + RESTART_MENU_SELECT_Y_OFFSET;
+    *next_sprite++ = RESTART_MENU_SELECT_X_OFFSET +
+                     pickbounce[inv_select_frame & 7] +
+                     (restart_menu_select ? 40 : 0);
+    *next_sprite++ = 0;
+    *next_sprite++ = 0;
+  }
+}
+
 void inv_display_blind(void) {
   vram_copy(INV_FLOOR_ADDR, blind_map, INV_BLIND_LEN);
   counter_thirty(&st_recover);
@@ -205,6 +295,16 @@ void inv_open(void) {
 void inv_close(void) {
   inv_anim_timer = INV_ANIM_FRAMES;
   inv_anim_up = 0;
+}
+
+void restart_menu_open(void) {
+  restart_menu_anim_timer = RESTART_MENU_ANIM_FRAMES;
+  restart_menu_up = 1;
+}
+
+void restart_menu_close(void) {
+  restart_menu_anim_timer = RESTART_MENU_ANIM_FRAMES;
+  restart_menu_up = 0;
 }
 
 u8 inv_acquire_pickup(PickupType ptype) {
