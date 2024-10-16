@@ -63,25 +63,25 @@ void animate_end(void) {
     if (fogmap[pos]) {
       tile = 0;
     } else {
+      tile = tmap[pos];
+      if ((tile & TILE_SAW_MASK) == TILE_SAW || tile == TILE_SAW_BROKEN) {
+        *dirty_saw_ptr++ = pos;
+      }
+
       if ((index = mobmap[pos])) {
         --index;
-        tile = mob_tile[index];
         if (!mob_move_timer[index]) {
+          tile = mob_tile[index];
           goto ok;
         }
       }
 
       if ((index = pickmap[pos])) {
         --index;
-        tile = pick_tile[index];
         if (!pick_move_timer[index]) {
+          tile = pick_tile[index];
           goto ok;
         }
-      }
-
-      tile = tmap[pos];
-      if ((tile & TILE_SAW_MASK) == TILE_SAW || tile == TILE_SAW_BROKEN) {
-        *dirty_saw_ptr++ = pos;
       }
     }
 
