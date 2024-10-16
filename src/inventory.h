@@ -8,7 +8,7 @@
 
 // Hide sprites under this y position, so they aren't displayed on top of the
 // inventory
-#define INV_TOP_Y() (WY_REG + 9)
+#define INV_TOP_Y() (WY_REG + 12)
 
 void inv_init(void);
 void inv_update(void);
