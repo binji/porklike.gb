@@ -103,6 +103,11 @@ void inv_update(void) {
         inv_close();
         is_targeting = 1;
         sfx(SFX_OK);
+        // Make sure the target dir is valid.
+        u8 pos = mob_pos[PLAYER_MOB];
+        while (!(validmap[pos] & dirvalid[target_dir])) {
+          target_dir = (target_dir + 1) & 3;
+        }
       }
     } else if (joy == (J_LEFT | J_START)) {
       // Display level seed instead of the floor

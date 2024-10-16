@@ -299,15 +299,15 @@ void move_player(void) {
         dir = DIR_DOWN;
       }
 
+      u8 pos = mob_pos[PLAYER_MOB];
       if (is_targeting) {
-        if (dir != target_dir) {
+        if (dir != target_dir && (validmap[pos] & dirvalid[dir])) {
           target_dir = dir;
           mobdir(PLAYER_MOB, dir);
           mob_anim_timer[PLAYER_MOB] = 1;  // Update the player's direction
           sfx(SFX_SELECT);
         }
       } else {
-        u8 pos = mob_pos[PLAYER_MOB];
         if (validmap[pos] & dirvalid[dir]) {
           u8 newpos = POS_DIR(pos, dir);
           if (IS_MOB(newpos)) {
