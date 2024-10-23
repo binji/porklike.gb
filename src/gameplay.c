@@ -150,6 +150,8 @@ void gameplay_init(void) {
 
   recover = 0;
   floor = 0;
+  steps = 0;
+  num_keys = 0;
   counter_zero(&st_floor);
   counter_zero(&st_steps);
   counter_zero(&st_kills);
