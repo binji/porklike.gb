@@ -617,14 +617,14 @@ name::
 .macro CH1_DUTY name duty
 name::
   ld a, #duty
-  ldh (#11), a
+  ldh (#0x11), a
   ret
 .endm
 
 .macro CH2_DUTY name duty
 name::
   ld a, #duty
-  ldh (#16), a
+  ldh (#0x16), a
   ret
 .endm
 
