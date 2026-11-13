@@ -162,6 +162,10 @@ skip:
   dirty_code[0] = 0xf5; // push af
 }
 
+void animate_clear(void) {
+  dirty_code[0] = 0xc9; // ret
+}
+
 u8 animate(void) {
   u8 animdone = num_sprs == 0;
 

@@ -6,6 +6,7 @@
 void animate_init(void);
 void animate_begin(void);
 void animate_end(void);
+void animate_clear(void);
 u8 animate(void);
 
 extern u8 anim_tiles[];

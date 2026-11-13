@@ -762,6 +762,7 @@ void blind(void) {
 
     // Reset all tile animations (e.g. saws, torches)
     anim_tile_ptr = anim_tiles;
+    animate_clear();
 
     // Use sight() instead of dosight=1, since the tile updates will be removed
     sight();
